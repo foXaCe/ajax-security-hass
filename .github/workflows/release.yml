@@ -1,0 +1,72 @@
+name: Create Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Get version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+      - name: Create release package
+        run: |
+          cd custom_components
+          zip -r ../ajax-${{ steps.version.outputs.VERSION }}.zip ajax/ \
+            -x "ajax/__pycache__/*" \
+            -x "ajax/**/__pycache__/*" \
+            -x "ajax/**/*.pyc"
+
+      - name: Generate release notes
+        id: notes
+        run: |
+          cat > release_notes.md << 'EOF'
+          ## Ajax Security System Integration v${{ steps.version.outputs.VERSION }}
+
+          ### Installation
+
+          1. Téléchargez le fichier `ajax-${{ steps.version.outputs.VERSION }}.zip`
+          2. Extrayez le dossier `ajax` dans votre répertoire `custom_components` de Home Assistant
+          3. Redémarrez Home Assistant
+          4. Ajoutez l'intégration via Configuration > Intégrations > Ajouter une intégration > Ajax Security System
+
+          ### Fonctionnalités
+
+          - ✅ Alarm Control Panel avec streaming temps réel
+          - ✅ Capteurs de batterie et température
+          - ✅ Boutons panic et test siren
+
+          ### Configuration requise
+
+          - Home Assistant 2023.8.0 ou plus récent
+          - Compte Ajax Systems
+
+          ### Notes
+
+          Pour plus d'informations, consultez le [README](https://github.com/foxace66/Ajax/blob/main/README.md).
+          EOF
+          echo "NOTES<<EOF" >> $GITHUB_OUTPUT
+          cat release_notes.md >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: Ajax Integration v${{ steps.version.outputs.VERSION }}
+          body: ${{ steps.notes.outputs.NOTES }}
+          files: ajax-${{ steps.version.outputs.VERSION }}.zip
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

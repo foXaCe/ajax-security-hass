@@ -40,3 +40,50 @@ secrets.yaml
 # Temporary files
 *.tmp
 *.log
+
+# Development and research files
+research/
+captures/
+captures_*/
+ajax_apks/
+proto_files/
+generated/
+generated_test/
+decompiled/
+*.apks
+*.bin
+*.flow
+metadata_*.json
+request_*.bin
+response_*.bin
+
+# Build scripts (development only)
+build_proto.sh
+generate_*.py
+fix_*.py
+analyze_*.py
+bypass_*.js
+bypass_*.md
+capture_*.py
+capture_*.sh
+test_*.py
+install_cert_android.sh
+install_magisk_module.sh
+create_magisk_module.sh
+ssl-unpinning.js
+magisk_module/
+mitmproxy-cert-magisk.zip
+
+# Documentation (markdown files in root - keep README.md)
+/*.md
+!README.md
+
+# Brand assets (handled in separate repo)
+brands_assets/
+add_to_brands_fork.sh
+icon.png
+icon_round.png
+logo.png
+
+# Requirements (development only, manifest.json has official deps)
+requirements.txt

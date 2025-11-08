@@ -180,20 +180,23 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
 
                         if mode_value is not None:
                             # Extract the space_state which contains the actual security mode
-                            # Example: space_state: REGULAR_MODE_SPACE_SECURITY_STATE_NIGHT_MODE
+                            # space_state is an enum with numeric values:
+                            # 1 = ARMED, 2 = DISARMED, 3 = NIGHT_MODE, etc.
                             if hasattr(mode_value, "space_state"):
-                                state_str = str(mode_value.space_state)
-                                _LOGGER.debug("Security space_state: %s", state_str)
+                                state_value = mode_value.space_state
+                                state_int = int(state_value)
+                                _LOGGER.debug("Security space_state: %s (int: %d)", state_value, state_int)
 
-                                # Map security mode to our internal state
-                                if "DISARMED" in state_str or "DISARM" in state_str:
+                                # Map numeric security mode to our internal state
+                                # Based on Ajax API: 1=ARMED, 2=DISARMED, 3=NIGHT_MODE
+                                if state_int == 2:
                                     new_state = SecurityState.DISARMED
-                                elif "NIGHT_MODE" in state_str or "NIGHT" in state_str:
+                                elif state_int == 3:
                                     new_state = SecurityState.NIGHT_MODE
-                                elif "ARMED" in state_str or "ARM" in state_str:
+                                elif state_int == 1:
                                     new_state = SecurityState.ARMED
                                 else:
-                                    _LOGGER.warning("Unknown security state: %s", state_str)
+                                    _LOGGER.warning("Unknown security state value: %d (%s)", state_int, state_value)
                                     new_state = None
 
                                 # Only update if state changed

@@ -6,11 +6,11 @@
   "dependencies": [],
   "documentation": "https://github.com/foXaCe/ajax-hass",
   "integration_type": "hub",
-  "iot_class": "cloud_polling",
+  "iot_class": "cloud_push",
   "issue_tracker": "https://github.com/foXaCe/ajax-hass/issues",
   "requirements": [
     "grpcio>=1.62.0",
     "protobuf>=4.25.0"
   ],
-  "version": "0.1.2"
+  "version": "0.2.0"
 }

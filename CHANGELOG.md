@@ -5,6 +5,27 @@ All notable changes to the Ajax Security System integration will be documented i
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.1] - 2025-11-09
+
+### Added
+- **Binary sensors for device arming settings**:
+  - "Always Active" sensor - shows if device is active even when system is disarmed
+  - "Armed in Night Mode" sensor - shows if device is armed during night mode
+  - These sensors are only created for detectors (motion, door, etc.), not for hubs
+
+### Fixed
+- **Keyboard/keypad device recognition**: All Ajax keyboard variants now properly recognized
+  - Added support for: Keyboard, KeypadPlus, KeypadSPlus, KeypadPlusG3
+  - Added support for: KeypadCombi, KeyboardFibra, KeypadTouchscreen
+  - Added support for: KeypadBeep, KeypadBase, KeypadOutdoor variants
+  - Previously these devices were showing as "unknown" type
+- **Hub binary sensors**: Removed incorrect "Always Active" and "Armed in Night Mode" sensors from hub devices (these settings only apply to detectors)
+
+### Technical
+- Added parsing for `always_active` and `armed_in_night_mode` status fields from Ajax API
+- Enhanced device type mapping with 30+ keyboard/keypad variant names
+- Added debug logging for `spread_properties` and `device_specific_properties`
+
 ## [0.2.0] - 2025-11-09
 
 ### Added

@@ -184,6 +184,9 @@
       "device_marketing_id": {
         "name": "Device marketing ID"
       },
+      "device_state": {
+        "name": "Device state"
+      },
       "gsm_signal_level": {
         "name": "Cellular signal (GSM)"
       },

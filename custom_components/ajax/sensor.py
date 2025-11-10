@@ -260,6 +260,25 @@ DEVICE_METADATA_SENSORS: tuple[AjaxDeviceSensorDescription, ...] = (
         should_create=lambda device: device.device_marketing_id is not None,
         enabled_by_default=False,
     ),
+    AjaxDeviceSensorDescription(
+        key="device_state",
+        translation_key="device_state",
+        icon="mdi:state-machine",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda device: device.states[0] if device.states else "PASSIVE",
+        should_create=lambda device: True,
+        enabled_by_default=False,
+    ),
+    AjaxDeviceSensorDescription(
+        key="malfunctions",
+        translation_key="malfunctions",
+        icon="mdi:alert-circle",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda device: device.malfunctions,
+        should_create=lambda device: True,
+        enabled_by_default=True,
+    ),
 )
 
 

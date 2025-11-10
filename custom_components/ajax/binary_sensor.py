@@ -127,13 +127,13 @@ BINARY_SENSORS: tuple[AjaxBinarySensorDescription, ...] = (
         ),
         enabled_by_default=True,
     ),
-    # Hub-specific binary sensors
+    # Problem detection for all devices
     AjaxBinarySensorDescription(
         key="problem",
         translation_key="problem",
         device_class=BinarySensorDeviceClass.PROBLEM,
         value_fn=lambda device: device.malfunctions > 0,
-        should_create=lambda device: device.type == DeviceType.HUB,
+        should_create=lambda device: True,  # Create for all devices
         enabled_by_default=True,
     ),
 )

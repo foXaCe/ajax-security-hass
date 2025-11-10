@@ -212,10 +212,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         config_path = Path(hass.config.config_dir)
         report_path = config_path / "ajax_device_info.json"
 
-        try:
+        def write_report():
+            """Write the report to file (runs in executor)."""
             with open(report_path, "w", encoding="utf-8") as f:
                 json.dump(report, f, indent=2, ensure_ascii=False)
 
+        try:
+            await hass.async_add_executor_job(write_report)
             _LOGGER.info("Device info report saved to: %s", report_path)
 
             # Send persistent notification to user

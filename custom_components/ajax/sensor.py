@@ -513,6 +513,19 @@ class AjaxDeviceSensor(CoordinatorEntity[AjaxDataCoordinator], SensorEntity):
         if not device:
             return {}
 
+        # For hub devices, use the space identifier to merge with space-level sensors
+        # This prevents duplicate hub devices in Home Assistant
+        if device.type == DeviceType.HUB:
+            return {
+                "identifiers": {(DOMAIN, self._space_id)},
+                "name": f"Ajax Hub - {device.name}",
+                "manufacturer": "Ajax Systems",
+                "model": device.type.value.replace("_", " ").title(),
+                "sw_version": device.firmware_version,
+                "hw_version": device.hardware_version,
+            }
+
+        # For non-hub devices, use device identifier
         return {
             "identifiers": {(DOMAIN, self._device_id)},
             "name": f"Ajax {device.name}",

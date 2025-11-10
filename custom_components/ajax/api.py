@@ -558,7 +558,7 @@ class AjaxApi:
                     "hub_id": common.hub_id,
                     "room_id": profile.room_id if profile.room_id else None,
                     "group_id": profile.group_id if profile.group_id else None,
-                    "malfunctions": len(profile.malfunctions) if profile.malfunctions else 0,
+                    "malfunctions": profile.malfunctions,
                     "bypassed": profile.bypassed,
                     "states": [str(state).split(".")[-1] if "." in str(state) else str(state) for state in profile.states],
                     "online": True,  # TODO: Parse status to determine online state

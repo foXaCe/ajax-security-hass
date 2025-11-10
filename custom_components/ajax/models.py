@@ -119,9 +119,9 @@ class AjaxDevice:
     id: str
     name: str
     type: DeviceType
-    raw_type: str | None = None  # Raw device type before parsing (for debugging unknown devices)
     space_id: str
     hub_id: str
+    raw_type: str | None = None  # Raw device type before parsing (for debugging unknown devices)
     room_id: str | None = None
     group_id: str | None = None
 

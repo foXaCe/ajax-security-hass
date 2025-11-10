@@ -833,9 +833,9 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
                     id=device_id,
                     name=device_data.get("name", "Unknown Device"),
                     type=device_type,
-                    raw_type=raw_device_type,
                     space_id=space_id,
                     hub_id=device_data.get("hub_id", space.hub_id or ""),
+                    raw_type=raw_device_type,
                     room_id=device_data.get("room_id"),
                     group_id=device_data.get("group_id"),
                 )

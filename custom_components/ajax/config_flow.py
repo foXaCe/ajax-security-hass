@@ -1,6 +1,7 @@
 """Config flow for Ajax integration."""
 from __future__ import annotations
 
+import hashlib
 import logging
 from typing import Any
 import uuid
@@ -53,17 +54,20 @@ async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str,
     """Validate the user input allows us to connect.
 
     Data has the keys from STEP_USER_DATA_SCHEMA with values provided by the user.
+    Note: password in data is already hashed by async_step_user.
     """
     # Generate a unique device ID if not provided
     device_id = data.get(CONF_DEVICE_ID)
     if not device_id:
         device_id = f"homeassistant_{uuid.uuid4().hex[:16]}"
 
-    # Create API client
+    # Password is already hashed by async_step_user
+    # Create API client with hashed password
     api = AjaxApi(
         email=data[CONF_EMAIL],
-        password=data[CONF_PASSWORD],
+        password=data[CONF_PASSWORD],  # Already hashed
         device_id=device_id,
+        password_is_hashed=True,
     )
 
     # Try to authenticate
@@ -87,7 +91,7 @@ async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str,
 class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle a config flow for Ajax."""
 
-    VERSION = 1
+    VERSION = 2
 
     def __init__(self) -> None:
         """Initialize the config flow."""
@@ -103,6 +107,11 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         errors: dict[str, str] = {}
 
         if user_input is not None:
+            # Hash password immediately and replace in user_input
+            # This ensures we only store the hash, never the plain password
+            password_hash = hashlib.sha256(user_input[CONF_PASSWORD].encode()).hexdigest()
+            user_input[CONF_PASSWORD] = password_hash
+
             try:
                 info = await validate_input(self.hass, user_input)
             except CannotConnect:
@@ -110,7 +119,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             except InvalidAuth:
                 errors["base"] = "invalid_auth"
             except Ajax2FARequiredError as err:
-                # Store request_id and user input, then go to TOTP step
+                # Store request_id and user input (with hashed password), then go to TOTP step
                 self._totp_request_id = err.request_id
                 self._user_input = user_input
                 return await self.async_step_totp()
@@ -122,14 +131,14 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 await self.async_set_unique_id(info["user_id"])
                 self._abort_if_unique_id_configured()
 
-                # Store user input and info for next step
+                # Store user input (with hashed password) and info for next step
                 self._user_input = user_input
                 self._info = info
 
                 # Get list of spaces for selection
                 try:
                     from .api import AjaxApi
-                    api = AjaxApi(user_input[CONF_EMAIL], user_input[CONF_PASSWORD], info["device_id"])
+                    api = AjaxApi(user_input[CONF_EMAIL], user_input[CONF_PASSWORD], info["device_id"], password_is_hashed=True)
                     await api.async_login()
                     self._spaces = await api.async_get_spaces()
                     await api.close()
@@ -175,6 +184,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     email=self._user_input[CONF_EMAIL],
                     password=self._user_input[CONF_PASSWORD],
                     device_id=device_id,
+                    password_is_hashed=True,
                 )
 
                 try:
@@ -308,7 +318,8 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
             api = AjaxApi(
                 self.config_entry.data[CONF_EMAIL],
                 self.config_entry.data[CONF_PASSWORD],
-                self.config_entry.data[CONF_DEVICE_ID]
+                self.config_entry.data[CONF_DEVICE_ID],
+                password_is_hashed=True,
             )
             await api.async_login()
             self._spaces = await api.async_get_spaces()

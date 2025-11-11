@@ -125,12 +125,22 @@ class AjaxApi:
         password: str,
         device_id: str,
         device_model: str = DEFAULT_DEVICE_MODEL,
+        password_is_hashed: bool = False,
     ) -> None:
-        """Initialize the Ajax API client."""
+        """Initialize the Ajax API client.
+
+        Args:
+            email: User email
+            password: User password (plain text or SHA256 hash if password_is_hashed=True)
+            device_id: Device identifier
+            device_model: Device model name
+            password_is_hashed: If True, password is already SHA256 hashed
+        """
         self.email = email
         self.password = password
         self.device_id = device_id
         self.device_model = device_model
+        self.password_is_hashed = password_is_hashed
 
         self.session_token: bytes | None = None
         self.user_id: str | None = None
@@ -172,7 +182,11 @@ class AjaxApi:
             # Hash password with SHA256 (required by Ajax API protocol)
             # Note: SHA256 is mandated by Ajax Systems API, not our choice
             # The password is transmitted as SHA256 hash over TLS
-            password_hash = hashlib.sha256(self.password.encode()).hexdigest()  # nosec B324
+            # If password is already hashed (from config entry), use it directly
+            if self.password_is_hashed:
+                password_hash = self.password
+            else:
+                password_hash = hashlib.sha256(self.password.encode()).hexdigest()  # nosec B324
 
             # Create login request
             request = login_request_pb2.LoginByPasswordRequest(

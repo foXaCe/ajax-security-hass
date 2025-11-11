@@ -1,6 +1,7 @@
 """The Ajax Security System integration."""
 from __future__ import annotations
 
+import hashlib
 import logging
 from typing import TYPE_CHECKING
 
@@ -35,6 +36,30 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     return True
 
 
+async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    """Migrate config entry to new version."""
+    _LOGGER.info("Migrating Ajax config entry from version %s", entry.version)
+
+    if entry.version == 1:
+        # Version 1 -> 2: Hash the password if it's not already hashed
+        new_data = {**entry.data}
+        password = new_data.get(CONF_PASSWORD, "")
+
+        # Check if password is already a SHA256 hash (64 hex characters)
+        if len(password) != 64 or not all(c in "0123456789abcdef" for c in password.lower()):
+            # Password is plain text, hash it
+            password_hash = hashlib.sha256(password.encode()).hexdigest()
+            new_data[CONF_PASSWORD] = password_hash
+            _LOGGER.info("Migrated password to SHA256 hash for security")
+        else:
+            _LOGGER.info("Password already appears to be hashed, skipping migration")
+
+        hass.config_entries.async_update_entry(entry, data=new_data, version=2)
+        _LOGGER.info("Migration to version 2 successful")
+
+    return True
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Ajax Security System from a config entry."""
     hass.data.setdefault(DOMAIN, {})
@@ -44,7 +69,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     device_id = entry.entry_id  # Use entry ID as unique device ID
 
     # Create API instance
-    api = AjaxApi(email=email, password=password, device_id=device_id)
+    # Password is already hashed (SHA256) in config entry
+    api = AjaxApi(email=email, password=password, device_id=device_id, password_is_hashed=True)
 
     try:
         # Authenticate

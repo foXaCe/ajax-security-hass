@@ -321,6 +321,24 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 If you have Ajax devices that aren't tested yet, your help would be invaluable in improving device support.
 
+### 🤖 Development Process & AI Transparency
+
+This integration is developed through a **collaborative approach** combining:
+
+- **Human expertise** - Core architecture, security decisions, and code review by [@foXaCe](https://github.com/foXaCe)
+- **AI assistance** - Code generation and optimization using Claude (Anthropic) and Cursor AI
+- **Community contributions** - Bug reports, feature requests, and testing from users
+
+**Why AI?** AI tools accelerate development and help implement features faster, but every line of code is:
+- ✅ Reviewed and validated by human developers
+- ✅ Tested with real Ajax hardware
+- ✅ Open source and auditable
+- ✅ Subject to community scrutiny
+
+**Security note**: All security-critical code (authentication, encryption, credential handling) is carefully reviewed and follows Home Assistant best practices. The integration uses only official Ajax APIs and maintains the same security standards as the official Ajax mobile app.
+
+We believe in **full transparency** about our development process. If you have concerns or questions, please open an issue!
+
 ## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
@@ -657,6 +675,24 @@ logger:
 Les contributions sont les bienvenues ! N'hésitez pas à soumettre une Pull Request.
 
 Si vous possédez des appareils Ajax qui n'ont pas encore été testés, votre aide serait inestimable pour améliorer la compatibilité.
+
+### 🤖 Processus de Développement & Transparence IA
+
+Cette intégration est développée par une **approche collaborative** combinant :
+
+- **Expertise humaine** - Architecture principale, décisions de sécurité et revue de code par [@foXaCe](https://github.com/foXaCe)
+- **Assistance IA** - Génération et optimisation de code utilisant Claude (Anthropic) et Cursor AI
+- **Contributions communautaires** - Rapports de bugs, demandes de fonctionnalités et tests par les utilisateurs
+
+**Pourquoi l'IA ?** Les outils IA accélèrent le développement et aident à implémenter les fonctionnalités plus rapidement, mais chaque ligne de code est :
+- ✅ Revue et validée par des développeurs humains
+- ✅ Testée avec du matériel Ajax réel
+- ✅ Open source et auditable
+- ✅ Soumise à l'examen de la communauté
+
+**Note de sécurité** : Tout le code critique pour la sécurité (authentification, chiffrement, gestion des identifiants) est soigneusement revu et suit les meilleures pratiques de Home Assistant. L'intégration utilise uniquement les API officielles Ajax et maintient les mêmes standards de sécurité que l'application mobile Ajax officielle.
+
+Nous croyons en la **transparence totale** concernant notre processus de développement. Si vous avez des préoccupations ou des questions, n'hésitez pas à ouvrir une issue !
 
 ## 📄 Licence
 

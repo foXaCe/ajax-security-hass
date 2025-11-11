@@ -6,6 +6,7 @@
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://github.com/hacs/integration)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![GitHub Sponsors](https://img.shields.io/github/sponsors/foXaCe?style=flat&logo=github&label=Sponsor&color=ea4aaa)](https://github.com/sponsors/foXaCe)
+[![Revolut](https://img.shields.io/badge/Revolut-Donate-0075EB?logo=revolut&logoColor=white)](https://revolut.me/foxace)
 [![Community Forum](https://img.shields.io/badge/Home_Assistant-Community-blue?logo=home-assistant)](https://community.home-assistant.io/t/custom-component-ajax-systems/948939/2)
 
 **Full-featured** Home Assistant integration for Ajax Security Systems via the official Cloud API with **real-time synchronization**.
@@ -326,6 +327,8 @@ The integration accesses your Ajax account using your credentials. Your credenti
 If this integration is useful to you, you can support its development:
 
 💖 **[GitHub Sponsors](https://github.com/sponsors/foXaCe)** - Support via GitHub
+
+💳 **[Revolut](https://revolut.me/foxace)** - Instant payment via Revolut
 
 🪙 **Bitcoin**: `bc1qhe4ge22x0anuyeg0fmts6rdmz3t735dnqwt3p7`
 
@@ -651,6 +654,8 @@ L'intégration accède à votre compte Ajax en utilisant vos identifiants. Vos i
 Si cette intégration vous est utile, vous pouvez soutenir son développement :
 
 💖 **[GitHub Sponsors](https://github.com/sponsors/foXaCe)** - Soutenir via GitHub
+
+💳 **[Revolut](https://revolut.me/foxace)** - Paiement instantané via Revolut
 
 🪙 **Bitcoin** : `bc1qhe4ge22x0anuyeg0fmts6rdmz3t735dnqwt3p7`
 

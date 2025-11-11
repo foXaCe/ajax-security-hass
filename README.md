@@ -5,7 +5,7 @@
 
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://github.com/hacs/integration)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![GitHub Sponsors](https://img.shields.io/github/sponsors/foXaCe?style=flat&logo=github&label=Sponsor&color=ea4aaa)](https://github.com/sponsors/foXaCe)
+[![Sponsor](https://img.shields.io/badge/Sponsor-GitHub-ea4aaa?logo=github)](https://github.com/sponsors/foXaCe)
 [![Revolut](https://img.shields.io/badge/Revolut-Donate-0075EB?logo=revolut&logoColor=white)](https://revolut.me/foxace)
 [![Community Forum](https://img.shields.io/badge/Home_Assistant-Community-blue?logo=home-assistant)](https://community.home-assistant.io/t/custom-component-ajax-systems/948939/2)
 

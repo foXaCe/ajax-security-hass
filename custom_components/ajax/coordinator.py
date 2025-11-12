@@ -66,6 +66,7 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
         self._streaming_tasks: dict[str, asyncio.Task] = {}  # space_id -> space updates streaming task
         self._notification_streaming_tasks: dict[str, asyncio.Task] = {}  # space_id -> notification streaming task
         self._groups_loaded_events: dict[str, asyncio.Event] = {}  # space_id -> event triggered when groups are loaded
+        self._wire_input_polling_tasks: dict[str, asyncio.Task] = {}  # space_id -> wire_input polling task
 
         super().__init__(
             hass,
@@ -164,6 +165,20 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
                 task = asyncio.create_task(self._async_stream_notifications(space_id))
                 self._notification_streaming_tasks[space_id] = task
                 _LOGGER.info("Started notification streaming for space %s", space_id)
+
+            # Check if space has wire_input devices (EOL sensors)
+            space = self.account.spaces.get(space_id)
+            if space:
+                has_wire_inputs = any(
+                    device.type == DeviceType.WIRE_INPUT
+                    for device in space.devices.values()
+                )
+                # Start wire_input polling if space has wire_input devices
+                if has_wire_inputs:
+                    if space_id not in self._wire_input_polling_tasks or self._wire_input_polling_tasks[space_id].done():
+                        task = asyncio.create_task(self._async_poll_wire_inputs(space_id))
+                        self._wire_input_polling_tasks[space_id] = task
+                        _LOGGER.info("Started wire_input polling for space %s (EOL sensors need polling)", space_id)
 
     async def _async_stream_space(self, space_id: str) -> None:
         """Stream updates for a specific space in the background."""
@@ -310,6 +325,77 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
                 else:
                     _LOGGER.error("Max retries reached for notification streaming %s, giving up", space_id)
                     break
+
+    async def _async_poll_wire_inputs(self, space_id: str) -> None:
+        """Poll wire_input devices every 10 seconds to get their states.
+
+        Wire_input (EOL sensors) states are not transmitted via streaming API,
+        so we need to poll them periodically.
+        """
+        poll_interval = 10  # seconds
+        _LOGGER.info("Starting wire_input polling for space %s (interval: %ds)", space_id, poll_interval)
+
+        try:
+            while True:
+                try:
+                    # Get fresh device data from API
+                    devices_data = await self.api.async_get_devices(space_id)
+
+                    if not devices_data:
+                        _LOGGER.debug("No devices returned from polling for space %s", space_id)
+                        await asyncio.sleep(poll_interval)
+                        continue
+
+                    # Update only wire_input devices
+                    space = self.account.spaces.get(space_id)
+                    if space:
+                        updated_count = 0
+                        for device_data in devices_data:
+                            device_id = device_data.get("id")
+                            device_type = device_data.get("type")
+
+                            # Only process wire_input devices
+                            if device_type != "wire_input" or not device_id:
+                                continue
+
+                            # Check if device exists in our data
+                            existing_device = space.devices.get(device_id)
+                            if not existing_device:
+                                continue
+
+                            # Check if door_opened state changed
+                            new_door_opened = device_data.get("attributes", {}).get("door_opened", False)
+                            old_door_opened = existing_device.attributes.get("door_opened", False)
+
+                            if new_door_opened != old_door_opened:
+                                _LOGGER.info(
+                                    "Wire_input '%s' state changed: %s -> %s",
+                                    existing_device.name,
+                                    "open" if old_door_opened else "closed",
+                                    "open" if new_door_opened else "closed"
+                                )
+                                # Update the device attributes
+                                existing_device.attributes["door_opened"] = new_door_opened
+                                updated_count += 1
+
+                        # Notify Home Assistant of changes if any updates occurred
+                        if updated_count > 0:
+                            _LOGGER.debug("Updated %d wire_input device(s), notifying listeners", updated_count)
+                            self.async_update_listeners()
+
+                except asyncio.CancelledError:
+                    _LOGGER.info("Wire_input polling cancelled for space %s", space_id)
+                    raise
+
+                except Exception as err:
+                    _LOGGER.error("Error polling wire_input devices for space %s: %s", space_id, err, exc_info=True)
+
+                # Wait before next poll
+                await asyncio.sleep(poll_interval)
+
+        except asyncio.CancelledError:
+            _LOGGER.info("Wire_input polling stopped for space %s", space_id)
+            raise
 
     async def _async_process_notification_event(self, space_id: str, event) -> None:
         """Process a notification event from the stream."""
@@ -1584,6 +1670,17 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
                     pass
 
         self._notification_streaming_tasks.clear()
+
+        # Stop all wire_input polling tasks
+        for space_id, task in self._wire_input_polling_tasks.items():
+            if not task.done():
+                task.cancel()
+                try:
+                    await task
+                except asyncio.CancelledError:
+                    pass
+
+        self._wire_input_polling_tasks.clear()
 
         # Close API connection
         await self.api.close()

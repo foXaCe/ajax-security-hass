@@ -1019,7 +1019,7 @@ class AjaxApi:
 
                 # Add default value for door_opened if not set
                 # (door_opened status only appears when door is open, absent when closed)
-                if "door" in object_type_str.lower() or "contact" in object_type_str.lower():
+                if "door" in object_type_str.lower() or "contact" in object_type_str.lower() or object_type_str == "wire_input":
                     if "door_opened" not in attributes:
                         attributes["door_opened"] = False
 

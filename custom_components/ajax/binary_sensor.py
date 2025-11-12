@@ -52,7 +52,7 @@ BINARY_SENSORS: tuple[AjaxBinarySensorDescription, ...] = (
         translation_key="door",
         device_class=BinarySensorDeviceClass.DOOR,
         value_fn=lambda device: device.attributes.get("door_opened", False),
-        should_create=lambda device: device.type == DeviceType.DOOR_CONTACT
+        should_create=lambda device: device.type in [DeviceType.DOOR_CONTACT, DeviceType.WIRE_INPUT]
         or "door_opened" in device.attributes,
         enabled_by_default=True,
     ),

@@ -181,13 +181,7 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
                 self._device_streaming_tasks[space_id] = task
                 _LOGGER.info("Started device status streaming for space %s", space_id)
 
-            # Start device-specific stream for door sensor (30DD9A8B)
-            # This stream provides complete device snapshots including door_opened=false
-            door_sensor_id = "30DD9A8B"
-            if door_sensor_id not in self._specific_device_streams or self._specific_device_streams[door_sensor_id].done():
-                task = asyncio.create_task(self._async_stream_specific_device(space_id, door_sensor_id))
-                self._specific_device_streams[door_sensor_id] = task
-                _LOGGER.info("Started device-specific stream for door sensor %s", door_sensor_id)
+            # REMOVED: Device-specific stream for door sensor 30DD9A8B (buggy device, now ignored)
 
     async def _async_stream_space(self, space_id: str) -> None:
         """Stream updates for a specific space in the background."""
@@ -1272,6 +1266,11 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
         for device_data in devices_data:
             device_id = device_data.get("id")
             if not device_id:
+                continue
+
+            # TEMPORARY: Ignore buggy door sensor (device ID: 30DD9A8B)
+            if device_id == "30DD9A8B":
+                _LOGGER.debug("Ignoring buggy device 30DD9A8B (Capteur Porte d'entrée)")
                 continue
 
             # Parse device type

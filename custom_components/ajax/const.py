@@ -35,20 +35,6 @@ DEFAULT_SCAN_INTERVAL = 30  # seconds
 # Update intervals (seconds)
 UPDATE_INTERVAL = 30  # Poll every 30 seconds (real-time updates via SQS)
 
-# Device classes
-DEVICE_CLASS_MOTION = "motion"
-DEVICE_CLASS_DOOR = "door"
-DEVICE_CLASS_WINDOW = "window"
-DEVICE_CLASS_SMOKE = "smoke"
-DEVICE_CLASS_TEMPERATURE = "temperature"
-DEVICE_CLASS_BATTERY = "battery"
-
-# Security states mapping
-SECURITY_STATE_ARMED = "armed"
-SECURITY_STATE_DISARMED = "disarmed"
-SECURITY_STATE_NIGHT_MODE = "night_mode"
-SECURITY_STATE_PARTIALLY_ARMED = "partially_armed"
-
 
 # ==============================================================================
 # Malfunction and Event Message Mappings

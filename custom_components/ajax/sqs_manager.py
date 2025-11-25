@@ -197,19 +197,53 @@ class SQSManager:
         Args:
             event: Parsed arming event
         """
-        from .models import AjaxNotification, NotificationType
+        import time
+        from .models import AjaxNotification, NotificationType, SecurityState
 
         action = event["action"]
         hub_id = event.get("hub_id")
         user_name = event.get("user_name", "") or event.get("source_name", "")
+        event_timestamp = event.get("timestamp", 0)
 
         _LOGGER.info("Hub arming event received: %s (hub: %s, user: %s)", action, hub_id, user_name)
 
-        # NOTE: We don't update security_state here anymore because:
-        # 1. SQS events can arrive out of order or delayed
-        # 2. The REST polling (triggered by async_request_refresh) already updated the correct state
-        # 3. SQS events were overwriting the correct state with stale data
-        # The REST API is the source of truth for security state.
+        # Update security state from SQS event (for immediate response)
+        # Only update if the event is recent (within last 30 seconds) to avoid stale events
+        if hub_id and self.coordinator.account:
+            space = self.coordinator.account.spaces.get(hub_id)
+            if space:
+                current_time = time.time()
+                event_age = current_time - event_timestamp if event_timestamp else 999
+
+                if event_age < 30:  # Only process events less than 30 seconds old
+                    old_state = space.security_state
+
+                    # Map SQS action to SecurityState
+                    action_lower = action.lower()
+                    new_state = None
+                    if "disarm" in action_lower:
+                        new_state = SecurityState.DISARMED
+                    elif "night" in action_lower:
+                        new_state = SecurityState.NIGHT_MODE
+                    elif "arm" in action_lower:
+                        new_state = SecurityState.ARMED
+
+                    if new_state and new_state != old_state:
+                        space.security_state = new_state
+                        _LOGGER.info(
+                            "Updated security state from SQS: %s -> %s (event age: %.1fs)",
+                            old_state,
+                            new_state,
+                            event_age,
+                        )
+                        # Notify Home Assistant of the state change immediately
+                        self.coordinator.async_set_updated_data(self.coordinator.account)
+                else:
+                    _LOGGER.debug(
+                        "Ignoring stale SQS arming event: %s (age: %.1fs)",
+                        action,
+                        event_age,
+                    )
 
         # Create notification for arming event (respects user filter)
         if hub_id:

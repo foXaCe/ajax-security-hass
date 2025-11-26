@@ -25,7 +25,7 @@ jobs:
         run: pip install ruff
 
       - name: Run ruff check
-        run: ruff check .
+        run: ruff check . --config ruff.toml
 
       # Formatting disabled - protobuf files have strict import dependencies
       # - name: Run ruff format check

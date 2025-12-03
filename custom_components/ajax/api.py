@@ -104,10 +104,10 @@ class AjaxRestApi:
         """
         if self.proxy_mode == AUTH_MODE_PROXY_SECURE:
             # Secure mode: ALL requests go through proxy
-            return f"{self.proxy_url}/api" if self.proxy_url else AJAX_REST_API_BASE_URL
+            return self.proxy_url if self.proxy_url else AJAX_REST_API_BASE_URL
         elif self.proxy_mode and self.proxy_url and for_login:
             # Hybrid mode: only login goes through proxy
-            return f"{self.proxy_url}/api"
+            return self.proxy_url
         else:
             # Direct mode or hybrid mode after login
             return AJAX_REST_API_BASE_URL
@@ -178,13 +178,20 @@ class AjaxRestApi:
                 response.raise_for_status()
                 result = await response.json()
 
-                # Extract tokens from response (Swagger format)
+                # Extract tokens from response
+                # Proxy format: {"user_id": "xxx"}
+                # Direct API format: {"sessionToken": "xxx", "userId": "xxx"}
                 self.session_token = result.get("sessionToken")
                 self.refresh_token = result.get("refreshToken")
-                self.user_id = result.get("userId")
+                self.user_id = result.get("userId") or result.get("user_id")
 
                 # For proxy modes, extract additional info
                 if self.proxy_url:
+                    # Proxy returns user_id, we use it as session token for SSE
+                    if not self.session_token and self.user_id:
+                        self.session_token = self.user_id
+                        _LOGGER.debug("Using user_id as session token for proxy mode")
+
                     # API key provided by proxy (for hybrid mode)
                     proxy_api_key = result.get("apiKey")
                     if proxy_api_key:
@@ -194,6 +201,9 @@ class AjaxRestApi:
 
                     # SSE URL for real-time events
                     self.sse_url = result.get("sseUrl")
+                    if not self.sse_url and self.proxy_url and self.user_id:
+                        # Build SSE URL from proxy URL if not provided
+                        self.sse_url = f"{self.proxy_url}/events?userId={self.user_id}"
                     if self.sse_url:
                         _LOGGER.info("SSE endpoint: %s", self.sse_url)
 

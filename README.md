@@ -91,7 +91,7 @@ Issues, pull requests, and feedback are welcome!
 
 ### 🌍 Multi-Hub & Multi-Language
 - Support for multiple Ajax Hubs in one Home Assistant instance
-- Fully localized in **French** and **English**
+- Fully localized in **French**, **English**, and **Spanish**
 - All entities properly translated
 
 ## 📦 Installation
@@ -124,29 +124,29 @@ Issues, pull requests, and feedback are welcome!
 3. Search for **"Ajax Security System"**
 4. Choose your connection mode:
 
-#### Direct Mode (Recommended)
-Direct connection to the Ajax API with optional AWS SQS for real-time events.
-
-- **API Key**: Your API key from Ajax Systems
-- **Email**: Your Ajax account email
-- **Password**: Your Ajax account password
-- **AWS Credentials** (optional): For real-time event notifications
-
-#### Proxy Secure Mode
-All requests go through a proxy server. Real-time events are received via SSE.
+#### Proxy Ajax (Recommended)
+Connect via the Ajax community proxy server. Real-time events via SSE (Server-Sent Events).
 
 - **Proxy URL**: URL of the Ajax proxy server
 - **Email**: Your Ajax account email
 - **Password**: Your Ajax account password
 
-#### Proxy Hybrid Mode
-Login via proxy to obtain API key, then direct API requests. Real-time events via SSE.
+> **Note**: This is the recommended mode for most users. No API key required.
 
-- **Proxy URL**: URL of the Ajax proxy server
+#### Direct Mode (Enterprise API key only)
+Direct connection to the Ajax API. Requires an enterprise API key from Ajax Systems.
+
+- **API Key**: Your enterprise API key from Ajax Systems
 - **Email**: Your Ajax account email
 - **Password**: Your Ajax account password
+- **AWS Credentials** (optional): For real-time event notifications via SQS
+
+> **Note**: Enterprise API keys are only available through Ajax Systems partnership program.
 
 ### Optional: Real-Time Events
+
+#### SSE (Proxy Mode)
+In proxy mode, real-time events are automatically received via Server-Sent Events (SSE). No additional configuration required.
 
 #### AWS SQS (Direct Mode)
 For instant updates (<1 second) in direct mode, configure AWS SQS credentials:
@@ -154,10 +154,7 @@ For instant updates (<1 second) in direct mode, configure AWS SQS credentials:
 - **AWS Secret Access Key**
 - **Queue Name**
 
-These credentials are provided by Ajax Systems when you request API access.
-
-#### SSE (Proxy Modes)
-In proxy modes, real-time events are automatically received via Server-Sent Events (SSE). No additional configuration required.
+These credentials are provided by Ajax Systems with your enterprise API key.
 
 ### Options (after setup)
 

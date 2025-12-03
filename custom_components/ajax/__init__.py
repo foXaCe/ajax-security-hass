@@ -128,9 +128,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     except AjaxRestAuthError as err:
         _LOGGER.error("Authentication failed: %s", err)
+        await api.close()
         return False
     except AjaxRestApiError as err:
         _LOGGER.error("API error during setup: %s", err)
+        await api.close()
         raise ConfigEntryNotReady from err
 
     # Create coordinator

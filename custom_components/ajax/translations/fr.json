@@ -8,7 +8,7 @@
           "auth_mode": "Mode d'authentification"
         },
         "data_description": {
-          "auth_mode": "Direct: connexion directe à l'API Ajax. Proxy: connexion via un serveur proxy."
+          "auth_mode": "Proxy: connexion via le serveur proxy Ajax. Direct: clé API entreprise uniquement."
         }
       },
       "direct": {
@@ -30,10 +30,6 @@
           "aws_secret_access_key": "Clé secrète AWS pour les événements SQS en temps réel",
           "queue_name": "Nom de la file SQS (ex: ajax-events-xxxxx-prod.fifo)"
         }
-      },
-      "proxy_dev": {
-        "title": "Mode en développement",
-        "description": "⚠️ **Ce mode est en cours de développement.**\n\nLe mode Proxy Hybride n'est pas encore disponible. Veuillez utiliser le mode Direct ou Proxy Sécurisé.\n\nCliquez sur Valider pour revenir à la sélection du mode."
       },
       "proxy": {
         "title": "Connexion via proxy",

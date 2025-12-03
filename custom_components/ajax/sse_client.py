@@ -156,7 +156,10 @@ class AjaxSSEClient:
                     event_data.append(line[5:].strip())
                 elif line.startswith(":"):
                     # Comment/keepalive, ignore
-                    pass
+                    _LOGGER.debug("SSE keepalive received")
+                elif line.startswith("{"):
+                    # Raw JSON line (Julien's proxy format)
+                    await self._process_event(None, line)
 
     async def _process_event(self, event_type: str | None, data: str) -> None:
         """Process a received SSE event.

@@ -24,7 +24,6 @@ from .api import (
 )
 from .const import (
     AUTH_MODE_DIRECT,
-    AUTH_MODE_PROXY_HYBRID,
     AUTH_MODE_PROXY_SECURE,
     CONF_API_KEY,
     CONF_AUTH_MODE,
@@ -76,29 +75,25 @@ class AjaxConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
             if self._auth_mode == AUTH_MODE_DIRECT:
                 return await self.async_step_direct()
-            elif self._auth_mode == AUTH_MODE_PROXY_HYBRID:
-                # Hybrid mode is in development
-                return await self.async_step_proxy_dev()
             else:
+                # Proxy mode - the proxy decides between secure/hybrid
                 return await self.async_step_proxy()
 
-        # Show auth mode selection
+        # Show auth mode selection (2 options only, Proxy is default)
         data_schema = vol.Schema(
             {
-                vol.Required(CONF_AUTH_MODE, default=AUTH_MODE_DIRECT): SelectSelector(
+                vol.Required(
+                    CONF_AUTH_MODE, default=AUTH_MODE_PROXY_SECURE
+                ): SelectSelector(
                     SelectSelectorConfig(
                         options=[
                             {
-                                "value": AUTH_MODE_DIRECT,
-                                "label": "Direct (API key + SQS)",
-                            },
-                            {
                                 "value": AUTH_MODE_PROXY_SECURE,
-                                "label": "Proxy Sécurisé (tout via proxy)",
+                                "label": "Proxy Ajax",
                             },
                             {
-                                "value": AUTH_MODE_PROXY_HYBRID,
-                                "label": "Proxy Hybride (API directe + SSE events)",
+                                "value": AUTH_MODE_DIRECT,
+                                "label": "Direct (Clé API entreprise uniquement)",
                             },
                         ],
                         mode=SelectSelectorMode.LIST,
@@ -204,19 +199,6 @@ class AjaxConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             errors=errors,
         )
 
-    async def async_step_proxy_dev(
-        self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
-        """Handle proxy hybrid mode - in development."""
-        if user_input is not None:
-            # Go back to mode selection
-            return await self.async_step_user()
-
-        return self.async_show_form(
-            step_id="proxy_dev",
-            data_schema=vol.Schema({}),
-        )
-
     async def async_step_proxy(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
@@ -244,8 +226,8 @@ class AjaxConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 # Test connection by logging in via proxy
                 await self._api.async_login()
 
-                # Verify access
-                await self._api.async_get_hubs()
+                # Skip hub verification for proxy mode (proxy may not have all endpoints)
+                # await self._api.async_get_hubs()
                 await self._api.close()
 
                 # Hash password for secure storage

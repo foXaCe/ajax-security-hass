@@ -57,7 +57,7 @@ class AjaxConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         config_entry: config_entries.ConfigEntry,
     ) -> config_entries.OptionsFlow:
         """Get the options flow for this handler."""
-        return AjaxOptionsFlow(config_entry)
+        return AjaxOptionsFlow()
 
     def __init__(self):
         """Initialize the config flow."""
@@ -364,10 +364,6 @@ class AjaxConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
 class AjaxOptionsFlow(config_entries.OptionsFlow):
     """Handle Ajax options."""
-
-    def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
-        """Initialize options flow."""
-        self.config_entry = config_entry
 
     def _mask_credential(self, value: str | None) -> str:
         """Mask a credential for display (show first 4 and last 4 chars)."""

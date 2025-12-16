@@ -48,7 +48,7 @@ class SmokeDetectorHandler(AjaxDeviceHandler):
 
         # CO detector (FireProtect Plus, FireProtect 2)
         # CO alarm is separate from smoke - check for CO-specific state
-        if self.device.device_type in ["FireProtect2", "FireProtectPlus"]:
+        if self.device.raw_type in ["FireProtect2", "FireProtectPlus"]:
             sensors.append(
                 {
                     "key": "gas",

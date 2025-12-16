@@ -45,6 +45,7 @@ class DeviceType(Enum):
     REMOTE_CONTROL = "remote_control"
     BUTTON = "button"  # Button / DoubleButton devices
     SIREN = "siren"
+    SPEAKERPHONE = "speakerphone"  # SpeakerPhone Jeweller
     TRANSMITTER = "transmitter"
     REPEATER = "repeater"
     WIRE_INPUT = (

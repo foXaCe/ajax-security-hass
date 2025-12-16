@@ -212,7 +212,7 @@ async def _async_setup_services(
         if coordinator.account:
             for _space_id, space in coordinator.account.spaces.items():
                 for _device_id, device in space.devices.items():
-                    device_type = device.device_type
+                    device_type = device.raw_type
                     if device_type not in device_info["device_types"]:
                         device_info["device_types"][device_type] = {
                             "count": 0,

@@ -1388,6 +1388,8 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
             # Sirens
             "siren": DeviceType.SIREN,
             "alarm": DeviceType.SIREN,
+            # SpeakerPhone
+            "speakerphone": DeviceType.SPEAKERPHONE,
             # Transmitter
             "transmitter": DeviceType.TRANSMITTER,
             "integration": DeviceType.TRANSMITTER,

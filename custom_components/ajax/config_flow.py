@@ -365,6 +365,10 @@ class AjaxConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 class AjaxOptionsFlow(config_entries.OptionsFlow):
     """Handle Ajax options."""
 
+    def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
+        """Initialize options flow."""
+        self.config_entry = config_entry
+
     def _mask_credential(self, value: str | None) -> str:
         """Mask a credential for display (show first 4 and last 4 chars)."""
         if not value or len(value) < 10:

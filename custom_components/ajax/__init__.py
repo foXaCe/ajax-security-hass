@@ -256,8 +256,21 @@ async def _async_setup_services(
 
     async def handle_device_debug(call: ServiceCall) -> None:
         """Handle device debug service call - show all attributes for a device."""
+        from homeassistant.helpers import device_registry as dr
+
+        ha_device_id = call.data.get("device")
         device_id = call.data.get("device_id", "").upper()
         device_name = call.data.get("device_name", "").lower()
+
+        # If HA device selector was used, extract the Ajax device ID from identifiers
+        if ha_device_id:
+            device_registry = dr.async_get(hass)
+            ha_device = device_registry.async_get(ha_device_id)
+            if ha_device:
+                for identifier in ha_device.identifiers:
+                    if identifier[0] == DOMAIN:
+                        device_id = identifier[1].upper()
+                        break
 
         _LOGGER.info("Device debug for id=%s, name=%s", device_id, device_name)
 

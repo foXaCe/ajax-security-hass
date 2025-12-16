@@ -22,9 +22,16 @@ device_debug:
   name: Device Debug
   description: Show all raw attributes for a specific device. Useful for debugging and identifying missing features.
   fields:
+    device:
+      name: Device
+      description: Select an Ajax device to debug
+      required: false
+      selector:
+        device:
+          integration: ajax
     device_id:
-      name: Device ID
-      description: The Ajax device ID (e.g., 00B994ED)
+      name: Device ID (Ajax)
+      description: The Ajax device ID (e.g., 00B994ED) - use this if device selector doesn't work
       required: false
       example: "00B994ED"
       selector:

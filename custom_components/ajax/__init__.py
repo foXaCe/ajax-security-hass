@@ -40,6 +40,7 @@ _LOGGER = logging.getLogger(__name__)
 SERVICE_FORCE_ARM = "force_arm"
 SERVICE_FORCE_ARM_NIGHT = "force_arm_night"
 SERVICE_GENERATE_DEVICE_INFO = "generate_device_info"
+SERVICE_DEVICE_DEBUG = "device_debug"
 
 PLATFORMS: list[Platform] = [
     Platform.ALARM_CONTROL_PANEL,
@@ -253,6 +254,83 @@ async def _async_setup_services(
             notification_id="ajax_device_info",
         )
 
+    async def handle_device_debug(call: ServiceCall) -> None:
+        """Handle device debug service call - show all attributes for a device."""
+        device_id = call.data.get("device_id", "").upper()
+        device_name = call.data.get("device_name", "").lower()
+
+        _LOGGER.info("Device debug for id=%s, name=%s", device_id, device_name)
+
+        found_device = None
+        if coordinator.account:
+            for _space_id, space in coordinator.account.spaces.items():
+                for dev_id, device in space.devices.items():
+                    if device_id and dev_id.upper() == device_id:
+                        found_device = device
+                        break
+                    if device_name and device_name in device.name.lower():
+                        found_device = device
+                        break
+                if found_device:
+                    break
+
+        if not found_device:
+            _LOGGER.warning("Device not found: id=%s, name=%s", device_id, device_name)
+            from homeassistant.components.persistent_notification import async_create
+
+            async_create(
+                hass,
+                f"Device not found: id={device_id}, name={device_name}",
+                title="Ajax Device Debug",
+                notification_id="ajax_device_debug",
+            )
+            return
+
+        # Build debug info
+        debug_info = {
+            "device_id": found_device.id,
+            "device_name": found_device.name,
+            "device_type": found_device.type.value,
+            "raw_type": found_device.raw_type,
+            "online": found_device.online,
+            "bypassed": found_device.bypassed,
+            "malfunctions": found_device.malfunctions,
+            "battery_level": found_device.battery_level,
+            "battery_state": found_device.battery_state,
+            "signal_strength": found_device.signal_strength,
+            "firmware_version": found_device.firmware_version,
+            "states": found_device.states,
+            "raw_attributes": found_device.attributes,
+        }
+
+        # Write to file
+        output_path = Path(hass.config.path("ajax_device_debug.json"))
+        with open(output_path, "w", encoding="utf-8") as f:
+            json.dump(debug_info, f, indent=2, default=str)
+
+        _LOGGER.info("Device debug written to %s", output_path)
+
+        # Create notification with summary
+        from homeassistant.components.persistent_notification import async_create
+
+        attr_list = "\n".join(
+            f"- {k}: {v}" for k, v in sorted(found_device.attributes.items())
+        )
+        message = (
+            f"**Device:** {found_device.name}\n"
+            f"**Type:** {found_device.raw_type} → {found_device.type.value}\n"
+            f"**ID:** {found_device.id}\n\n"
+            f"**Attributes ({len(found_device.attributes)}):**\n{attr_list}\n\n"
+            f"Full details: {output_path}"
+        )
+
+        async_create(
+            hass,
+            message,
+            title=f"Ajax Debug: {found_device.name}",
+            notification_id="ajax_device_debug",
+        )
+
     # Register services if not already registered
     if not hass.services.has_service(DOMAIN, SERVICE_FORCE_ARM):
         hass.services.async_register(
@@ -275,6 +353,19 @@ async def _async_setup_services(
             DOMAIN,
             SERVICE_GENERATE_DEVICE_INFO,
             handle_generate_device_info,
+        )
+
+    if not hass.services.has_service(DOMAIN, SERVICE_DEVICE_DEBUG):
+        hass.services.async_register(
+            DOMAIN,
+            SERVICE_DEVICE_DEBUG,
+            handle_device_debug,
+            schema=vol.Schema(
+                {
+                    vol.Optional("device_id"): cv.string,
+                    vol.Optional("device_name"): cv.string,
+                }
+            ),
         )
 
 

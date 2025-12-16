@@ -17,3 +17,22 @@ force_arm_night:
 generate_device_info:
   name: Generate Device Info
   description: Generate a JSON file with anonymized device information for debugging and support.
+
+device_debug:
+  name: Device Debug
+  description: Show all raw attributes for a specific device. Useful for debugging and identifying missing features.
+  fields:
+    device_id:
+      name: Device ID
+      description: The Ajax device ID (e.g., 00B994ED)
+      required: false
+      example: "00B994ED"
+      selector:
+        text:
+    device_name:
+      name: Device Name
+      description: Part of the device name to search for (case insensitive)
+      required: false
+      example: "parking"
+      selector:
+        text:

@@ -575,13 +575,38 @@ class AjaxRestApi:
         """
         return await self._request("POST", f"devices/{device_id}/control", command)
 
+    async def async_send_device_command(
+        self, hub_id: str, device_id: str, command: str, device_type: str
+    ) -> None:
+        """Send command to device (Socket/Relay/WallSwitch).
+
+        Uses the /command endpoint which is simpler and more reliable than PUT.
+        Supported commands: SWITCH_ON, SWITCH_OFF
+
+        Args:
+            hub_id: Hub ID
+            device_id: Device ID
+            command: Command string (e.g., "SWITCH_ON", "SWITCH_OFF")
+            device_type: Device type string (e.g., "WALL_SWITCH", "SOCKET", "RELAY")
+        """
+        if not self.user_id:
+            raise AjaxRestApiError("No user_id available. Call async_login() first.")
+
+        endpoint = f"user/{self.user_id}/hubs/{hub_id}/devices/{device_id}/command"
+        payload = {"command": command, "deviceType": device_type}
+        _LOGGER.info(
+            "Sending device command: POST %s with %s",
+            endpoint,
+            payload,
+        )
+        await self._request_no_response("POST", endpoint, payload)
+
     async def async_set_switch_state(
         self, hub_id: str, device_id: str, state: bool, device_type: str
     ) -> None:
-        """Set switch/relay/socket state (proxy mode).
+        """Set switch/relay/socket state.
 
-        This sends only the required fields for switch control.
-        Used for Socket/Relay/WallSwitch control via proxy.
+        Uses the /command endpoint for reliable switch control.
 
         Args:
             hub_id: Hub ID
@@ -589,15 +614,8 @@ class AjaxRestApi:
             state: True for on, False for off
             device_type: Device type string (e.g., "WallSwitch", "Socket", "Relay")
         """
-        if not self.user_id:
-            raise AjaxRestApiError("No user_id available. Call async_login() first.")
-
-        switch_state = ["SWITCHED_ON"] if state else ["SWITCHED_OFF"]
-        await self._request_no_response(
-            "PUT",
-            f"user/{self.user_id}/hubs/{hub_id}/devices/{device_id}",
-            {"switchState": switch_state, "deviceType": device_type},
-        )
+        command = "SWITCH_ON" if state else "SWITCH_OFF"
+        await self.async_send_device_command(hub_id, device_id, command, device_type)
 
     # Socket methods
     async def async_get_socket_power(self, device_id: str) -> dict[str, Any]:

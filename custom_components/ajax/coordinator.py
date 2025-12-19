@@ -129,6 +129,11 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
         self._sse_url = sse_url or (api.sse_url if hasattr(api, "sse_url") else None)
         self._sse_initialized = False
 
+        # Device details refresh optimization
+        # Battery/signal don't change often, so refresh every 10 minutes instead of every poll
+        self._last_device_details_refresh: float = 0
+        self._device_details_refresh_interval: int = 600  # 10 minutes in seconds
+
         super().__init__(
             hass,
             _LOGGER,
@@ -234,10 +239,10 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
                     break
 
                 try:
-                    devices_data = await self.api.async_get_devices(space_id)
                     space = self.account.spaces.get(space_id)
                     if not space:
                         break
+                    devices_data = await self.api.async_get_devices(space.hub_id)
 
                     device_found = False
                     for device_data in devices_data:
@@ -593,18 +598,31 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
 
     async def _async_update_devices(self, space_id: str) -> None:
         """Update devices for a specific space."""
-
         space = self.account.spaces.get(space_id)
         if not space:
             return
 
-        devices_data = await self.api.async_get_devices(space_id)
+        # Get device list (basic info: online, deviceType, deviceName, etc.)
+        devices_list = await self.api.async_get_devices(space.hub_id, enrich=False)
+
+        # Check if we need to refresh device details (battery, signal)
+        # This is done every 10 minutes instead of every poll to reduce API calls
+        current_time = time.time()
+        need_details_refresh = (
+            current_time - self._last_device_details_refresh
+            >= self._device_details_refresh_interval
+        )
+        if need_details_refresh:
+            _LOGGER.debug(
+                "Refreshing device details (battery/signal) - 10 min interval"
+            )
+            self._last_device_details_refresh = current_time
 
         new_devices_count = 0
         processed_ids: set[str] = set()  # Track processed IDs to skip duplicates
 
-        for device_data in devices_data:
-            device_id = device_data.get("id")
+        for device_summary in devices_list:
+            device_id = device_summary.get("id")
             if not device_id:
                 continue
 
@@ -614,10 +632,29 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
                 _LOGGER.warning(
                     "Skipping duplicate device ID %s (%s) - already processed",
                     device_id,
-                    device_data.get("deviceName", "unknown"),
+                    device_summary.get("deviceName", "unknown"),
                 )
                 continue
             processed_ids.add(device_id)
+
+            # Get full device details (battery, signal) only every 10 minutes
+            # or for new devices (first time setup)
+            is_new_device = device_id not in space.devices
+            if need_details_refresh or is_new_device:
+                try:
+                    device_data = await self.api.async_get_device(
+                        space.hub_id, device_id
+                    )
+                except Exception as err:
+                    _LOGGER.warning(
+                        "Failed to get device %s details: %s",
+                        device_id,
+                        err,
+                    )
+                    device_data = device_summary  # Fall back to summary
+            else:
+                # Use summary data only (no battery/signal update)
+                device_data = device_summary
 
             # Parse device type - API uses camelCase (deviceType, deviceName)
             raw_device_type = device_data.get(
@@ -675,8 +712,7 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
             device.online = device_data.get("online", True)
             device.bypassed = device_data.get("bypassed", False)
 
-            # With ?enrich=true, device_data contains full device details
-            # No need for individual async_get_device calls (N+1 optimization)
+            # Get full device details from individual API call
             # malfunctions can be a list or an int - normalize to int (count)
             malfunctions_data = device_data.get("malfunctions", 0)
             if isinstance(malfunctions_data, list):
@@ -728,9 +764,13 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
                     "alwaysActive", False
                 )
             if "nightModeArm" in device_data or "armedInNightMode" in device_data:
-                device.attributes["armed_in_night_mode"] = device_data.get(
+                night_mode_value = device_data.get(
                     "nightModeArm",
                     device_data.get("armedInNightMode", False),
+                )
+                device.attributes["armed_in_night_mode"] = night_mode_value
+                device.attributes["night_mode_arm"] = (
+                    night_mode_value  # Alias for handlers
                 )
 
             # DoorProtect Plus specific attributes

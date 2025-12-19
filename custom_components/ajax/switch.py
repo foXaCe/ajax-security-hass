@@ -170,29 +170,45 @@ class AjaxSwitch(CoordinatorEntity[AjaxDataCoordinator], SwitchEntity):
             _LOGGER.error("Space or device not found for switch %s", self._switch_key)
             return
 
-        # Handle Socket/Relay/WallSwitch
+        # Handle Socket/Relay/WallSwitch using /command endpoint
         if device.type in (DeviceType.SOCKET, DeviceType.RELAY, DeviceType.WALLSWITCH):
+            # Optimistic update
+            old_value = device.attributes.get("is_on")
+            device.attributes["is_on"] = value
+            self.async_write_ha_state()
+
             try:
-                switch_state = ["SWITCHED_ON"] if value else ["SWITCHED_OFF"]
-                # Both modes use async_update_device (merges with full device data)
-                # Ajax API requires all mandatory fields in PUT request
-                await self.coordinator.api.async_update_device(
+                # Map device type enum to API deviceType string
+                # Note: API uses UPPER_SNAKE_CASE for deviceType in commands
+                device_type_map = {
+                    DeviceType.SOCKET: "SOCKET",
+                    DeviceType.RELAY: "RELAY",
+                    DeviceType.WALLSWITCH: "WALL_SWITCH",
+                }
+                device_type_str = device_type_map.get(device.type, device.raw_type)
+
+                await self.coordinator.api.async_set_switch_state(
                     space.hub_id,
                     self._device_id,
-                    {"switchState": switch_state},
+                    value,
+                    device_type_str,
                 )
                 _LOGGER.info(
-                    "Set relay/socket state=%s for device %s",
-                    switch_state,
+                    "Set %s state=%s for device %s via /command",
+                    device_type_str,
+                    "ON" if value else "OFF",
                     self._device_id,
                 )
-                await self.coordinator.async_request_refresh()
             except Exception as err:
                 _LOGGER.error(
                     "Failed to set relay/socket state for device %s: %s",
                     self._device_id,
                     err,
                 )
+                # Revert optimistic update on error
+                device.attributes["is_on"] = old_value
+                self.async_write_ha_state()
+                await self.coordinator.async_request_refresh()
             return
 
         api_key = self._switch_desc.get("api_key")
@@ -214,6 +230,26 @@ class AjaxSwitch(CoordinatorEntity[AjaxDataCoordinator], SwitchEntity):
             api_value = self._switch_desc.get("api_value_off", False)
             api_extra = self._switch_desc.get("api_extra_off", {})
 
+        # Optimistic update: update local state immediately
+        # Map API key to attribute key (camelCase -> snake_case)
+        attr_key_map = {
+            "nightModeArm": "night_mode_arm",
+            "alwaysActive": "always_active",
+            "extraContactAware": "extra_contact_aware",
+            "shockSensorAware": "shock_sensor_aware",
+            "accelerometerAware": "accelerometer_aware",
+            "ignoreSimpleImpact": "ignore_simple_impact",
+            "beepOnArming": "beep_on_arming",
+            "beepOnEntryDelay": "beep_on_entry_delay",
+            "blinkWhileArmed": "blink_while_armed",
+            "chimesEnabled": "chimes_enabled",
+            "indicatorLightEnabled": "indicator_light_enabled",
+        }
+        attr_key = attr_key_map.get(api_key, api_key)
+        old_value = device.attributes.get(attr_key)
+        device.attributes[attr_key] = api_value
+        self.async_write_ha_state()
+
         # Build the payload
         payload = {api_key: api_value}
         payload.update(api_extra)
@@ -228,7 +264,6 @@ class AjaxSwitch(CoordinatorEntity[AjaxDataCoordinator], SwitchEntity):
                 api_value,
                 self._device_id,
             )
-            await self.coordinator.async_request_refresh()
         except Exception as err:
             _LOGGER.error(
                 "Failed to set %s for device %s: %s",
@@ -236,6 +271,10 @@ class AjaxSwitch(CoordinatorEntity[AjaxDataCoordinator], SwitchEntity):
                 self._device_id,
                 err,
             )
+            # Revert optimistic update on error
+            device.attributes[attr_key] = old_value
+            self.async_write_ha_state()
+            await self.coordinator.async_request_refresh()
 
     async def _set_trigger_value(
         self, space, device, trigger_key: str, enabled: bool

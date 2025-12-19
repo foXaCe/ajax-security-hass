@@ -178,14 +178,14 @@ class AjaxSwitch(CoordinatorEntity[AjaxDataCoordinator], SwitchEntity):
             self.async_write_ha_state()
 
             try:
-                # Map device type enum to API deviceType string
-                # Note: API uses UPPER_SNAKE_CASE for deviceType in commands
-                device_type_map = {
-                    DeviceType.SOCKET: "SOCKET",
-                    DeviceType.RELAY: "RELAY",
-                    DeviceType.WALLSWITCH: "WALL_SWITCH",
-                }
-                device_type_str = device_type_map.get(device.type, device.raw_type)
+                # Use raw_type from API (exact device type like LIGHT_SWITCH_ONE_GANG)
+                # instead of generic mapping (WALL_SWITCH, SOCKET, RELAY)
+                device_type_str = device.raw_type
+                _LOGGER.debug(
+                    "Using device raw_type for command: %s (device: %s)",
+                    device_type_str,
+                    self._device_id,
+                )
 
                 await self.coordinator.api.async_set_switch_state(
                     space.hub_id,

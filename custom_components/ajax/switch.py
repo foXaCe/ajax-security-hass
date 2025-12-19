@@ -174,16 +174,15 @@ class AjaxSwitch(CoordinatorEntity[AjaxDataCoordinator], SwitchEntity):
         if device.type in (DeviceType.SOCKET, DeviceType.RELAY, DeviceType.WALLSWITCH):
             try:
                 if self.coordinator.api.is_proxy_mode:
-                    # Proxy mode: use device update with switchState
-                    switch_state = ["SWITCHED_ON"] if value else ["SWITCHED_OFF"]
-                    await self.coordinator.api.async_update_device(
+                    # Proxy mode: send ONLY switchState (not full device data)
+                    await self.coordinator.api.async_set_switch_state(
                         space.hub_id,
                         self._device_id,
-                        {"switchState": switch_state},
+                        value,
                     )
                     _LOGGER.info(
-                        "Set relay/socket switchState=%s for device %s (proxy mode)",
-                        switch_state,
+                        "Set relay/socket state=%s for device %s (proxy mode)",
+                        value,
                         self._device_id,
                     )
                 else:

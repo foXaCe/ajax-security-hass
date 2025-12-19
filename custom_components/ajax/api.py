@@ -569,6 +569,29 @@ class AjaxRestApi:
         """
         return await self._request("POST", f"devices/{device_id}/control", command)
 
+    async def async_set_switch_state(
+        self, hub_id: str, device_id: str, state: bool
+    ) -> None:
+        """Set switch/relay/socket state (proxy mode).
+
+        This sends ONLY the switchState field, not the entire device data.
+        Used for Socket/Relay/WallSwitch control via proxy.
+
+        Args:
+            hub_id: Hub ID
+            device_id: Device ID
+            state: True for on, False for off
+        """
+        if not self.user_id:
+            raise AjaxRestApiError("No user_id available. Call async_login() first.")
+
+        switch_state = ["SWITCHED_ON"] if state else ["SWITCHED_OFF"]
+        await self._request_no_response(
+            "PUT",
+            f"user/{self.user_id}/hubs/{hub_id}/devices/{device_id}",
+            {"switchState": switch_state},
+        )
+
     # Socket methods
     async def async_get_socket_power(self, device_id: str) -> dict[str, Any]:
         """Get socket power consumption.

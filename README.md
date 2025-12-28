@@ -18,6 +18,16 @@
 
 ---
 
+> [!WARNING]
+> ## No Public Proxy Available
+> There is currently **no public proxy server available**. The integration requires either:
+> - An **enterprise API key** from Ajax Systems (Direct mode)
+> - A **self-hosted proxy server** (Proxy mode)
+>
+> For discussions and updates, join the community: [HACF Forum](https://forum.hacf.fr/t/alarme-ajax-sur-home-assistant/29511/160)
+
+---
+
 ## ⚠️ Project Status & Community
 
 This integration is **actively developed** but I'm just getting started with Ajax security systems. I currently own and test with:

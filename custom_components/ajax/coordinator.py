@@ -805,6 +805,12 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
                 device.attributes["external_contact_opened"] = not device_data.get(
                     "extraContactClosed", True
                 )
+            # Multitransmitter state (externalContactState -> door_opened)
+            if "externalContactState" in device_data:
+                # externalContactState=!OK means door is opened, so door_opened=True
+                device.attributes["door_opened"] = (
+                    device_data.get("externalContactState") != "OK"
+                )
 
             # Sensitivity (GlassProtect, MotionProtect, etc.)
             if "sensitivity" in device_data:

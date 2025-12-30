@@ -408,6 +408,13 @@
       },
       "hub_wifi": {
         "name": "Hub Wi-Fi",
+        "state": {
+          "strong": "Strong",
+          "good": "Good",
+          "normal": "Normal",
+          "weak": "Weak",
+          "none": "None"
+        },
         "state_attributes": {
           "ssid": {
             "name": "Network"

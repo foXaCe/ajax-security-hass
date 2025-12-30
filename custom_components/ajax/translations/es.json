@@ -472,6 +472,13 @@
       },
       "hub_wifi": {
         "name": "WiFi",
+        "state": {
+          "strong": "Fuerte",
+          "good": "Bueno",
+          "normal": "Normal",
+          "weak": "Débil",
+          "none": "Ninguno"
+        },
         "state_attributes": {
           "ssid": {
             "name": "Red"

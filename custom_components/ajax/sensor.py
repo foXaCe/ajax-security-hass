@@ -440,7 +440,7 @@ SPACE_SENSORS: tuple[AjaxSpaceSensorDescription, ...] = (
         translation_key="hub_limits",
         icon="mdi:counter",
         entity_category=EntityCategory.DIAGNOSTIC,
-        value_fn=lambda space: f"{len(space.devices)}/{space.hub_details.get('limits', {}).get('sensors', 0)} capteurs"
+        value_fn=lambda space: f"{len(space.devices)}/{space.hub_details.get('limits', {}).get('sensors', 0)}"
         if space.hub_details and space.hub_details.get("limits")
         else None,
         should_create=lambda space: space.hub_details

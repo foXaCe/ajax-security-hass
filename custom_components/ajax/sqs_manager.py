@@ -546,7 +546,7 @@ class SQSManager:
         if source:
             parts.append(f"Source: {source}")
         if room:
-            parts.append(f"Pièce: {room}")
+            parts.append(f"Room: {room}")
 
         notification_message = "\n".join(parts)
 

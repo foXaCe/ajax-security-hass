@@ -146,16 +146,17 @@ class SirenHandler(AjaxDeviceHandler):
         return volume.lower() if volume else None
 
     def _format_duration(self, duration: int | str | None) -> str | None:
-        """Format alarm duration to translation key."""
+        """Format alarm duration to translation key or readable format."""
         if duration is None:
             return None
-        # If it's a number (seconds), convert to key format
+        # If it's a number (seconds), format as readable duration
         if isinstance(duration, (int, float)):
-            minutes = int(duration) // 60
-            if minutes == 0:
-                return f"{int(duration)}_seconds"
-            return f"{minutes}_minutes"
-        # Return lowercase key for translation
+            seconds = int(duration)
+            if seconds >= 60:
+                minutes = seconds // 60
+                return f"{minutes} min"
+            return f"{seconds}s"
+        # Return lowercase key for translation (e.g., "continuous")
         return str(duration).lower() if duration else None
 
     def get_switches(self) -> list[dict]:

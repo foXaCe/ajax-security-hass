@@ -228,7 +228,9 @@ class SQSManager:
             if event_tag in EVENT_TAG_TO_STATE:
                 await self._handle_security_event(space, event_tag, source_name)
             elif event_tag in DOOR_EVENTS:
-                await self._handle_door_event(space, event_tag, source_name, source_id)
+                await self._handle_door_event(
+                    space, event_tag, source_name, source_id, transition
+                )
             elif event_tag in MOTION_EVENTS:
                 await self._handle_motion_event(
                     space, event_tag, source_name, source_id
@@ -406,13 +408,23 @@ class SQSManager:
         return True
 
     async def _handle_door_event(
-        self, space, event_tag: str, source_name: str, source_id: str
+        self, space, event_tag: str, source_name: str, source_id: str, transition: str
     ) -> bool:
         """Handle door open/close events."""
         event_data = DOOR_EVENTS.get(event_tag)
         if event_data is None:
             return False
         action, is_open = event_data
+
+        # Use transition to determine actual state (fixes issue #9)
+        # RECOVERED means the alarm condition ended (door closed)
+        # TRIGGERED means the alarm condition started (door opened)
+        if transition == "RECOVERED":
+            is_open = False
+            action = "door_closed"
+        elif transition == "TRIGGERED":
+            is_open = True
+            action = "door_opened"
 
         # Find and update the device
         device = self._find_device(space, source_name, source_id)

@@ -258,6 +258,9 @@
       },
       "recent_events": {
         "name": "Recent events",
+        "state": {
+          "no_event": "No event"
+        },
         "state_attributes": {
           "event_count": {
             "name": "Event count"

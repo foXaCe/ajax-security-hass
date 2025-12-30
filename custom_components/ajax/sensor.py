@@ -134,7 +134,7 @@ def format_event_text(event: dict) -> str:
 def get_last_event_text(space) -> str:
     """Get the last event formatted as text."""
     if not space.recent_events:
-        return "Aucun événement"
+        return "no_event"
     return format_event_text(space.recent_events[0])
 
 

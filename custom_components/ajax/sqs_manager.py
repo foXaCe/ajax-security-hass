@@ -102,6 +102,16 @@ RELAY_EVENTS = {
     "turnedoff": ("light_off", False),
 }
 
+BUTTON_EVENTS = {
+    "buttonpressed": ("single_press", True),
+    "buttonsinglepress": ("single_press", True),
+    "buttondoublepress": ("double_press", True),
+    "buttonlongpress": ("long_press", True),
+    "buttonshortpress": ("single_press", True),
+    "panicbuttonpressed": ("panic", True),
+    "emergencybuttonpressed": ("emergency", True),
+}
+
 # Map event tags to action keys for security events
 SECURITY_EVENT_ACTIONS = {
     "arm": "armed",
@@ -249,6 +259,10 @@ class SQSManager:
                 )
             elif event_tag in RELAY_EVENTS:
                 await self._handle_relay_event(space, event_tag, source_name, source_id)
+            elif event_tag in BUTTON_EVENTS:
+                await self._handle_button_event(
+                    space, event_tag, source_name, source_id
+                )
             elif event_tag in TAMPER_EVENTS or event_tag in DEVICE_STATUS_EVENTS:
                 await self._handle_device_status_event(
                     space, event_tag, source_name, source_id
@@ -499,6 +513,39 @@ class SQSManager:
             return True
 
         _LOGGER.warning("SQS: Relay device %s not found", source_name)
+        return False
+
+    async def _handle_button_event(
+        self, space, event_tag: str, source_name: str, source_id: str
+    ) -> bool:
+        """Handle button press events."""
+        event_data = BUTTON_EVENTS.get(event_tag)
+        if event_data is None:
+            return False
+        action, _ = event_data
+
+        device = self._find_device(space, source_name, source_id)
+        if device:
+            # Store the last action in device attributes
+            device.attributes["last_action"] = action
+            device.last_trigger_time = datetime.now(timezone.utc)
+
+            # Fire a Home Assistant event for automations
+            self.coordinator.hass.bus.async_fire(
+                "ajax_button_pressed",
+                {
+                    "device_id": device.id,
+                    "device_name": device.name,
+                    "action": action,
+                    "space_name": space.name,
+                },
+            )
+
+            message = get_event_message(action, self._language)
+            _LOGGER.info("SQS instant: %s -> %s (button)", source_name, message)
+            return True
+
+        _LOGGER.warning("SQS: Button device %s not found", source_name)
         return False
 
     async def _handle_device_status_event(

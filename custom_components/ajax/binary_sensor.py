@@ -20,11 +20,13 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from .const import DOMAIN
 from .coordinator import AjaxDataCoordinator
 from .devices import (
+    ButtonHandler,
     DoorContactHandler,
     FloodDetectorHandler,
     GlassBreakHandler,
     HubHandler,
     MotionDetectorHandler,
+    RepeaterHandler,
     SirenHandler,
     SmokeDetectorHandler,
     SocketHandler,
@@ -50,6 +52,8 @@ DEVICE_HANDLERS = {
     DeviceType.SPEAKERPHONE: SirenHandler,
     DeviceType.MULTI_TRANSMITTER: SirenHandler,
     DeviceType.KEYPAD: SirenHandler,
+    DeviceType.BUTTON: ButtonHandler,
+    DeviceType.REPEATER: RepeaterHandler,
     DeviceType.HUB: HubHandler,
 }
 

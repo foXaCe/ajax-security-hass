@@ -414,6 +414,27 @@ EVENT_MESSAGES: dict[str, dict[str, str]] = {
         "en": "Valve stuck",
         "es": "Válvula atascada",
     },
+    # Button
+    "single_press": {
+        "fr": "Appui simple",
+        "en": "Single press",
+        "es": "Pulsación simple",
+    },
+    "double_press": {
+        "fr": "Double appui",
+        "en": "Double press",
+        "es": "Doble pulsación",
+    },
+    "long_press": {
+        "fr": "Appui long",
+        "en": "Long press",
+        "es": "Pulsación larga",
+    },
+    "emergency": {
+        "fr": "Bouton d'urgence",
+        "en": "Emergency button",
+        "es": "Botón de emergencia",
+    },
     "siren_activated": {
         "fr": "Sirène activée",
         "en": "Siren activated",

@@ -316,6 +316,16 @@
           "high": "High"
         }
       },
+      "last_action": {
+        "name": "Last action",
+        "state": {
+          "single_press": "Single press",
+          "double_press": "Double press",
+          "long_press": "Long press",
+          "panic": "Panic",
+          "emergency": "Emergency"
+        }
+      },
       "malfunctions": {
         "name": "Malfunctions"
       },

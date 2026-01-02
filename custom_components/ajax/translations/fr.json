@@ -349,6 +349,16 @@
           "high": "Élevé"
         }
       },
+      "last_action": {
+        "name": "Dernière action",
+        "state": {
+          "single_press": "Appui simple",
+          "double_press": "Double appui",
+          "long_press": "Appui long",
+          "panic": "Panique",
+          "emergency": "Urgence"
+        }
+      },
       "color": {
         "name": "Couleur"
       },

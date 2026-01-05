@@ -344,7 +344,22 @@ class WireInputHandler(DoorContactHandler):
     These are wired devices connected to a MultiTransmitter, so they don't have:
     - Battery (powered by wire)
     - Signal strength (wired connection)
+    - Tamper sensor (no physical enclosure)
     """
+
+    def get_binary_sensors(self) -> list[dict]:
+        """Return binary sensor entities for wired inputs (no tamper)."""
+        # Only return door sensor, no tamper for wired devices
+        sensors = [
+            {
+                "key": "door",
+                "translation_key": "door",
+                "device_class": BinarySensorDeviceClass.DOOR,
+                "value_fn": lambda: self.device.attributes.get("door_opened", False),
+                "enabled_by_default": True,
+            }
+        ]
+        return sensors
 
     def get_sensors(self) -> list[dict]:
         """Return sensor entities for wired inputs (no battery/signal)."""

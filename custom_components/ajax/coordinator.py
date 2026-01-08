@@ -287,7 +287,30 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
                                     if reed_closed is not None:
                                         new_door_state = not reed_closed
                                     elif external_state is not None:
+                                        # Default to externalContactState
                                         new_door_state = external_state != "OK"
+                                        # Check wiringSchemeSpecificDetails for more accurate state
+                                        wiring_details = device_data.get(
+                                            "wiringSchemeSpecificDetails", {}
+                                        )
+                                        wiring_type = wiring_details.get(
+                                            "wiringSchemeType"
+                                        )
+                                        if wiring_type == "TWO_EOL":
+                                            contact_two = wiring_details.get(
+                                                "contactTwoDetails", {}
+                                            )
+                                            contact_state = contact_two.get(
+                                                "contactState"
+                                            )
+                                            if contact_state:
+                                                new_door_state = contact_state != "OK"
+                                        elif wiring_type in ("NO_EOL", "ONE_EOL"):
+                                            contact_state = wiring_details.get(
+                                                "contactState"
+                                            )
+                                            if contact_state:
+                                                new_door_state = contact_state != "OK"
                                     else:
                                         # Try attributes as fallback
                                         api_attrs = device_data.get("attributes", {})

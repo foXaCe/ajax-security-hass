@@ -357,6 +357,37 @@ EVENT_MESSAGES: dict[str, dict[str, str]] = {
         "en": "Alarm temporarily muted",
         "es": "Alarma temporalmente silenciada",
     },
+    # WireInput alarm events
+    "intrusion_alarm": {
+        "fr": "Alarme intrusion",
+        "en": "Intrusion alarm",
+        "es": "Alarma de intrusión",
+    },
+    "s1_alarm": {
+        "fr": "Alarme S1",
+        "en": "S1 alarm",
+        "es": "Alarma S1",
+    },
+    "s2_alarm": {
+        "fr": "Alarme S2",
+        "en": "S2 alarm",
+        "es": "Alarma S2",
+    },
+    "s3_alarm": {
+        "fr": "Alarme S3",
+        "en": "S3 alarm",
+        "es": "Alarma S3",
+    },
+    "roller_shutter_alarm": {
+        "fr": "Alarme volet roulant",
+        "en": "Roller shutter alarm",
+        "es": "Alarma de persiana",
+    },
+    "roller_shutter_offline": {
+        "fr": "Volet roulant hors ligne",
+        "en": "Roller shutter offline",
+        "es": "Persiana fuera de línea",
+    },
     "unauthorized_access": {
         "fr": "Tentative d'accès non autorisé",
         "en": "Unauthorized access attempt",

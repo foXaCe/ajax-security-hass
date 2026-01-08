@@ -82,6 +82,17 @@ GLASS_EVENTS = {
     "glassbreakdetected": ("glass_break", True),
 }
 
+# WireInput alarm events (when system is armed)
+# These are sent by MultiTransmitterWireInput and MultiTransmitterWireInputRs devices
+WIRE_INPUT_EVENTS = {
+    "intrusionalarm": ("intrusion_alarm", True),
+    "s1alarm": ("s1_alarm", True),
+    "s2alarm": ("s2_alarm", True),
+    "s3alarm": ("s3_alarm", True),
+    "rollershutteralarm": ("roller_shutter_alarm", True),
+    "rollershutteroffline": ("roller_shutter_offline", True),
+}
+
 TAMPER_EVENTS = {
     "lidopen": ("tamper_open", True),
     "lidclosed": ("tamper_closed", False),
@@ -278,6 +289,10 @@ class SQSManager:
             elif event_tag in SCENARIO_EVENTS:
                 await self._handle_scenario_event(
                     space, event_tag, source_name, additional_data_v2
+                )
+            elif event_tag in WIRE_INPUT_EVENTS:
+                await self._handle_wire_input_event(
+                    space, event_tag, source_name, source_id, transition
                 )
             elif event_tag in TAMPER_EVENTS or event_tag in DEVICE_STATUS_EVENTS:
                 await self._handle_device_status_event(
@@ -536,6 +551,43 @@ class SQSManager:
         _LOGGER.warning("SQS: Relay device %s not found", source_name)
         return False
 
+    async def _handle_wire_input_event(
+        self, space, event_tag: str, source_name: str, source_id: str, transition: str
+    ) -> bool:
+        """Handle WireInput alarm events (intrusion, S1/S2/S3, roller shutter).
+
+        These events are sent when the system is armed and a WireInput device
+        is triggered. We treat them as door open/close events.
+        """
+        event_data = WIRE_INPUT_EVENTS.get(event_tag)
+        if event_data is None:
+            return False
+        action, is_triggered = event_data
+
+        # Use transition to determine actual state
+        if transition == "RECOVERED":
+            is_triggered = False
+        elif transition == "TRIGGERED":
+            is_triggered = True
+
+        # Find the device
+        device = self._find_device(space, source_name, source_id)
+        if device:
+            # Update door_opened state (same as door events)
+            device.attributes["door_opened"] = is_triggered
+            device.last_trigger_time = (
+                datetime.now(timezone.utc) if is_triggered else None
+            )
+
+            message = get_event_message(action, self._language)
+            _LOGGER.info("SQS instant: %s -> %s (wire input)", source_name, message)
+            return True
+
+        _LOGGER.warning(
+            "SQS: WireInput device %s (id=%s) not found", source_name, source_id
+        )
+        return False
+
     async def _handle_button_event(
         self, space, event_tag: str, source_name: str, source_id: str
     ) -> bool:
@@ -642,17 +694,57 @@ class SQSManager:
         return True
 
     def _find_device(self, space, source_name: str, source_id: str):
-        """Find device by name or ID."""
-        # Try by ID first
+        """Find device by name or ID.
+
+        WireInput devices have composite IDs (parent ID + wire input index).
+        SQS events might use the full ID, just the index, or just the parent ID.
+        We try multiple matching strategies to find the device.
+        """
+        # Try by exact ID match first
         if source_id:
             for device in space.devices.values():
                 if device.id == source_id:
                     return device
-        # Fall back to name
+
+            # For WireInput devices: try matching by suffix (wire input index)
+            # Device ID format: 16 chars = 8 char parent ID + 8 char wire input index
+            # SQS might send just the 8-char index
+            if len(source_id) == 8:
+                for device in space.devices.values():
+                    if len(device.id) == 16 and device.id.endswith(source_id):
+                        _LOGGER.debug(
+                            "SQS: Matched device %s by suffix %s",
+                            device.name,
+                            source_id,
+                        )
+                        return device
+
+            # Try matching by prefix (parent ID)
+            if len(source_id) == 8:
+                for device in space.devices.values():
+                    if len(device.id) == 16 and device.id.startswith(source_id):
+                        _LOGGER.debug(
+                            "SQS: Matched device %s by prefix %s",
+                            device.name,
+                            source_id,
+                        )
+                        return device
+
+        # Fall back to name match
         if source_name:
             for device in space.devices.values():
                 if device.name == source_name:
                     return device
+
+        # Log all device IDs for debugging if no match found
+        if source_id or source_name:
+            device_ids = [f"{d.name}:{d.id}" for d in list(space.devices.values())[:10]]
+            _LOGGER.debug(
+                "SQS: No device match for id=%s, name=%s. Devices: %s",
+                source_id,
+                source_name,
+                device_ids,
+            )
         return None
 
     async def _create_alarm_notification(

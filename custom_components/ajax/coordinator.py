@@ -1119,9 +1119,21 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
                 wiring_details = device_data.get("wiringSchemeSpecificDetails", {})
                 wiring_type = wiring_details.get("wiringSchemeType")
 
+                # Store wiring type for handler to know if tamper sensor is available
+                if wiring_type:
+                    device.attributes["wiring_type"] = wiring_type
+
                 if wiring_type == "TWO_EOL":
-                    # TWO_EOL: contactTwoDetails is the door contact (contactOneDetails is tamper)
+                    # TWO_EOL: contactOneDetails is tamper, contactTwoDetails is door
+                    contact_one = wiring_details.get("contactOneDetails", {})
                     contact_two = wiring_details.get("contactTwoDetails", {})
+
+                    # Parse tamper state from contactOneDetails
+                    tamper_state = contact_one.get("contactState")
+                    if tamper_state:
+                        device.attributes["tampered"] = tamper_state != "OK"
+
+                    # Parse door state from contactTwoDetails
                     contact_state = contact_two.get("contactState")
                     if contact_state:
                         door_opened = contact_state != "OK"
@@ -1273,12 +1285,21 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
                 wiring_details = api_attributes.get("wiringSchemeSpecificDetails", {})
                 wiring_type = wiring_details.get("wiringSchemeType")
 
+                # Store wiring type for handler to know if tamper sensor is available
+                if wiring_type:
+                    normalized["wiring_type"] = wiring_type
+
                 if wiring_type == "TWO_EOL":
-                    # TWO_EOL: contactTwoDetails is the door contact
+                    # TWO_EOL: contactTwoDetails is the door contact, contactOneDetails is tamper
+                    contact_one = wiring_details.get("contactOneDetails", {})
                     contact_two = wiring_details.get("contactTwoDetails", {})
                     contact_state = contact_two.get("contactState")
                     if contact_state:
                         door_opened = contact_state != "OK"
+                    # Parse tamper from contactOneDetails
+                    tamper_state = contact_one.get("contactState")
+                    if tamper_state:
+                        normalized["tampered"] = tamper_state != "OK"
                 elif wiring_type in ("NO_EOL", "ONE_EOL"):
                     # NO_EOL/ONE_EOL: contactState is directly in wiringSchemeSpecificDetails
                     contact_state = wiring_details.get("contactState")

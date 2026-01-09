@@ -344,12 +344,15 @@ class WireInputHandler(DoorContactHandler):
     These are wired devices connected to a MultiTransmitter, so they don't have:
     - Battery (powered by wire)
     - Signal strength (wired connection)
-    - Tamper sensor (no physical enclosure)
+
+    TWO_EOL wiring scheme supports tamper detection via contactOneDetails.
     """
 
     def get_binary_sensors(self) -> list[dict]:
-        """Return binary sensor entities for wired inputs (no tamper)."""
-        # Only return door sensor, no tamper for wired devices
+        """Return binary sensor entities for wired inputs.
+
+        TWO_EOL wiring scheme provides tamper detection via contactOneDetails.
+        """
         sensors = [
             {
                 "key": "door",
@@ -359,6 +362,20 @@ class WireInputHandler(DoorContactHandler):
                 "enabled_by_default": True,
             }
         ]
+
+        # TWO_EOL wiring scheme has tamper detection (contactOneDetails)
+        if self.device.attributes.get("wiring_type") == "TWO_EOL":
+            sensors.append(
+                {
+                    "key": "tamper",
+                    "translation_key": "tamper",
+                    "device_class": BinarySensorDeviceClass.TAMPER,
+                    "icon": "mdi:lock-open-alert",
+                    "value_fn": lambda: self.device.attributes.get("tampered", False),
+                    "enabled_by_default": True,
+                }
+            )
+
         return sensors
 
     def get_sensors(self) -> list[dict]:

@@ -12,5 +12,5 @@
     "aiohttp>=3.9.0",
     "aiobotocore>=2.7.0"
   ],
-  "version": "0.7.46"
+  "version": "0.7.47"
 }

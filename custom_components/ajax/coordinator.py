@@ -406,6 +406,9 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
                     if space:
                         self._reset_expired_motion_detections(space)
                         await self._async_update_devices(space_id)
+                        # Refresh video edges to get AI detection states
+                        if space.video_edges:
+                            await self._async_update_video_edges(space_id)
 
             return self.account
 

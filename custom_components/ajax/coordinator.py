@@ -917,15 +917,6 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
             )
             device_type = self._parse_device_type(raw_device_type)
 
-            # Debug logging for specific device types
-            if device_type in (DeviceType.REPEATER, DeviceType.BUTTON):
-                _LOGGER.debug(
-                    "Raw API data for %s (%s): %s",
-                    device_data.get("deviceName", device_id),
-                    raw_device_type,
-                    device_data,
-                )
-
             # Get room_id and room_name
             room_id = device_data.get("roomId", device_data.get("room_id"))
             rooms_map = getattr(space, "_rooms_map", {})

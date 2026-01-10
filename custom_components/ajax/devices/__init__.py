@@ -30,6 +30,7 @@ from .repeater import RepeaterHandler
 from .siren import SirenHandler
 from .smoke_detector import SmokeDetectorHandler
 from .socket import SocketHandler
+from .video_edge import VideoEdgeHandler
 
 __all__ = [
     "AjaxDeviceHandler",
@@ -44,5 +45,6 @@ __all__ = [
     "SirenHandler",
     "SmokeDetectorHandler",
     "SocketHandler",
+    "VideoEdgeHandler",
     "WireInputHandler",
 ]

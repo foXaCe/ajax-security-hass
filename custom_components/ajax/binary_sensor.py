@@ -30,9 +30,10 @@ from .devices import (
     SirenHandler,
     SmokeDetectorHandler,
     SocketHandler,
+    VideoEdgeHandler,
     WireInputHandler,
 )
-from .models import AjaxDevice, DeviceType
+from .models import AjaxDevice, AjaxVideoEdge, DeviceType
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -106,6 +107,33 @@ async def async_setup_entry(
                         device.name,
                         device.type.value,
                     )
+
+        # Create binary sensors for video edges (surveillance cameras)
+        for ve_id, video_edge in space.video_edges.items():
+            handler = VideoEdgeHandler(video_edge)
+            binary_sensors = handler.get_binary_sensors()
+
+            for sensor_desc in binary_sensors:
+                unique_id = f"{ve_id}_{sensor_desc['key']}"
+
+                if unique_id in seen_unique_ids:
+                    continue
+                seen_unique_ids.add(unique_id)
+
+                entities.append(
+                    AjaxVideoEdgeBinarySensor(
+                        coordinator=coordinator,
+                        space_id=space_id,
+                        video_edge_id=ve_id,
+                        sensor_key=sensor_desc["key"],
+                        sensor_desc=sensor_desc,
+                    )
+                )
+                _LOGGER.debug(
+                    "Created video edge binary sensor '%s' for: %s",
+                    sensor_desc["key"],
+                    video_edge.name,
+                )
 
     async_add_entities(entities)
     if entities:
@@ -268,3 +296,105 @@ class AjaxBinarySensor(CoordinatorEntity[AjaxDataCoordinator], BinarySensorEntit
         if not space:
             return None
         return space.devices.get(self._device_id)
+
+
+class AjaxVideoEdgeBinarySensor(
+    CoordinatorEntity[AjaxDataCoordinator], BinarySensorEntity
+):
+    """Representation of an Ajax Video Edge binary sensor."""
+
+    _attr_has_entity_name = True
+
+    def __init__(
+        self,
+        coordinator: AjaxDataCoordinator,
+        space_id: str,
+        video_edge_id: str,
+        sensor_key: str,
+        sensor_desc: dict,
+    ) -> None:
+        """Initialize the Ajax video edge binary sensor."""
+        super().__init__(coordinator)
+        self._space_id = space_id
+        self._video_edge_id = video_edge_id
+        self._sensor_key = sensor_key
+        self._sensor_desc = sensor_desc
+
+        # Set unique ID
+        self._attr_unique_id = f"{video_edge_id}_{sensor_key}"
+
+        # Set translation key
+        self._attr_translation_key = sensor_desc.get("translation_key", sensor_key)
+
+        # Set icon if provided
+        if "icon" in sensor_desc:
+            self._attr_icon = sensor_desc["icon"]
+
+        # Set enabled by default
+        if "enabled_by_default" in sensor_desc:
+            self._attr_entity_registry_enabled_default = sensor_desc[
+                "enabled_by_default"
+            ]
+
+    @property
+    def is_on(self) -> bool | None:
+        """Return true if the binary sensor is on."""
+        video_edge = self._get_video_edge()
+        if not video_edge:
+            return None
+
+        value_fn = self._sensor_desc.get("value_fn")
+        if value_fn:
+            try:
+                return value_fn()
+            except Exception as err:
+                _LOGGER.error(
+                    "Error getting value for video edge sensor %s: %s",
+                    self._sensor_key,
+                    err,
+                )
+                return None
+        return None
+
+    @property
+    def available(self) -> bool:
+        """Return True if entity is available."""
+        video_edge = self._get_video_edge()
+        return video_edge is not None
+
+    @property
+    def device_info(self) -> dict[str, Any]:
+        """Return device information."""
+        video_edge = self._get_video_edge()
+        if not video_edge:
+            return {}
+
+        # Include room name in device name if available
+        device_display_name = (
+            f"{video_edge.room_name} - {video_edge.name}"
+            if video_edge.room_name
+            else video_edge.name
+        )
+
+        model_name = video_edge.video_edge_type.value
+        if video_edge.color:
+            model_name = f"{model_name} ({video_edge.color.title()})"
+
+        info = {
+            "identifiers": {(DOMAIN, self._video_edge_id)},
+            "name": f"Ajax {device_display_name}",
+            "manufacturer": "Ajax Systems",
+            "model": model_name,
+            "via_device": (DOMAIN, self._space_id),
+            "sw_version": video_edge.firmware_version,
+        }
+        if video_edge.room_name:
+            info["suggested_area"] = video_edge.room_name
+        return info
+
+    def _get_video_edge(self) -> AjaxVideoEdge | None:
+        """Get the video edge from coordinator data."""
+        space = self.coordinator.get_space(self._space_id)
+        if not space:
+            return None
+        return space.video_edges.get(self._video_edge_id)

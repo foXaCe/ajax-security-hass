@@ -811,6 +811,62 @@ class AjaxRestApi:
         )
         return data.get("url", "")
 
+    # Video Edge methods (Bullet/Turret/MiniDome cameras)
+    async def async_get_space(self, space_id: str) -> dict[str, Any]:
+        """Get full space details including devices list.
+
+        Args:
+            space_id: Space ID (not hub_id)
+
+        Returns:
+            Space dictionary with devices array
+        """
+        return await self._request("GET", f"user/{self.user_id}/spaces/{space_id}")
+
+    async def async_get_video_edges(self, space_id: str) -> list[dict[str, Any]]:
+        """Get all video edge devices for a space.
+
+        Args:
+            space_id: Space ID
+
+        Returns:
+            List of video edge dictionaries
+        """
+        # First get the space to find VIDEO_EDGE devices
+        space_data = await self.async_get_space(space_id)
+        video_edges = []
+        for device in space_data.get("devices", []):
+            if device.get("type") == "VIDEO_EDGE":
+                video_edge_id = device.get("id")
+                if video_edge_id:
+                    try:
+                        video_edge = await self.async_get_video_edge(
+                            space_id, video_edge_id
+                        )
+                        video_edges.append(video_edge)
+                    except Exception as err:
+                        _LOGGER.warning(
+                            "Failed to get video edge %s: %s", video_edge_id, err
+                        )
+        return video_edges
+
+    async def async_get_video_edge(
+        self, space_id: str, video_edge_id: str
+    ) -> dict[str, Any]:
+        """Get video edge device details.
+
+        Args:
+            space_id: Space ID
+            video_edge_id: Video edge device ID
+
+        Returns:
+            Video edge details dictionary
+        """
+        return await self._request(
+            "GET",
+            f"user/{self.user_id}/spaces/{space_id}/devices/video-edges/{video_edge_id}",
+        )
+
     # Light/Button methods
     async def async_set_light_state(
         self,

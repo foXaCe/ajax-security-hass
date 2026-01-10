@@ -190,6 +190,18 @@
       },
       "wings_radio": {
         "name": "Wings radio"
+      },
+      "video_motion": {
+        "name": "Motion detected"
+      },
+      "video_human": {
+        "name": "Human detected"
+      },
+      "video_vehicle": {
+        "name": "Vehicle detected"
+      },
+      "video_pet": {
+        "name": "Pet detected"
       }
     },
     "sensor": {
@@ -271,6 +283,9 @@
       },
       "firmware_version": {
         "name": "Firmware version"
+      },
+      "ip_address": {
+        "name": "IP address"
       },
       "hardware_version": {
         "name": "Hardware version"

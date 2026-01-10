@@ -43,10 +43,12 @@ from .models import (
     AjaxGroup,
     AjaxRoom,
     AjaxSpace,
+    AjaxVideoEdge,
     DeviceType,
     GroupState,
     NotificationType,
     SecurityState,
+    VideoEdgeType,
 )
 
 # Optional SQS support
@@ -364,10 +366,11 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
                 # Update spaces - use hubs endpoint directly to get hubId
                 await self._async_update_spaces_from_hubs()
 
-                # Load devices and notifications in parallel for all spaces
+                # Load devices, video edges, and notifications in parallel for all spaces
                 tasks = []
                 for space_id in self.account.spaces:
                     tasks.append(self._async_update_devices(space_id))
+                    tasks.append(self._async_update_video_edges(space_id))
                     tasks.append(self._async_update_notifications(space_id, limit=20))
 
                 # Execute all API calls in parallel for faster startup
@@ -657,18 +660,22 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
                 hub_details = await self.api.async_get_hub(hub_id)
 
                 # Get space details to get the actual space name (e.g., "Maison")
+                # and the real space_id (different from hub_id, needed for video edges)
                 space_name = None
+                real_space_id = None
                 try:
                     space_binding = await self.api.async_get_space_by_hub(hub_id)
                     if space_binding:
                         space_name = space_binding.get("name")
+                        real_space_id = space_binding.get("id")
                         _LOGGER.debug(
-                            "Found space name '%s' for hub %s", space_name, hub_id
+                            "Found space '%s' (id: %s) for hub %s",
+                            space_name,
+                            real_space_id,
+                            hub_id,
                         )
                 except Exception as space_err:
-                    _LOGGER.debug(
-                        "Could not get space name for %s: %s", hub_id, space_err
-                    )
+                    _LOGGER.debug("Could not get space for %s: %s", hub_id, space_err)
 
                 # Get rooms for this hub
                 rooms_data: list[dict] = []
@@ -739,6 +746,7 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
                     id=space_id,
                     name=hub_name,
                     hub_id=hub_id,
+                    real_space_id=real_space_id,  # Actual space ID for video edges
                     security_state=security_state,  # Use API state at creation
                     hub_details=hub_details,  # Store all hub information
                 )
@@ -757,6 +765,7 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
                 space = self.account.spaces[space_id]
                 space.name = hub_name
                 space.hub_id = hub_id
+                space.real_space_id = real_space_id  # Update real space ID
                 space.hub_details = hub_details  # Update hub information
 
             # Store rooms mapping in space for device room name lookup
@@ -1474,6 +1483,111 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
         except Exception as err:
             _LOGGER.error(
                 "Error updating notifications for space %s: %s", space_id, err
+            )
+
+    async def _async_update_video_edges(self, space_id: str) -> None:
+        """Update video edge devices (surveillance cameras) for a specific space."""
+        space = self.account.spaces.get(space_id)
+        if not space:
+            return
+
+        # Need real_space_id to fetch video edges
+        if not space.real_space_id:
+            _LOGGER.debug(
+                "No real_space_id for space %s, skipping video edges", space_id
+            )
+            return
+
+        try:
+            video_edges_data = await self.api.async_get_video_edges(space.real_space_id)
+            _LOGGER.debug(
+                "Found %d video edge(s) for space %s",
+                len(video_edges_data),
+                space_id,
+            )
+
+            for ve_data in video_edges_data:
+                ve_id = ve_data.get("id")
+                if not ve_id:
+                    continue
+
+                # Parse video edge type
+                ve_type_str = ve_data.get("type", "UNKNOWN")
+                try:
+                    ve_type = VideoEdgeType(ve_type_str)
+                except ValueError:
+                    ve_type = VideoEdgeType.UNKNOWN
+
+                # Get network info
+                network = ve_data.get("network", {})
+                ethernet = network.get("ethernet", {})
+                wifi = network.get("wifi", {})
+
+                # Get IP address from ethernet or wifi
+                ip_address = None
+                if ethernet.get("configuration", {}).get("ipv4", {}).get("ip"):
+                    ip_address = ethernet["configuration"]["ipv4"]["ip"]
+                elif wifi.get("configuration", {}).get("ipv4", {}).get("ip"):
+                    ip_address = wifi["configuration"]["ipv4"]["ip"]
+
+                # Get MAC address
+                mac_address = ethernet.get("mac") or wifi.get("mac")
+
+                # Get firmware version
+                firmware = ve_data.get("firmware", {})
+                firmware_version = firmware.get("current")
+
+                # Get room info
+                room_id = None
+                room_name = None
+                # Video edges might have channels with room assignments
+                channels = ve_data.get("channels", [])
+                if channels:
+                    first_channel = channels[0]
+                    space_settings = first_channel.get("spaceSettings", {})
+                    room_id = space_settings.get("roomId")
+                    if room_id and room_id in space.rooms:
+                        room_name = space.rooms[room_id].name
+
+                # Create or update video edge
+                if ve_id not in space.video_edges:
+                    video_edge = AjaxVideoEdge(
+                        id=ve_id,
+                        name=ve_data.get("name", f"Camera {ve_id[:6]}"),
+                        space_id=space_id,
+                        video_edge_type=ve_type,
+                        color=ve_data.get("color"),
+                        ip_address=ip_address,
+                        mac_address=mac_address,
+                        firmware_version=firmware_version,
+                        channels=channels,
+                        room_id=room_id,
+                        room_name=room_name,
+                        raw_data=ve_data,
+                    )
+                    space.video_edges[ve_id] = video_edge
+                    _LOGGER.info(
+                        "Added video edge: %s (%s)",
+                        video_edge.name,
+                        video_edge.video_edge_type.value,
+                    )
+                else:
+                    # Update existing video edge
+                    video_edge = space.video_edges[ve_id]
+                    video_edge.name = ve_data.get("name", video_edge.name)
+                    video_edge.video_edge_type = ve_type
+                    video_edge.color = ve_data.get("color")
+                    video_edge.ip_address = ip_address
+                    video_edge.mac_address = mac_address
+                    video_edge.firmware_version = firmware_version
+                    video_edge.channels = channels
+                    video_edge.room_id = room_id
+                    video_edge.room_name = room_name
+                    video_edge.raw_data = ve_data
+
+        except Exception as err:
+            _LOGGER.warning(
+                "Error updating video edges for space %s: %s", space_id, err
             )
 
     def _parse_notification_type(self, event_type: str | None) -> NotificationType:

@@ -65,6 +65,7 @@ class DeviceType(Enum):
 
     # Cameras
     CAMERA = "camera"
+    VIDEO_EDGE = "video_edge"  # Surveillance cameras (Bullet, Turret, MiniDome)
 
     # Hub
     HUB = "hub"
@@ -231,6 +232,47 @@ class AjaxDevice:
         )
 
 
+class VideoEdgeType(Enum):
+    """Video edge camera types."""
+
+    NVR = "NVR"
+    TURRET = "TURRET"
+    BULLET = "BULLET"
+    MINIDOME = "MINIDOME"
+    UNKNOWN = "UNKNOWN"
+
+
+@dataclass
+class AjaxVideoEdge:
+    """Represents a video edge device (surveillance camera)."""
+
+    id: str
+    name: str
+    space_id: str
+    video_edge_type: VideoEdgeType = VideoEdgeType.UNKNOWN
+    color: str | None = None
+
+    # Network info
+    ip_address: str | None = None
+    mac_address: str | None = None
+
+    # Firmware
+    firmware_version: str | None = None
+
+    # Channels (for NVR or multi-channel cameras)
+    channels: list[dict[str, Any]] = field(default_factory=list)
+
+    # Room assignment
+    room_id: str | None = None
+    room_name: str | None = None
+
+    # Raw data from API
+    raw_data: dict[str, Any] = field(default_factory=dict)
+
+    def __str__(self) -> str:
+        return f"VideoEdge({self.name}, type={self.video_edge_type.value})"
+
+
 @dataclass
 class AjaxNotification:
     """Represents a notification from Ajax."""
@@ -265,6 +307,7 @@ class AjaxSpace:
     id: str
     name: str
     hub_id: str | None = None
+    real_space_id: str | None = None  # Actual space ID from API (different from hub_id)
 
     # Security
     security_state: SecurityState = SecurityState.NONE
@@ -282,6 +325,7 @@ class AjaxSpace:
     rooms: dict[str, AjaxRoom] = field(default_factory=dict)
     groups: dict[str, AjaxGroup] = field(default_factory=dict)
     devices: dict[str, AjaxDevice] = field(default_factory=dict)
+    video_edges: dict[str, AjaxVideoEdge] = field(default_factory=dict)
     notifications: list[AjaxNotification] = field(default_factory=list)
 
     # Metadata

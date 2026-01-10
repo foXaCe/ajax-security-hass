@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.7.46] - 2025-01-10
+
+### Added
+- Video Edge camera support (Bullet, Turret, MiniDome) (#25)
+- AI detection sensors: motion, human, vehicle, pet
+- Camera diagnostic sensors: IP address, firmware version
+
 ## [0.7.45] - 2025-01-10
 
 ### Fixed

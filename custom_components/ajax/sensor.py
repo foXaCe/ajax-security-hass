@@ -39,9 +39,10 @@ from .devices import (
     SirenHandler,
     SmokeDetectorHandler,
     SocketHandler,
+    VideoEdgeHandler,
     WireInputHandler,
 )
-from .models import AjaxDevice, AjaxSpace, DeviceType
+from .models import AjaxDevice, AjaxSpace, AjaxVideoEdge, DeviceType
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -546,6 +547,33 @@ async def async_setup_entry(
                         device.type.value,
                     )
 
+        # Create sensors for video edges (surveillance cameras)
+        for ve_id, video_edge in space.video_edges.items():
+            handler = VideoEdgeHandler(video_edge)
+            sensors = handler.get_sensors()
+
+            for sensor_desc in sensors:
+                unique_id = f"{ve_id}_{sensor_desc['key']}"
+
+                if unique_id in seen_unique_ids:
+                    continue
+                seen_unique_ids.add(unique_id)
+
+                entities.append(
+                    AjaxVideoEdgeSensor(
+                        coordinator=coordinator,
+                        space_id=space_id,
+                        video_edge_id=ve_id,
+                        sensor_key=sensor_desc["key"],
+                        sensor_desc=sensor_desc,
+                    )
+                )
+                _LOGGER.debug(
+                    "Created video edge sensor '%s' for: %s",
+                    sensor_desc["key"],
+                    video_edge.name,
+                )
+
     if entities:
         async_add_entities(entities)
         _LOGGER.info("Added %d Ajax sensor(s)", len(entities))
@@ -744,6 +772,123 @@ class AjaxDeviceSensor(CoordinatorEntity[AjaxDataCoordinator], SensorEntity):
         if not space:
             return None
         return space.devices.get(self._device_id)
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        """Handle updated data from the coordinator."""
+        self.async_write_ha_state()
+
+
+# ==============================================================================
+# Video Edge Sensors
+# ==============================================================================
+
+
+class AjaxVideoEdgeSensor(CoordinatorEntity[AjaxDataCoordinator], SensorEntity):
+    """Representation of an Ajax Video Edge sensor."""
+
+    _attr_has_entity_name = True
+
+    def __init__(
+        self,
+        coordinator: AjaxDataCoordinator,
+        space_id: str,
+        video_edge_id: str,
+        sensor_key: str,
+        sensor_desc: dict,
+    ) -> None:
+        """Initialize the Ajax video edge sensor."""
+        super().__init__(coordinator)
+        self._space_id = space_id
+        self._video_edge_id = video_edge_id
+        self._sensor_key = sensor_key
+        self._sensor_desc = sensor_desc
+
+        # Set unique ID
+        self._attr_unique_id = f"{video_edge_id}_{sensor_key}"
+
+        # Set translation key
+        self._attr_translation_key = sensor_desc.get("translation_key", sensor_key)
+
+        # Set icon if provided
+        if "icon" in sensor_desc:
+            self._attr_icon = sensor_desc["icon"]
+
+        # Set entity category if provided (diagnostic, config, etc.)
+        if "entity_category" in sensor_desc:
+            cat = sensor_desc["entity_category"]
+            if cat == "diagnostic":
+                self._attr_entity_category = EntityCategory.DIAGNOSTIC
+            elif cat == "config":
+                self._attr_entity_category = EntityCategory.CONFIG
+
+        # Set enabled by default
+        if "enabled_by_default" in sensor_desc:
+            self._attr_entity_registry_enabled_default = sensor_desc[
+                "enabled_by_default"
+            ]
+
+    @property
+    def native_value(self) -> Any:
+        """Return the state of the sensor."""
+        video_edge = self._get_video_edge()
+        if not video_edge:
+            return None
+
+        value_fn = self._sensor_desc.get("value_fn")
+        if value_fn:
+            try:
+                return value_fn()
+            except Exception as err:
+                _LOGGER.error(
+                    "Error getting value for video edge sensor %s: %s",
+                    self._sensor_key,
+                    err,
+                )
+                return None
+        return None
+
+    @property
+    def available(self) -> bool:
+        """Return True if entity is available."""
+        video_edge = self._get_video_edge()
+        return video_edge is not None
+
+    @property
+    def device_info(self) -> dict[str, Any]:
+        """Return device information."""
+        video_edge = self._get_video_edge()
+        if not video_edge:
+            return {}
+
+        device_display_name = (
+            f"{video_edge.room_name} - {video_edge.name}"
+            if video_edge.room_name
+            else video_edge.name
+        )
+
+        model_name = video_edge.video_edge_type.value
+        if video_edge.color:
+            model_name = f"{model_name} ({video_edge.color.title()})"
+
+        info = {
+            "identifiers": {(DOMAIN, self._video_edge_id)},
+            "name": f"Ajax {device_display_name}",
+            "manufacturer": "Ajax Systems",
+            "model": model_name,
+            "via_device": (DOMAIN, self._space_id),
+            "sw_version": video_edge.firmware_version,
+        }
+        if video_edge.room_name:
+            info["suggested_area"] = video_edge.room_name
+        return info
+
+    def _get_video_edge(self) -> AjaxVideoEdge | None:
+        """Get the video edge from coordinator data."""
+        space = self.coordinator.get_space(self._space_id)
+        if not space:
+            return None
+        return space.video_edges.get(self._video_edge_id)
 
     @callback
     def _handle_coordinator_update(self) -> None:

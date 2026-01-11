@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.7.50] - 2026-01-11
+
+### Fixed
+- Include video_edges data in `ajax.get_raw_devices` service output (#33)
+
 ## [0.7.49] - 2026-01-11
 
 ### Fixed

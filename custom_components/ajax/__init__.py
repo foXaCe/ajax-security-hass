@@ -268,10 +268,11 @@ async def _async_setup_services(
 
     async def handle_get_raw_devices(call: ServiceCall) -> None:
         """Handle get raw devices service call - get full raw API data for all devices."""
-        _LOGGER.info("Getting full raw data for all devices and cameras")
+        _LOGGER.info("Getting full raw data for all devices, cameras, and video edges")
 
         all_devices = []
         all_cameras = []
+        all_video_edges = []
         hub_count = 0
 
         if coordinator.account:
@@ -333,11 +334,28 @@ async def _async_setup_services(
                             "Failed to get cameras for hub %s: %s", hub_id, err
                         )
 
-        # Write to file (include both devices and cameras)
+            # Fetch video edges for each space (requires real_space_id)
+            for _space_id, space in coordinator.account.spaces.items():
+                real_space_id = space.real_space_id
+                if real_space_id:
+                    try:
+                        video_edges_list = await coordinator.api.async_get_video_edges(
+                            real_space_id
+                        )
+                        all_video_edges.extend(video_edges_list)
+                    except Exception as err:
+                        _LOGGER.warning(
+                            "Failed to get video edges for space %s: %s",
+                            real_space_id,
+                            err,
+                        )
+
+        # Write to file (include devices, cameras, and video edges)
         output_path = Path(hass.config.path("ajax_raw_devices.json"))
         output_data = {
             "devices": all_devices,
             "cameras": all_cameras,
+            "video_edges": all_video_edges,
         }
 
         def write_json():
@@ -347,10 +365,11 @@ async def _async_setup_services(
         await hass.async_add_executor_job(write_json)
 
         _LOGGER.info(
-            "Raw data written to %s (%d devices, %d cameras)",
+            "Raw data written to %s (%d devices, %d cameras, %d video edges)",
             output_path,
             len(all_devices),
             len(all_cameras),
+            len(all_video_edges),
         )
 
         # Create notification with summary
@@ -367,7 +386,8 @@ async def _async_setup_services(
         message = (
             f"**Hubs:** {hub_count}\n"
             f"**Devices:** {len(all_devices)}\n"
-            f"**Cameras:** {len(all_cameras)}\n\n"
+            f"**Cameras:** {len(all_cameras)}\n"
+            f"**Video Edges:** {len(all_video_edges)}\n\n"
             f"**Device types:**\n{type_list}\n\n"
             f"Saved to: {output_path}"
         )

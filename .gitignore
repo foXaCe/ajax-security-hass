@@ -15,6 +15,9 @@ swagger.yaml
 
 # Local development
 Julien AJax/
+docker-compose.yml
+.claude/
+.ruff_cache/
 
 # Python
 __pycache__/

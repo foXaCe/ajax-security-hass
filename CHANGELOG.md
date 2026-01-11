@@ -2,7 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.7.48] - 2025-01-11
+## [0.7.48] - 2026-01-11
+
+### Fixed
+- Shock sensitivity mapping values (0=low, 4=normal, 7=high) (#30)
+- Video Edge AI detection sensors showing unknown state (#33)
+- Polling option changes now apply immediately without reboot
+
+### Added
+- Handle `grouparm` and `groupdisarm` events for zone-based arming (#32)
+- Debug logging for multi-gang channel switch commands (#26)
+- Polling settings in integration options (Options → Polling Settings)
+- `ajax.refresh_metadata` service for manual metadata refresh
+- Option to enable/disable door sensor fast polling (5s interval)
 
 ### Changed
 - **API optimization**: Reduced polling from ~7 calls/hub to 2 calls/hub per cycle
@@ -10,11 +22,6 @@ All notable changes to this project will be documented in this file.
 - Full metadata refresh (rooms, users, groups): Hourly instead of every poll
 - Polling interval: 30s when disarmed, 60s when armed (SSE/SQS handles real-time)
 - Door sensor fast polling disabled by default (can be enabled in options)
-
-### Added
-- Polling settings in integration options (Options → Polling Settings)
-- `ajax.refresh_metadata` service for manual metadata refresh
-- Option to enable/disable door sensor fast polling (5s interval)
 
 ## [0.7.47] - 2025-01-10
 

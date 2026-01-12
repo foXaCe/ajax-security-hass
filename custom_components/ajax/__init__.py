@@ -8,11 +8,17 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import voluptuous as vol
+from homeassistant.components.persistent_notification import async_create
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant, ServiceCall
-from homeassistant.exceptions import ConfigEntryNotReady
-from homeassistant.helpers import config_validation as cv
+from homeassistant.exceptions import ConfigEntryNotReady, ServiceValidationError
+from homeassistant.helpers import (
+    area_registry as ar,
+    config_validation as cv,
+    device_registry as dr,
+)
+from homeassistant.helpers.service import async_extract_config_entry_ids
 
 from .api import AjaxRestApi, AjaxRestApiError, AjaxRestAuthError
 from .const import (
@@ -56,9 +62,14 @@ PLATFORMS: list[Platform] = [
     Platform.SWITCH,
 ]
 
+CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
+
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     """Set up the Ajax Security System component."""
+    # Register services
+    await _async_setup_services(hass)
+
     return True
 
 
@@ -175,9 +186,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Set up platforms
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
-    # Register services
-    await _async_setup_services(hass, coordinator)
-
     # Create HA Areas from Ajax rooms and assign devices
     await _async_setup_areas(hass, coordinator)
 
@@ -230,16 +238,39 @@ async def _async_update_options(hass: HomeAssistant, entry: ConfigEntry) -> None
                         break  # Only need one polling task
 
 
-async def _async_setup_services(
-    hass: HomeAssistant, coordinator: AjaxDataCoordinator
-) -> None:
+async def _async_setup_services(hass: HomeAssistant) -> None:
     """Set up Ajax services."""
+
+    async def _extract_config_entry(service_call: ServiceCall) -> list[ConfigEntry]:
+        """Extract config entry from the service call."""
+        target_entry_ids = await async_extract_config_entry_ids(service_call)
+        _LOGGER.error("target_entry_ids: %s", target_entry_ids)
+        _LOGGER.error(
+            "Loaded entries: %s",
+            service_call.hass.config_entries.async_loaded_entries(DOMAIN),
+        )
+        target_entries: list[ConfigEntry] = [
+            loaded_entry
+            for loaded_entry in service_call.hass.config_entries.async_loaded_entries(
+                DOMAIN
+            )
+            if loaded_entry.entry_id in target_entry_ids or target_entry_ids == set()
+        ]
+        if not target_entries:
+            raise ServiceValidationError(
+                translation_domain=DOMAIN,
+                translation_key="invalid_target",
+            )
+        return target_entries
 
     async def handle_force_arm(call: ServiceCall) -> None:
         """Handle force arm service call."""
         entity_id = call.data.get("entity_id")
         _LOGGER.info("Force arming via service call (entity: %s)", entity_id)
 
+        entries = await _extract_config_entry(call)
+        entry = entries[0]
+        coordinator: AjaxDataCoordinator = hass.data[DOMAIN][entry.entry_id]
         # Get the first hub from coordinator
         if coordinator.account and coordinator.account.spaces:
             for hub_id in coordinator.account.spaces:
@@ -255,6 +286,9 @@ async def _async_setup_services(
         entity_id = call.data.get("entity_id")
         _LOGGER.info("Force arming night mode via service call (entity: %s)", entity_id)
 
+        entries = await _extract_config_entry(call)
+        entry = entries[0]
+        coordinator: AjaxDataCoordinator = hass.data[DOMAIN][entry.entry_id]
         if coordinator.account and coordinator.account.spaces:
             for hub_id in coordinator.account.spaces:
                 try:
@@ -275,6 +309,9 @@ async def _async_setup_services(
         all_video_edges = []
         hub_count = 0
 
+        entries = await _extract_config_entry(call)
+        entry = entries[0]
+        coordinator: AjaxDataCoordinator = call.hass.data[DOMAIN][entry.entry_id]
         if coordinator.account:
             for _space_id, space in coordinator.account.spaces.items():
                 hub_id = space.hub_id
@@ -373,7 +410,6 @@ async def _async_setup_services(
         )
 
         # Create notification with summary
-        from homeassistant.components.persistent_notification import async_create
 
         # Count device types
         type_counts: dict[str, int] = {}
@@ -426,9 +462,11 @@ async def _async_setup_services(
     async def handle_refresh_metadata(call: ServiceCall) -> None:
         """Handle refresh metadata service call - force full metadata refresh."""
         _LOGGER.info("Forcing full metadata refresh via service call")
-        await coordinator.async_force_metadata_refresh()
 
-        from homeassistant.components.persistent_notification import async_create
+        entries = await _extract_config_entry(call)
+        entry = entries[0]
+        coordinator: AjaxDataCoordinator = hass.data[DOMAIN][entry.entry_id]
+        await coordinator.async_force_metadata_refresh()
 
         async_create(
             hass,
@@ -449,7 +487,6 @@ async def _async_setup_areas(
     hass: HomeAssistant, coordinator: AjaxDataCoordinator
 ) -> None:
     """Create HA Areas from Ajax rooms and assign devices to them."""
-    from homeassistant.helpers import area_registry as ar, device_registry as dr
 
     area_reg = ar.async_get(hass)
     device_reg = dr.async_get(hass)

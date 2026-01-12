@@ -851,46 +851,27 @@
       }
     }
   },
+  "exceptions": {
+    "invalid_target": {
+      "message": "Invalid target for service."
+    }
+  },
   "services": {
-    "arm": {
-      "name": "Arm",
-      "description": "Arm the Ajax system"
-    },
-    "disarm": {
-      "name": "Disarm",
-      "description": "Disarm the Ajax system"
-    },
-    "arm_night": {
-      "name": "Night mode",
-      "description": "Activate night mode"
-    },
-    "arm_partial": {
-      "name": "Partial arming",
-      "description": "Activate partial arming"
-    },
     "force_arm": {
       "name": "Force arm",
-      "description": "Force arm the security system, ignoring open sensors and problems",
-      "fields": {
-        "entity_id": {
-          "name": "Entity",
-          "description": "The alarm control panel entity to force arm"
-        }
-      }
-    },
+      "description": "Force arm the security system, ignoring open sensors and problems."
+      },
     "force_arm_night": {
       "name": "Force arm night mode",
-      "description": "Force activate night mode, ignoring open sensors and problems",
-      "fields": {
-        "entity_id": {
-          "name": "Entity",
-          "description": "The alarm control panel entity to force arm in night mode"
-        }
-      }
+      "description": "Force activate night mode, ignoring open sensors and problems."
     },
     "refresh_metadata": {
       "name": "Refresh metadata",
-      "description": "Force a full refresh of rooms, users, and groups from Ajax"
+      "description": "Force a full refresh of rooms, users, and groups from Ajax."
+    },
+    "get_raw_devices": {
+      "name": "Get raw devices",
+      "description": "Get raw API JSON data for all devices. Saves the complete API response to ajax_raw_devices.json."
     }
   },
   "options": {

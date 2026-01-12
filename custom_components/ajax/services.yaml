@@ -1,19 +1,15 @@
 force_arm:
-  name: Force Arm
-  description: Force arm the security system, ignoring open sensors and problems.
   target:
     entity:
       integration: ajax
       domain: alarm_control_panel
 
 force_arm_night:
-  name: Force Arm Night Mode
-  description: Force arm the security system in night mode, ignoring open sensors and problems.
   target:
     entity:
       integration: ajax
       domain: alarm_control_panel
 
 get_raw_devices:
-  name: Get Raw Devices
-  description: Get raw API JSON data for all devices. Saves the complete API response to ajax_raw_devices.json.
+
+refresh_metadata:

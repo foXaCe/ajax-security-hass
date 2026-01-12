@@ -171,16 +171,15 @@ These credentials are provided by Ajax Systems with your enterprise API key.
 
 #### Real-Time Event Limitations
 
-Due to Ajax Systems architecture, **motion and door/window events are only sent in real-time when**:
-- The system is **armed** (Away, Night, or Partial mode)
-- OR the sensor has **"Always Active"** mode enabled
-
-When the system is **disarmed** and sensors are not in "Always Active" mode:
-- Motion and door events are **not** sent to SQS/SSE
-- The integration uses fast polling (5 seconds) for door sensors
-- Motion sensors fall back to standard polling (30 seconds)
-
-> 💡 **Tip**: Enable "Always Active" on motion sensors if you need real-time motion detection while disarmed (e.g., for automation). Note: This will use more battery and may trigger alarms if not configured properly (set siren to "sound only when armed").
+> [!WARNING]
+> Due to Ajax Systems architecture, **real-time events (SSE/SQS) are only received when the system is armed**.
+>
+> When **disarmed**, Ajax does not send real-time events - this is an Ajax API limitation, not the integration.
+> - Motion and door events are **not** sent to SQS/SSE
+> - The integration uses fast polling (5 seconds) for door sensors
+> - Motion sensors fall back to standard polling (30 seconds)
+>
+> **Exception**: Sensors with **"Always Active"** mode enabled will send real-time events even when disarmed.
 
 ### Options (after setup)
 

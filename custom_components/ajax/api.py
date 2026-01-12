@@ -974,15 +974,15 @@ class AjaxRestApi:
         )
 
     # Fields that should not be sent in device update requests (read-only or internal)
+    # Note: deviceType MUST be included - API needs it for deserialization
     DEVICE_UPDATE_EXCLUDE_FIELDS = {
         # Identifiers (read-only)
         "id",
         "hubId",
         "spaceId",
         "serial",
-        # Type info (read-only)
+        # Type info (read-only) - but NOT deviceType (required by API)
         "type",
-        "deviceType",
         "deviceCategory",
         # Version info (read-only)
         "firmwareVersion",

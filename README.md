@@ -115,7 +115,7 @@ Issues, pull requests, and feedback are welcome!
 
 ### 🌍 Multi-Hub & Multi-Language
 - Support for multiple Ajax Hubs in one Home Assistant instance
-- Fully localized in **English**, **French**, **German**, **Spanish**, and **Swedish**
+- Fully localized in **English**, **French**, **German**, **Spanish**, **Swedish**, and **Ukrainian**
 - All entities properly translated
 
 ## 📦 Installation

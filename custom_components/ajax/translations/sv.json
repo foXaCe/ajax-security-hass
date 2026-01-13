@@ -903,13 +903,13 @@
       },
       "polling_settings": {
         "data": {
-          "door_sensor_fast_poll": "Door sensor fast polling"
+          "door_sensor_fast_poll": "Snabb pollning av dörrsensorer"
         },
         "data_description": {
-          "door_sensor_fast_poll": "Poll door sensors every 5 seconds when disarmed. Disable to reduce API calls."
+          "door_sensor_fast_poll": "Polla dörrsensorer var 5:e sekund i frånkopplad läge. Avmarkera för att minska API-anropen."
         },
-        "description": "Configure API polling behavior to optimize performance.\n\n**Current behavior:**\n- Light polling (hub state + devices): every 30-60s\n- Full metadata refresh (rooms, users, groups): hourly",
-        "title": "Polling Settings"
+        "description": "Konfigurera API-pollning för att optimenra prestanda.\n\n**Nuvarande inställning:**\n- Lugn pollning (hubstatus & enheter): 30-60s\n- Full uppdatering av metadata (rum, användare, grupper): 1 tim",
+        "title": "Pollingsintällningar"
       },
       "proxy_settings": {
         "data": {
@@ -919,7 +919,7 @@
           "proxy_url": "Exempel: https://my-proxy.example.com"
         },
         "description": "Ändra URL till Ajax proxyserver.",
-        "title": "Proxy Inställningar"
+        "title": "Proxyinställningar"
       }
     }
   },

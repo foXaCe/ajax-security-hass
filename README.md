@@ -13,7 +13,7 @@
 
 > [!CAUTION]
 > ## Proxy Mode Security
-> When using a proxy, the proxy administrator can see your password hash (SHA256), all API requests/responses, and your email. For security and trust considerations, contact your proxy provider. See [Security & Privacy](#-security--privacy) for details.
+> When using a proxy, the proxy administrator can see all API requests/responses and your email. For security and trust considerations, contact your proxy provider. See [Security & Privacy](#-security--privacy) for details.
 
 ---
 
@@ -217,7 +217,6 @@ Go to the integration options to configure:
 
 ### Proxy Mode
 When using a proxy, the proxy administrator can see:
-- Your password hash (SHA256) - sufficient to authenticate as you
 - All API requests and responses (alarm state, arm/disarm actions, device status)
 - Your email address
 

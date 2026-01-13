@@ -725,8 +725,19 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
                 continue
 
             # Store all discovered spaces for options flow
+            # First use hubName as fallback
             hub_name = hub_data.get("hubName", f"Hub {hub_id[:6]}")
             self.all_discovered_spaces[hub_id] = hub_name
+
+            # Try to get the proper space name for all spaces (including disabled)
+            # This ensures the options flow shows correct names
+            try:
+                space_binding = await self.api.async_get_space_by_hub(hub_id)
+                if space_binding and space_binding.get("name"):
+                    hub_name = space_binding.get("name")
+                    self.all_discovered_spaces[hub_id] = hub_name
+            except Exception:
+                pass  # Keep the fallback name
 
             # Skip spaces that are not enabled
             if self._enabled_spaces is not None and hub_id not in self._enabled_spaces:

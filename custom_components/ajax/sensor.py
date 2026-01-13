@@ -26,7 +26,7 @@ from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN
+from .const import DOMAIN, MANUFACTURER
 from .coordinator import AjaxDataCoordinator
 from .devices import (
     ButtonHandler,
@@ -647,13 +647,11 @@ class AjaxSpaceSensor(CoordinatorEntity[AjaxDataCoordinator], SensorEntity):
         if not space:
             return {}
 
-        hub_display_name = (
-            "Ajax Hub" if space.name == "Hub" else f"Ajax Hub - {space.name}"
-        )
+        hub_display_name = "Ajax Hub" if space.name == "Hub" else space.name
         device_info = {
             "identifiers": {(DOMAIN, self._space_id)},
             "name": hub_display_name,
-            "manufacturer": "Ajax Systems",
+            "manufacturer": MANUFACTURER,
             "model": format_hub_type(space.hub_details.get("hubSubtype"))
             if space.hub_details
             else "Security Hub",
@@ -757,14 +755,10 @@ class AjaxDeviceSensor(CoordinatorEntity[AjaxDataCoordinator], SensorEntity):
         if not device:
             return {}
 
-        device_display_name = (
-            f"{device.room_name} - {device.name}" if device.room_name else device.name
-        )
-
         info = {
             "identifiers": {(DOMAIN, self._device_id)},
-            "name": f"Ajax {device_display_name}",
-            "manufacturer": "Ajax Systems",
+            "name": device.name,
+            "manufacturer": MANUFACTURER,
             "model": device.raw_type,
             "via_device": (DOMAIN, self._space_id),
             "sw_version": device.firmware_version,
@@ -872,20 +866,14 @@ class AjaxVideoEdgeSensor(CoordinatorEntity[AjaxDataCoordinator], SensorEntity):
         if not video_edge:
             return {}
 
-        device_display_name = (
-            f"{video_edge.room_name} - {video_edge.name}"
-            if video_edge.room_name
-            else video_edge.name
-        )
-
         model_name = video_edge.video_edge_type.value
         if video_edge.color:
             model_name = f"{model_name} ({video_edge.color.title()})"
 
         info = {
             "identifiers": {(DOMAIN, self._video_edge_id)},
-            "name": f"Ajax {device_display_name}",
-            "manufacturer": "Ajax Systems",
+            "name": video_edge.name,
+            "manufacturer": MANUFACTURER,
             "model": model_name,
             "via_device": (DOMAIN, self._space_id),
             "sw_version": video_edge.firmware_version,

@@ -16,7 +16,7 @@ from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN
+from .const import DOMAIN, MANUFACTURER
 from .coordinator import AjaxDataCoordinator
 from .models import GroupState, SecurityState
 
@@ -120,8 +120,8 @@ class AjaxAlarmControlPanel(
 
         device_info = {
             "identifiers": {(DOMAIN, self._space_id)},
-            "name": f"Ajax Hub - {space.name}",
-            "manufacturer": "Ajax Systems",
+            "name": space.name,
+            "manufacturer": MANUFACTURER,
             "model": model_name,
         }
 

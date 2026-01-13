@@ -11,7 +11,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN
+from .const import DOMAIN, MANUFACTURER
 from .coordinator import AjaxDataCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -76,8 +76,8 @@ class AjaxPanicButton(CoordinatorEntity[AjaxDataCoordinator], ButtonEntity):
 
         return {
             "identifiers": {(DOMAIN, self._space_id)},
-            "name": f"Ajax Hub - {space.name}",
-            "manufacturer": "Ajax Systems",
+            "name": space.name,
+            "manufacturer": MANUFACTURER,
             "model": "Security Hub",
             "sw_version": None,  # TODO: Add hub firmware version when available
         }

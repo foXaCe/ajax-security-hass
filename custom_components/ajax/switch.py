@@ -15,7 +15,7 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN
+from .const import DOMAIN, MANUFACTURER
 from .coordinator import AjaxDataCoordinator
 from .devices import (
     ButtonHandler,
@@ -398,15 +398,10 @@ class AjaxSwitch(CoordinatorEntity[AjaxDataCoordinator], SwitchEntity):
         if not device:
             return {}
 
-        # Include room name in device name if available
-        device_display_name = (
-            f"{device.room_name} - {device.name}" if device.room_name else device.name
-        )
-
         info = {
             "identifiers": {(DOMAIN, self._device_id)},
-            "name": f"Ajax {device_display_name}",
-            "manufacturer": "Ajax Systems",
+            "name": device.name,
+            "manufacturer": MANUFACTURER,
             "model": device.raw_type,
             "via_device": (DOMAIN, self._space_id),
             "sw_version": device.firmware_version,

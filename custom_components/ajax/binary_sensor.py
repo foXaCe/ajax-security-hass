@@ -20,7 +20,7 @@ from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN
+from .const import DOMAIN, MANUFACTURER
 from .coordinator import AjaxDataCoordinator
 from .devices import (
     ButtonHandler,
@@ -287,11 +287,6 @@ class AjaxBinarySensor(CoordinatorEntity[AjaxDataCoordinator], BinarySensorEntit
         if not device:
             return {}
 
-        # Include room name in device name if available
-        device_display_name = (
-            f"{device.room_name} - {device.name}" if device.room_name else device.name
-        )
-
         # Get model name - use raw_type from API (e.g., "DoorProtect Plus")
         model_name = device.raw_type or device.type.value.replace("_", " ").title()
         if device.device_color:
@@ -301,8 +296,8 @@ class AjaxBinarySensor(CoordinatorEntity[AjaxDataCoordinator], BinarySensorEntit
 
         info = {
             "identifiers": {(DOMAIN, self._device_id)},
-            "name": f"Ajax {device_display_name}",
-            "manufacturer": "Ajax Systems",
+            "name": device.name,
+            "manufacturer": MANUFACTURER,
             "model": model_name,
             "via_device": (DOMAIN, self._space_id),
             "sw_version": device.firmware_version,
@@ -394,21 +389,14 @@ class AjaxVideoEdgeBinarySensor(
         if not video_edge:
             return {}
 
-        # Include room name in device name if available
-        device_display_name = (
-            f"{video_edge.room_name} - {video_edge.name}"
-            if video_edge.room_name
-            else video_edge.name
-        )
-
         model_name = video_edge.video_edge_type.value
         if video_edge.color:
             model_name = f"{model_name} ({video_edge.color.title()})"
 
         info = {
             "identifiers": {(DOMAIN, self._video_edge_id)},
-            "name": f"Ajax {device_display_name}",
-            "manufacturer": "Ajax Systems",
+            "name": video_edge.name,
+            "manufacturer": MANUFACTURER,
             "model": model_name,
             "via_device": (DOMAIN, self._space_id),
             "sw_version": video_edge.firmware_version,

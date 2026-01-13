@@ -16,7 +16,7 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN
+from .const import DOMAIN, MANUFACTURER
 from .coordinator import AjaxDataCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -139,8 +139,8 @@ class AjaxHubTracker(CoordinatorEntity[AjaxDataCoordinator], TrackerEntity):
 
         return {
             "identifiers": {(DOMAIN, self._space_id)},
-            "name": "Ajax Hub" if space.name == "Hub" else f"Ajax Hub - {space.name}",
-            "manufacturer": "Ajax Systems",
+            "name": "Ajax Hub" if space.name == "Hub" else space.name,
+            "manufacturer": MANUFACTURER,
         }
 
     @callback

@@ -3,6 +3,9 @@
 # Integration domain
 DOMAIN = "ajax"
 
+# Global/general strings
+MANUFACTURER = "Ajax Systems"
+
 # Configuration and defaults
 CONF_API_KEY = "api_key"
 CONF_EMAIL = "email"

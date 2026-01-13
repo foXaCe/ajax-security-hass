@@ -13,7 +13,7 @@
 
 > [!CAUTION]
 > ## Proxy Mode Security
-> When using a proxy, the proxy administrator can see all API requests/responses and your email. For security and trust considerations, contact your proxy provider. See [Security & Privacy](#-security--privacy) for details.
+> When using a proxy, the proxy administrator can see all API requests/responses and your credentials hash. This means the proxy can impersonate you with the Ajax API. For a detailed threat model analysis, see [Issue #47](https://github.com/foXaCe/ajax-security-hass/issues/47). For security considerations, see [Security & Privacy](#-security--privacy).
 
 ---
 

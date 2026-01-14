@@ -8,6 +8,7 @@ from typing import Any
 from homeassistant.components.diagnostics import async_redact_data
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.device_registry import DeviceEntry
 
 from .const import DOMAIN
 from .coordinator import AjaxDataCoordinator
@@ -24,7 +25,9 @@ TO_REDACT = {
 }
 
 
-async def get_ajax_raw_data(hass: HomeAssistant, entry: ConfigEntry) -> dict[str, Any]:
+async def get_ajax_raw_data(
+    hass: HomeAssistant, entry: ConfigEntry, device: DeviceEntry | None = None
+) -> dict[str, Any]:
     """Get fresh raw data from all devices."""
 
     coordinator: AjaxDataCoordinator = hass.data[DOMAIN][entry.entry_id]
@@ -32,6 +35,12 @@ async def get_ajax_raw_data(hass: HomeAssistant, entry: ConfigEntry) -> dict[str
     all_cameras = []
     all_video_edges = []
     hub_count = 0
+
+    target_device_id = (
+        next(str(value) for domain, value in device.identifiers if domain == DOMAIN)
+        if device is not None
+        else None
+    )
 
     if coordinator.account:
         for _space_id, space in coordinator.account.spaces.items():
@@ -44,6 +53,11 @@ async def get_ajax_raw_data(hass: HomeAssistant, entry: ConfigEntry) -> dict[str
                     # Then get full details for each device
                     for device_summary in devices_list:
                         device_id = device_summary.get("id")
+                        if (
+                            target_device_id is not None
+                            and target_device_id != device_id
+                        ):
+                            continue
                         if device_id:
                             try:
                                 full_device = await coordinator.api.async_get_device(
@@ -68,6 +82,11 @@ async def get_ajax_raw_data(hass: HomeAssistant, entry: ConfigEntry) -> dict[str
                     cameras_list = await coordinator.api.async_get_cameras(hub_id)
                     for camera_summary in cameras_list:
                         camera_id = camera_summary.get("id")
+                        if (
+                            target_device_id is not None
+                            and target_device_id != camera_id
+                        ):
+                            continue
                         if camera_id:
                             try:
                                 full_camera = await coordinator.api.async_get_camera(
@@ -130,5 +149,28 @@ async def async_get_config_entry_diagnostics(
 
     return {
         "config_entry_data": async_redact_data(dict(entry.data), TO_REDACT),
+        "ajax_data": async_redact_data(ajax_data, TO_REDACT),
+    }
+
+
+async def async_get_device_diagnostics(
+    hass: HomeAssistant, entry: ConfigEntry, device: DeviceEntry
+) -> dict[str, Any]:
+    """Return diagnostics for a specific device."""
+
+    device_info = {
+        "manufacturer": device.manufacturer,
+        "model": device.model,
+        "model_id": device.model_id,
+        "serial_number": device.serial_number,
+        "firmware_version": device.sw_version,
+        "hardware_version": device.hw_version,
+    }
+
+    ajax_data = await get_ajax_raw_data(hass, entry, device)
+
+    return {
+        "device_info": async_redact_data(device_info, TO_REDACT),
+        "config_entry_data": async_redact_data(entry.data, TO_REDACT),
         "ajax_data": async_redact_data(ajax_data, TO_REDACT),
     }

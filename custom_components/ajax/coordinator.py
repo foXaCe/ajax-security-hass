@@ -2106,6 +2106,8 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
             "doorbell": DeviceType.DOORBELL,
             "doorbellbutton": DeviceType.DOORBELL,
             "doorbell_button": DeviceType.DOORBELL,
+            "motioncamvideodoorbell": DeviceType.DOORBELL,
+            "motion_cam_video_doorbell": DeviceType.DOORBELL,
             # Transmitter
             "transmitter": DeviceType.TRANSMITTER,
             "transmitterfibra": DeviceType.TRANSMITTER,

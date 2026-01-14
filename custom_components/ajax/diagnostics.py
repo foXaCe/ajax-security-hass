@@ -9,9 +9,6 @@ from homeassistant.components.diagnostics import async_redact_data
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 
-from .const import DOMAIN
-from .coordinator import AjaxDataCoordinator
-
 _LOGGER = logging.getLogger(__name__)
 
 TO_REDACT = {

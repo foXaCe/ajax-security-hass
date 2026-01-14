@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.7.67] - 2026-01-14
+
+### Fixed
+- Doorbell device type mapping - add `MotionCamVideoDoorbell` (#50)
+- Multi-gang LightSwitch channels - use 0-indexed channels for API commands (#26)
+- DoorProtect sensors - use `OPENING` device_class instead of `DOOR` (#45)
+- FireProtect CO sensor - use `CO` device_class instead of `GAS` (#53)
+
+### Added
+- Dutch translations (nl.json)
+- Entity naming - use device name for main entity on device (PR #52)
+
+### Changed
+- Bump actions/checkout from 4 to 6
+- Update Swedish translations
+
 ## [0.7.51] - 2026-01-11
 
 ### Fixed

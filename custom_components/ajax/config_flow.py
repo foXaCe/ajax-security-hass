@@ -12,7 +12,6 @@ from homeassistant.config_entries import (
     ConfigFlowResult,
     OptionsFlow,
 )
-from . import AjaxConfigEntry
 from homeassistant.core import callback
 from homeassistant.helpers.selector import (
     SelectSelector,
@@ -20,6 +19,7 @@ from homeassistant.helpers.selector import (
     SelectSelectorMode,
 )
 
+from . import AjaxConfigEntry
 from .api import (
     AjaxRest2FARequiredError,
     AjaxRestApi,

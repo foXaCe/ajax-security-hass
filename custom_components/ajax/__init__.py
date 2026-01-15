@@ -73,10 +73,12 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     return True
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+type AjaxConfigEntry = ConfigEntry[AjaxDataCoordinator]
+
+
+async def async_setup_entry(hass: HomeAssistant, entry: AjaxConfigEntry) -> bool:
     """Set up Ajax Security System from a config entry."""
     _LOGGER.info("Ajax integration v0.7.6 starting...")
-    hass.data.setdefault(DOMAIN, {})
 
     # Get authentication mode (default to direct for backwards compatibility)
     auth_mode = entry.data.get(CONF_AUTH_MODE, AUTH_MODE_DIRECT)
@@ -178,7 +180,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         _LOGGER.debug("Door sensor fast polling disabled (API optimization)")
 
     # Store coordinator
-    hass.data[DOMAIN][entry.entry_id] = coordinator
+    entry.runtime_data = coordinator
 
     # Fetch initial data
     await coordinator.async_config_entry_first_refresh()
@@ -195,9 +197,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     return True
 
 
-async def _async_update_options(hass: HomeAssistant, entry: ConfigEntry) -> None:
+async def _async_update_options(hass: HomeAssistant, entry: AjaxConfigEntry) -> None:
     """Handle options update."""
-    coordinator: AjaxDataCoordinator = hass.data[DOMAIN][entry.entry_id]
+    coordinator = entry.runtime_data
 
     # Update door sensor fast polling option
     door_sensor_fast_poll = entry.options.get(CONF_DOOR_SENSOR_FAST_POLL, False)
@@ -241,10 +243,10 @@ async def _async_update_options(hass: HomeAssistant, entry: ConfigEntry) -> None
 async def _async_setup_services(hass: HomeAssistant) -> None:
     """Set up Ajax services."""
 
-    async def _extract_config_entry(service_call: ServiceCall) -> list[ConfigEntry]:
+    async def _extract_config_entry(service_call: ServiceCall) -> list[AjaxConfigEntry]:
         """Extract config entry from the service call."""
         target_entry_ids = await async_extract_config_entry_ids(service_call)
-        target_entries: list[ConfigEntry] = [
+        target_entries: list[AjaxConfigEntry] = [
             loaded_entry
             for loaded_entry in service_call.hass.config_entries.async_loaded_entries(
                 DOMAIN
@@ -265,7 +267,7 @@ async def _async_setup_services(hass: HomeAssistant) -> None:
 
         entries = await _extract_config_entry(call)
         entry = entries[0]
-        coordinator: AjaxDataCoordinator = hass.data[DOMAIN][entry.entry_id]
+        coordinator = entry.runtime_data
         # Get the first hub from coordinator
         if coordinator.account and coordinator.account.spaces:
             for hub_id in coordinator.account.spaces:
@@ -283,7 +285,7 @@ async def _async_setup_services(hass: HomeAssistant) -> None:
 
         entries = await _extract_config_entry(call)
         entry = entries[0]
-        coordinator: AjaxDataCoordinator = hass.data[DOMAIN][entry.entry_id]
+        coordinator = entry.runtime_data
         if coordinator.account and coordinator.account.spaces:
             for hub_id in coordinator.account.spaces:
                 try:
@@ -306,7 +308,7 @@ async def _async_setup_services(hass: HomeAssistant) -> None:
 
         entries = await _extract_config_entry(call)
         entry = entries[0]
-        coordinator: AjaxDataCoordinator = call.hass.data[DOMAIN][entry.entry_id]
+        coordinator = entry.runtime_data
         if coordinator.account:
             for _space_id, space in coordinator.account.spaces.items():
                 hub_id = space.hub_id
@@ -460,7 +462,7 @@ async def _async_setup_services(hass: HomeAssistant) -> None:
 
         entries = await _extract_config_entry(call)
         entry = entries[0]
-        coordinator: AjaxDataCoordinator = hass.data[DOMAIN][entry.entry_id]
+        coordinator = entry.runtime_data
         await coordinator.async_force_metadata_refresh()
 
         async_create(
@@ -528,10 +530,10 @@ async def _async_setup_areas(
         )
 
 
-async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+async def async_unload_entry(hass: HomeAssistant, entry: AjaxConfigEntry) -> bool:
     """Unload a config entry."""
     if unload_ok := await hass.config_entries.async_unload_platforms(entry, PLATFORMS):
-        coordinator: AjaxDataCoordinator = hass.data[DOMAIN].pop(entry.entry_id)
+        coordinator = entry.runtime_data
 
         # Shutdown coordinator (closes SQS manager, API connection, and all tasks)
         await coordinator.async_shutdown()

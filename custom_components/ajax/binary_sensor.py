@@ -71,7 +71,7 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up Ajax binary sensor platform."""
-    coordinator: AjaxDataCoordinator = hass.data[DOMAIN][entry.entry_id]
+    coordinator = entry.runtime_data
 
     entities = []
     seen_unique_ids: set[str] = set()
@@ -144,21 +144,23 @@ async def async_setup_entry(
         if space.hub_details:
             hub_id = space.hub_id
 
-            # Hub tamper binary sensor
-            tamper_unique_id = f"{hub_id}_tamper"
-            if tamper_unique_id not in seen_unique_ids:
-                seen_unique_ids.add(tamper_unique_id)
-                entities.append(
-                    AjaxHubBinarySensor(
-                        coordinator=coordinator,
-                        space_id=space_id,
-                        sensor_key="tamper",
+            # Create all hub binary sensors
+            for sensor_key in AjaxHubBinarySensor.HUB_BINARY_SENSORS:
+                unique_id = f"{hub_id}_{sensor_key}"
+                if unique_id not in seen_unique_ids:
+                    seen_unique_ids.add(unique_id)
+                    entities.append(
+                        AjaxHubBinarySensor(
+                            coordinator=coordinator,
+                            space_id=space_id,
+                            sensor_key=sensor_key,
+                        )
                     )
-                )
-                _LOGGER.debug(
-                    "Created hub binary sensor 'tamper' for space: %s",
-                    space.name,
-                )
+                    _LOGGER.debug(
+                        "Created hub binary sensor '%s' for space: %s",
+                        sensor_key,
+                        space.name,
+                    )
 
     async_add_entities(entities)
     if entities:
@@ -434,6 +436,13 @@ class AjaxHubBinarySensor(CoordinatorEntity[AjaxDataCoordinator], BinarySensorEn
             "device_class": BinarySensorDeviceClass.TAMPER,
             "value_key": "tampered",
         },
+        "external_power": {
+            "device_class": BinarySensorDeviceClass.PLUG,
+            "translation_key": "external_power",
+            "value_fn": lambda hd: hd.get("battery", {}).get("state") != "DISCHARGED"
+            if hd.get("battery")
+            else None,
+        },
     }
 
     def __init__(
@@ -459,12 +468,24 @@ class AjaxHubBinarySensor(CoordinatorEntity[AjaxDataCoordinator], BinarySensorEn
         if "device_class" in self._sensor_config:
             self._attr_device_class = self._sensor_config["device_class"]
 
+        # Set translation key if provided
+        if "translation_key" in self._sensor_config:
+            self._attr_translation_key = self._sensor_config["translation_key"]
+
     @property
     def is_on(self) -> bool | None:
         """Return true if the binary sensor is on."""
         space = self.coordinator.get_space(self._space_id)
         if not space or not space.hub_details:
             return None
+
+        # Support both value_key (direct key) and value_fn (function)
+        value_fn = self._sensor_config.get("value_fn")
+        if value_fn:
+            try:
+                return value_fn(space.hub_details)
+            except Exception:
+                return None
 
         value_key = self._sensor_config.get("value_key")
         if value_key:

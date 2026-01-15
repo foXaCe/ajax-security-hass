@@ -1,0 +1,27 @@
+# CodeRabbit Configuration
+# https://docs.coderabbit.ai/guides/configure-coderabbit
+
+language: "en"
+
+reviews:
+  profile: "chill"
+  request_changes_workflow: false
+  high_level_summary: true
+  poem: false
+  review_status: true
+  collapse_walkthrough: false
+  path_filters:
+    - "!**/*.md"
+  path_instructions:
+    - path: "custom_components/ajax/**"
+      instructions: |
+        This is a Home Assistant custom integration for Ajax Security Systems.
+        Focus on:
+        - Home Assistant integration best practices
+        - Async/await patterns
+        - Entity state management
+        - API error handling
+        - Memory leaks and resource cleanup
+
+chat:
+  auto_reply: true

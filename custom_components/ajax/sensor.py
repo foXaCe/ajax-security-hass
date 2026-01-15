@@ -19,13 +19,13 @@ from homeassistant.components.sensor import (
     SensorEntityDescription,
     SensorStateClass,
 )
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import PERCENTAGE
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
+from . import AjaxConfigEntry
 from .const import DOMAIN, MANUFACTURER
 from .coordinator import AjaxDataCoordinator
 from .devices import (
@@ -498,11 +498,11 @@ DEVICE_HANDLERS = {
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: ConfigEntry,
+    entry: AjaxConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up Ajax sensors from a config entry."""
-    coordinator: AjaxDataCoordinator = hass.data[DOMAIN][entry.entry_id]
+    coordinator = entry.runtime_data
 
     entities: list[SensorEntity] = []
     seen_unique_ids: set[str] = set()
@@ -585,6 +585,32 @@ async def async_setup_entry(
                     video_edge.name,
                 )
 
+        # Create hub-level sensors from hub_details
+        if space.hub_details:
+            hub_id = space.hub_id or space_id
+            hub_sensors = _get_hub_sensors(space)
+
+            for sensor_desc in hub_sensors:
+                unique_id = f"{hub_id}_{sensor_desc['key']}"
+
+                if unique_id in seen_unique_ids:
+                    continue
+                seen_unique_ids.add(unique_id)
+
+                entities.append(
+                    AjaxHubSensor(
+                        coordinator=coordinator,
+                        space_id=space_id,
+                        sensor_key=sensor_desc["key"],
+                        sensor_desc=sensor_desc,
+                    )
+                )
+                _LOGGER.debug(
+                    "Created hub sensor '%s' for space: %s",
+                    sensor_desc["key"],
+                    space.name,
+                )
+
     if entities:
         async_add_entities(entities)
         _LOGGER.info("Added %d Ajax sensor(s)", len(entities))
@@ -603,7 +629,7 @@ class AjaxSpaceSensor(CoordinatorEntity[AjaxDataCoordinator], SensorEntity):
     def __init__(
         self,
         coordinator: AjaxDataCoordinator,
-        entry: ConfigEntry,
+        entry: AjaxConfigEntry,
         space_id: str,
         description: AjaxSpaceSensorDescription,
     ) -> None:
@@ -890,6 +916,218 @@ class AjaxVideoEdgeSensor(CoordinatorEntity[AjaxDataCoordinator], SensorEntity):
         if not space:
             return None
         return space.video_edges.get(self._video_edge_id)
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        """Handle updated data from the coordinator."""
+        self.async_write_ha_state()
+
+
+# ==============================================================================
+# Hub-level Sensors (from hub_details)
+# ==============================================================================
+
+
+def _get_hub_sensors(space: AjaxSpace) -> list[dict]:
+    """Get hub sensor definitions based on available hub_details fields."""
+    sensors = []
+    hub_details = space.hub_details or {}
+
+    # Hub battery level
+    battery = hub_details.get("battery", {})
+    if battery and "chargeLevelPercentage" in battery:
+        sensors.append(
+            {
+                "key": "hub_battery",
+                "device_class": SensorDeviceClass.BATTERY,
+                "native_unit_of_measurement": PERCENTAGE,
+                "state_class": SensorStateClass.MEASUREMENT,
+                "value_fn": lambda hd=hub_details: hd.get("battery", {}).get(
+                    "chargeLevelPercentage"
+                ),
+                "enabled_by_default": True,
+            }
+        )
+
+    # GSM signal level
+    gsm = hub_details.get("gsm", {})
+    if gsm and "signalLevel" in gsm:
+        sensors.append(
+            {
+                "key": "gsm_signal",
+                "translation_key": "gsm_signal_level",
+                "icon": "mdi:signal-cellular-3",
+                "value_fn": lambda hd=hub_details: hd.get("gsm", {})
+                .get("signalLevel", "")
+                .lower()
+                if hd.get("gsm", {}).get("signalLevel")
+                else None,
+                "enabled_by_default": True,
+            }
+        )
+
+    # GSM network status (2G, 3G, 4G)
+    if gsm and "networkStatus" in gsm:
+        sensors.append(
+            {
+                "key": "gsm_network",
+                "translation_key": "gsm_type",
+                "icon": "mdi:signal-cellular-3",
+                "value_fn": lambda hd=hub_details: hd.get("gsm", {})
+                .get("networkStatus", "")
+                .lower()
+                if hd.get("gsm", {}).get("networkStatus")
+                else None,
+                "enabled_by_default": True,
+            }
+        )
+
+    # SIM card state
+    if gsm and "simCardState" in gsm:
+        sensors.append(
+            {
+                "key": "sim_status",
+                "translation_key": "sim_status",
+                "icon": "mdi:sim",
+                "value_fn": lambda hd=hub_details: hd.get("gsm", {})
+                .get("simCardState", "")
+                .lower()
+                if hd.get("gsm", {}).get("simCardState")
+                else None,
+                "enabled_by_default": True,
+            }
+        )
+
+    # Active channels (connection types)
+    if "activeChannels" in hub_details:
+        sensors.append(
+            {
+                "key": "active_connection",
+                "translation_key": "active_connection",
+                "icon": "mdi:connection",
+                "value_fn": lambda hd=hub_details: ", ".join(
+                    hd.get("activeChannels", [])
+                )
+                if hd.get("activeChannels")
+                else None,
+                "enabled_by_default": True,
+            }
+        )
+
+    # Firmware version
+    firmware = hub_details.get("firmware", {})
+    if firmware and "version" in firmware:
+        sensors.append(
+            {
+                "key": "hub_firmware",
+                "translation_key": "firmware_version",
+                "icon": "mdi:chip",
+                "value_fn": lambda hd=hub_details: hd.get("firmware", {}).get(
+                    "version"
+                ),
+                "enabled_by_default": False,
+            }
+        )
+
+    return sensors
+
+
+class AjaxHubSensor(CoordinatorEntity[AjaxDataCoordinator], SensorEntity):
+    """Representation of an Ajax Hub sensor.
+
+    This is for hub-level sensors that come from space.hub_details,
+    not from a device in space.devices.
+    """
+
+    _attr_has_entity_name = True
+
+    def __init__(
+        self,
+        coordinator: AjaxDataCoordinator,
+        space_id: str,
+        sensor_key: str,
+        sensor_desc: dict,
+    ) -> None:
+        """Initialize the Ajax hub sensor."""
+        super().__init__(coordinator)
+        self._space_id = space_id
+        self._sensor_key = sensor_key
+        self._sensor_desc = sensor_desc
+
+        # Get space for hub_id
+        space = coordinator.get_space(space_id)
+        hub_id = space.hub_id if space else space_id
+
+        # Set unique ID
+        self._attr_unique_id = f"{hub_id}_{sensor_key}"
+
+        # Set device class if provided
+        if "device_class" in sensor_desc:
+            self._attr_device_class = sensor_desc["device_class"]
+
+        # Set translation key
+        if "translation_key" in sensor_desc:
+            self._attr_translation_key = sensor_desc["translation_key"]
+        elif "device_class" not in sensor_desc:
+            self._attr_translation_key = sensor_key
+
+        # Set unit of measurement
+        if "native_unit_of_measurement" in sensor_desc:
+            self._attr_native_unit_of_measurement = sensor_desc[
+                "native_unit_of_measurement"
+            ]
+
+        # Set state class
+        if "state_class" in sensor_desc:
+            self._attr_state_class = sensor_desc["state_class"]
+
+        # Set icon
+        if "icon" in sensor_desc:
+            self._attr_icon = sensor_desc["icon"]
+
+        # Set enabled by default
+        if "enabled_by_default" in sensor_desc:
+            self._attr_entity_registry_enabled_default = sensor_desc[
+                "enabled_by_default"
+            ]
+
+    @property
+    def native_value(self) -> Any:
+        """Return the state of the sensor."""
+        space = self.coordinator.get_space(self._space_id)
+        if not space or not space.hub_details:
+            return None
+
+        value_fn = self._sensor_desc.get("value_fn")
+        if value_fn:
+            try:
+                return value_fn(space.hub_details)
+            except Exception as err:
+                _LOGGER.error(
+                    "Error getting value for hub sensor %s: %s",
+                    self._sensor_key,
+                    err,
+                )
+                return None
+        return None
+
+    @property
+    def available(self) -> bool:
+        """Return True if entity is available."""
+        space = self.coordinator.get_space(self._space_id)
+        return space is not None and space.hub_details is not None
+
+    @property
+    def device_info(self) -> dict[str, Any]:
+        """Return device information linking to the hub/space device."""
+        space = self.coordinator.get_space(self._space_id)
+        if not space:
+            return {}
+
+        # Link to the space device (hub)
+        return {
+            "identifiers": {(DOMAIN, self._space_id)},
+        }
 
     @callback
     def _handle_coordinator_update(self) -> None:

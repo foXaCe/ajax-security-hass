@@ -11,6 +11,7 @@ from typing import Any
 
 from homeassistant.components.switch import SwitchEntity
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
@@ -30,7 +31,7 @@ from .devices import (
     SocketHandler,
     WireInputHandler,
 )
-from .models import AjaxDevice, DeviceType
+from .models import AjaxDevice, DeviceType, SecurityState
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -256,6 +257,12 @@ class AjaxSwitch(CoordinatorEntity[AjaxDataCoordinator], SwitchEntity):
         else:
             api_value = self._switch_desc.get("api_value_off", False)
             api_extra = self._switch_desc.get("api_extra_off", {})
+
+        if space.security_state != SecurityState.DISARMED:
+            raise ServiceValidationError(
+                translation_domain=DOMAIN,
+                translation_key="system_armed",
+            )
 
         # Optimistic update: update local state immediately
         # Map API key to attribute key (camelCase -> snake_case)

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from contextlib import suppress
 from typing import Any
 
 from homeassistant.components.diagnostics import async_redact_data
@@ -11,7 +12,6 @@ from homeassistant.helpers.device_registry import DeviceEntry
 
 from . import AjaxConfigEntry
 from .const import DOMAIN
-import contextlib
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -37,7 +37,7 @@ async def get_ajax_raw_data(
     hub_count = 0
     target_device_id: str | None = None
 
-    with contextlib.suppress(StopIteration):
+    with suppress(StopIteration):
         target_device_id = (
             next(str(value) for domain, value in device.identifiers if domain == DOMAIN)
             if device is not None

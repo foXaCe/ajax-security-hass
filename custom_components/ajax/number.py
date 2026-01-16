@@ -11,12 +11,14 @@ from typing import Any
 
 from homeassistant.components.number import NumberEntity, NumberMode
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import AjaxConfigEntry
 from .const import DOMAIN
 from .coordinator import AjaxDataCoordinator
+from .models import SecurityState
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -112,7 +114,14 @@ class AjaxTiltDegreesNumber(AjaxDoorPlusBaseNumber):
         """Set the tilt degrees threshold."""
         space = self.coordinator.get_space(self._space_id)
         if not space:
-            return
+            raise HomeAssistantError("space_not_found")
+
+        if space.security_state != SecurityState.DISARMED:
+            raise ServiceValidationError(
+                translation_domain=DOMAIN,
+                translation_key="system_armed",
+            )
+
         try:
             await self.coordinator.api.async_update_device(
                 space.hub_id, self._device_id, {"accelerometerTiltDegrees": int(value)}
@@ -124,4 +133,11 @@ class AjaxTiltDegreesNumber(AjaxDoorPlusBaseNumber):
             )
             await self.coordinator.async_request_refresh()
         except Exception as err:
-            _LOGGER.error("Failed to set accelerometerTiltDegrees: %s", err)
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="failed_to_change",
+                translation_placeholders={
+                    "entity": "accelerometer tilt degrees",
+                    "error": err,
+                },
+            ) from err

@@ -11,11 +11,11 @@ from typing import Any
 
 from homeassistant.components.device_tracker import SourceType
 from homeassistant.components.device_tracker.config_entry import TrackerEntity
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
+from . import AjaxConfigEntry
 from .const import DOMAIN, MANUFACTURER
 from .coordinator import AjaxDataCoordinator
 
@@ -24,7 +24,7 @@ _LOGGER = logging.getLogger(__name__)
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: ConfigEntry,
+    entry: AjaxConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up Ajax device trackers from a config entry."""

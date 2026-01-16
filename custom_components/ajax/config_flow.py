@@ -8,7 +8,6 @@ from typing import Any
 
 import voluptuous as vol
 from homeassistant.config_entries import (
-    ConfigEntry,
     ConfigFlow,
     ConfigFlowResult,
     OptionsFlow,
@@ -20,6 +19,7 @@ from homeassistant.helpers.selector import (
     SelectSelectorMode,
 )
 
+from . import AjaxConfigEntry
 from .api import (
     AjaxRest2FARequiredError,
     AjaxRestApi,
@@ -62,7 +62,7 @@ class AjaxConfigFlow(ConfigFlow, domain=DOMAIN):
     @staticmethod
     @callback
     def async_get_options_flow(
-        config_entry: ConfigEntry,
+        config_entry: AjaxConfigEntry,
     ) -> OptionsFlow:
         """Get the options flow for this handler."""
         return AjaxOptionsFlow()

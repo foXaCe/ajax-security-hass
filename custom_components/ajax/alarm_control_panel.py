@@ -10,12 +10,12 @@ from homeassistant.components.alarm_control_panel import (
     AlarmControlPanelEntityFeature,
     AlarmControlPanelState,
 )
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
+from . import AjaxConfigEntry
 from .const import DOMAIN, MANUFACTURER
 from .coordinator import AjaxDataCoordinator
 from .models import GroupState, SecurityState
@@ -25,7 +25,7 @@ _LOGGER = logging.getLogger(__name__)
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: ConfigEntry,
+    entry: AjaxConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up Ajax alarm control panels from a config entry."""
@@ -78,7 +78,7 @@ class AjaxAlarmControlPanel(
     _attr_available = True  # Always available - keep last known state on API errors
 
     def __init__(
-        self, coordinator: AjaxDataCoordinator, entry: ConfigEntry, space_id: str
+        self, coordinator: AjaxDataCoordinator, entry: AjaxConfigEntry, space_id: str
     ) -> None:
         """Initialize the alarm control panel."""
         super().__init__(coordinator)
@@ -379,7 +379,7 @@ class AjaxGroupAlarmControlPanel(
     def __init__(
         self,
         coordinator: AjaxDataCoordinator,
-        entry: ConfigEntry,
+        entry: AjaxConfigEntry,
         space_id: str,
         group_id: str,
     ) -> None:

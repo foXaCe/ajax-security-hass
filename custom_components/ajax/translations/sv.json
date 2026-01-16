@@ -866,8 +866,17 @@
     }
   },
   "exceptions": {
+    "failed_to_change": {
+      "message": "Failed to change {entity}: {error}"
+    },
     "invalid_target": {
       "message": "Ogiltigt mål för tjänsten."
+    },
+    "space_not_found": {
+      "message": "Space kan ej hittas."
+    },
+    "system_armed": {
+      "message": "Systemet tillkopplat. Vänligen koppla ifrån."
     }
   },
   "options": {

@@ -6,11 +6,11 @@ import logging
 from typing import Any
 
 from homeassistant.components.button import ButtonDeviceClass, ButtonEntity
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
+from . import AjaxConfigEntry
 from .const import DOMAIN, MANUFACTURER
 from .coordinator import AjaxDataCoordinator
 
@@ -19,7 +19,7 @@ _LOGGER = logging.getLogger(__name__)
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: ConfigEntry,
+    entry: AjaxConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up Ajax buttons from a config entry."""
@@ -46,7 +46,7 @@ class AjaxPanicButton(CoordinatorEntity[AjaxDataCoordinator], ButtonEntity):
     _attr_icon = "mdi:alarm-light"
 
     def __init__(
-        self, coordinator: AjaxDataCoordinator, entry: ConfigEntry, space_id: str
+        self, coordinator: AjaxDataCoordinator, entry: AjaxConfigEntry, space_id: str
     ) -> None:
         """Initialize the panic button."""
         super().__init__(coordinator)

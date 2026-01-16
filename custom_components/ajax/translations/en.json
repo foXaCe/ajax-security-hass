@@ -869,8 +869,17 @@
     }
   },
   "exceptions": {
+    "failed_to_change": {
+      "message": "Failed to change {entity}: {error}"
+    },
     "invalid_target": {
       "message": "Invalid target for service."
+    },
+    "space_not_found": {
+      "message": "Space not found."
+    },
+    "system_armed": {
+      "message": "System armed. Please disarm."
     }
   },
   "options": {

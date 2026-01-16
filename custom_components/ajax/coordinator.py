@@ -1982,7 +1982,8 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
                 return SecurityState.PARTIALLY_ARMED
             # Check for NIGHT_MODE_ON specifically, not just "NIGHT"
             # because ARMED_NIGHT_MODE_OFF contains "NIGHT" but is actually ARMED
-            elif "NIGHT_MODE_ON" in state_str:
+            # Also handle exact "NIGHT_MODE" state (without "_ON" suffix)
+            elif "NIGHT_MODE_ON" in state_str or state_str == "NIGHT_MODE":
                 return SecurityState.NIGHT_MODE
             elif "ARMED" in state_str:
                 return SecurityState.ARMED

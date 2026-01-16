@@ -961,41 +961,17 @@
     }
   },
   "services": {
-    "arm": {
-      "description": "Arm the Ajax system",
-      "name": "Arm"
-    },
-    "arm_night": {
-      "description": "Activate night mode",
-      "name": "Night mode"
-    },
-    "arm_partial": {
-      "description": "Activate partial arming",
-      "name": "Partial arming"
-    },
-    "disarm": {
-      "description": "Disarm the Ajax system",
-      "name": "Disarm"
-    },
     "force_arm": {
       "description": "Forcera tillkoppling av larmsystemet, ignorera öppna sensorer och felfunktioner",
-      "fields": {
-        "entity_id": {
-          "description": "Larmpanel som ska tillkopplas forcerat",
-          "name": "Entitet"
-        }
-      },
       "name": "Forcera tillkoppling"
     },
     "force_arm_night": {
       "description": "Forcera tillkoppling i nattläge av larmsystemet, ignorera öppna sensorer och felfunktioner",
-      "fields": {
-        "entity_id": {
-          "description": "Larmpanel som ska forceras till nattläge",
-          "name": "Entitet"
-        }
-      },
       "name": "Forcera tillkoppling till nattläge"
+    },
+    "get_raw_devices": {
+      "description": "Hämta rådata för ella enheter i JSON-format. Resultatet sparas i  ajax_raw_devices.json.",
+      "name": "Hämta rådata för enheter"
     },
     "refresh_metadata": {
       "description": "Forcera fullständig omladdning av rum, användare och grupper från Ajax",

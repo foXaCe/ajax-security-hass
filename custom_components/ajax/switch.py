@@ -12,6 +12,7 @@ from typing import Any
 from homeassistant.components.switch import SwitchEntity
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import ServiceValidationError
+from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
@@ -118,6 +119,12 @@ class AjaxSwitch(CoordinatorEntity[AjaxDataCoordinator], SwitchEntity):
 
         # Set unique ID
         self._attr_unique_id = f"{device_id}_{switch_key}"
+
+        # Set entity category if provided
+        if "entity_category" in switch_desc:
+            self._attr_entity_category = switch_desc["entity_category"]
+        else:
+            self._attr_entity_category = EntityCategory.CONFIG
 
         # Set entity name - use custom name if provided (for multi-gang channels),
         # otherwise use translation key

@@ -166,6 +166,7 @@ class SocketHandler(AjaxDeviceHandler):
             {
                 "key": "socket",
                 "translation_key": "socket",
+                "entity_category": None,
                 "value_fn": lambda: self.device.attributes.get("is_on", False),
                 "turn_on_fn": lambda: {"action": "turn_on"},
                 "turn_off_fn": lambda: {"action": "turn_off"},
@@ -186,6 +187,7 @@ class SocketHandler(AjaxDeviceHandler):
                 "value_fn": lambda: self.device.attributes.get("channel_1_on", False),
                 "icon": "mdi:light-switch",
                 "enabled_by_default": True,
+                "entity_category": None,
                 "channel": 0,
             }
         )
@@ -199,6 +201,7 @@ class SocketHandler(AjaxDeviceHandler):
                 "value_fn": lambda: self.device.attributes.get("channel_2_on", False),
                 "icon": "mdi:light-switch",
                 "enabled_by_default": True,
+                "entity_category": None,
                 "channel": 1,
             }
         )

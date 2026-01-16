@@ -12,6 +12,7 @@ from typing import Any
 from homeassistant.components.select import SelectEntity
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
+from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
@@ -102,6 +103,7 @@ class AjaxDoorPlusBaseSelect(CoordinatorEntity[AjaxDataCoordinator], SelectEntit
 class AjaxShockSensitivitySelect(AjaxDoorPlusBaseSelect):
     """Select entity for shock sensor sensitivity."""
 
+    _attr_entity_category = EntityCategory.CONFIG
     _attr_options = list(SHOCK_SENSITIVITY_OPTIONS.values())
 
     def __init__(

@@ -12,6 +12,7 @@ from typing import Any
 from homeassistant.components.number import NumberEntity, NumberMode
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
+from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
@@ -101,6 +102,7 @@ class AjaxTiltDegreesNumber(AjaxDoorPlusBaseNumber):
         super().__init__(coordinator, space_id, device_id)
         self._attr_unique_id = f"{device_id}_tilt_degrees"
         self._attr_translation_key = "tilt_degrees"
+        self._attr_entity_category = EntityCategory.CONFIG
 
     @property
     def native_value(self) -> float | None:

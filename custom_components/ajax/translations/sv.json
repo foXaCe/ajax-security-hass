@@ -316,10 +316,10 @@
       "gsm_connection_status": {
         "name": "GSM anslutningsstatus",
         "state": {
-          "CONNECTED": "Ansluten",
-          "CONNECTING": "Ansluter",
-          "DISCONNECTED": "Ej ansluten",
-          "ERROR": "Fel"
+          "connected": "Ansluten",
+          "connecting": "Ansluter",
+          "disconnected": "Ej ansluten",
+          "error": "Fel"
         }
       },
       "gsm_signal_level": {
@@ -328,11 +328,11 @@
       "gsm_type": {
         "name": "GSM typ",
         "state": {
-          "2G": "2G",
-          "3G": "3G",
-          "4G": "4G",
-          "5G": "5G",
-          "UNKNOWN": "Okänt"
+          "2g": "2G",
+          "3g": "3G",
+          "4g": "4G",
+          "5g": "5G",
+          "unknown": "Okänt"
         }
       },
       "hardware_version": {
@@ -605,6 +605,9 @@
       },
       "led_indication": {
         "name": "LED-indikering"
+      },
+      "mac_address": {
+        "name": "MAC-adress"
       },
       "malfunctions": {
         "name": "Felfuntioner"
@@ -961,41 +964,17 @@
     }
   },
   "services": {
-    "arm": {
-      "description": "Arm the Ajax system",
-      "name": "Arm"
-    },
-    "arm_night": {
-      "description": "Activate night mode",
-      "name": "Night mode"
-    },
-    "arm_partial": {
-      "description": "Activate partial arming",
-      "name": "Partial arming"
-    },
-    "disarm": {
-      "description": "Disarm the Ajax system",
-      "name": "Disarm"
-    },
     "force_arm": {
       "description": "Forcera tillkoppling av larmsystemet, ignorera öppna sensorer och felfunktioner",
-      "fields": {
-        "entity_id": {
-          "description": "Larmpanel som ska tillkopplas forcerat",
-          "name": "Entitet"
-        }
-      },
       "name": "Forcera tillkoppling"
     },
     "force_arm_night": {
       "description": "Forcera tillkoppling i nattläge av larmsystemet, ignorera öppna sensorer och felfunktioner",
-      "fields": {
-        "entity_id": {
-          "description": "Larmpanel som ska forceras till nattläge",
-          "name": "Entitet"
-        }
-      },
       "name": "Forcera tillkoppling till nattläge"
+    },
+    "get_raw_devices": {
+      "description": "Hämta rådata för ella enheter i JSON-format. Resultatet sparas i  ajax_raw_devices.json.",
+      "name": "Hämta rådata för enheter"
     },
     "refresh_metadata": {
       "description": "Forcera fullständig omladdning av rum, användare och grupper från Ajax",

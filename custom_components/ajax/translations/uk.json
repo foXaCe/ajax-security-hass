@@ -137,6 +137,12 @@
       "battery_connected": {
         "name": "Батарея хаба"
       },
+      "beep_on_arm": {
+        "name": "Звук при постановці/знятті"
+      },
+      "beep_on_delay": {
+        "name": "Звук при затримці входу/виходу"
+      },
       "connection": {
         "name": "Підключення хаба",
         "state": {
@@ -863,8 +869,17 @@
     }
   },
   "exceptions": {
+    "failed_to_change": {
+      "message": "Не вдалося змінити {entity}: {error}"
+    },
     "invalid_target": {
       "message": "Невірна ціль для сервісу."
+    },
+    "space_not_found": {
+      "message": "Простір не знайдено."
+    },
+    "system_armed": {
+      "message": "Система під охороною. Будь ласка, зніміть."
     }
   },
   "options": {

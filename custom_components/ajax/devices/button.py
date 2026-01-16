@@ -60,7 +60,6 @@ class ButtonHandler(AjaxDeviceHandler):
             {
                 "key": "signal_strength",
                 "translation_key": "signal_strength",
-                "icon": "mdi:signal",
                 "native_unit_of_measurement": PERCENTAGE,
                 "state_class": SensorStateClass.MEASUREMENT,
                 "value_fn": lambda: self.device.signal_strength
@@ -75,7 +74,6 @@ class ButtonHandler(AjaxDeviceHandler):
             {
                 "key": "last_action",
                 "translation_key": "last_action",
-                "icon": "mdi:gesture-tap-button",
                 "value_fn": lambda: self.device.attributes.get("last_action"),
                 "enabled_by_default": True,
             }

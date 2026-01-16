@@ -56,7 +56,6 @@ class MotionDetectorHandler(AjaxDeviceHandler):
                     "key": "glass_break",
                     "translation_key": "glass_break",
                     "device_class": BinarySensorDeviceClass.SAFETY,
-                    "icon": "mdi:glass-fragile",
                     "value_fn": lambda: self.device.attributes.get(
                         "glass_break_detected", False
                     ),
@@ -90,7 +89,6 @@ class MotionDetectorHandler(AjaxDeviceHandler):
             {
                 "key": "signal_strength",
                 "translation_key": "signal_strength",
-                "icon": "mdi:signal",
                 "native_unit_of_measurement": PERCENTAGE,
                 "state_class": SensorStateClass.MEASUREMENT,
                 "value_fn": lambda: self.device.signal_strength
@@ -120,7 +118,6 @@ class MotionDetectorHandler(AjaxDeviceHandler):
                 {
                     "key": "sensitivity",
                     "translation_key": "sensitivity",
-                    "icon": "mdi:tune",
                     "value_fn": lambda: {0: "low", 1: "normal", 2: "high"}.get(
                         self.device.attributes.get("sensitivity"),
                         self.device.attributes.get("sensitivity"),
@@ -140,7 +137,6 @@ class MotionDetectorHandler(AjaxDeviceHandler):
             {
                 "key": "always_active",
                 "translation_key": "always_active",
-                "icon": "mdi:shield-alert",
                 "value_fn": lambda: self.device.attributes.get("always_active", False),
                 "api_key": "alwaysActive",
                 "enabled_by_default": True,
@@ -153,7 +149,6 @@ class MotionDetectorHandler(AjaxDeviceHandler):
                 {
                     "key": "indicator_light",
                     "translation_key": "indicator_light",
-                    "icon": "mdi:led-on",
                     "value_fn": lambda: self.device.attributes.get("indicatorLightMode")
                     == "STANDARD",
                     "api_key": "indicatorLightMode",
@@ -168,7 +163,6 @@ class MotionDetectorHandler(AjaxDeviceHandler):
             {
                 "key": "night_mode",
                 "translation_key": "night_mode",
-                "icon": "mdi:weather-night",
                 "value_fn": lambda: self.device.attributes.get("night_mode_arm", False),
                 "api_key": "nightModeArm",
                 "enabled_by_default": True,

@@ -43,7 +43,6 @@ class VideoEdgeHandler:
                 {
                     "key": f"motion_{channel_id}" if channel_name else "motion",
                     "translation_key": "video_motion",
-                    "icon": "mdi:motion-sensor",
                     "value_fn": lambda cid=channel_id: self._has_detection_by_id(
                         cid, "VIDEO_MOTION"
                     ),
@@ -57,7 +56,6 @@ class VideoEdgeHandler:
                 {
                     "key": f"human_{channel_id}" if channel_name else "human",
                     "translation_key": "video_human",
-                    "icon": "mdi:human",
                     "value_fn": lambda cid=channel_id: self._has_detection_by_id(
                         cid, "VIDEO_HUMAN"
                     ),
@@ -71,7 +69,6 @@ class VideoEdgeHandler:
                 {
                     "key": f"vehicle_{channel_id}" if channel_name else "vehicle",
                     "translation_key": "video_vehicle",
-                    "icon": "mdi:car",
                     "value_fn": lambda cid=channel_id: self._has_detection_by_id(
                         cid, "VIDEO_VEHICLE"
                     ),
@@ -85,7 +82,6 @@ class VideoEdgeHandler:
                 {
                     "key": f"pet_{channel_id}" if channel_name else "pet",
                     "translation_key": "video_pet",
-                    "icon": "mdi:dog",
                     "value_fn": lambda cid=channel_id: self._has_detection_by_id(
                         cid, "VIDEO_PET"
                     ),
@@ -106,7 +102,6 @@ class VideoEdgeHandler:
                 {
                     "key": "ip_address",
                     "translation_key": "ip_address",
-                    "icon": "mdi:ip-network",
                     "value_fn": lambda: self.video_edge.ip_address,
                     "enabled_by_default": True,
                     "entity_category": "diagnostic",
@@ -119,7 +114,6 @@ class VideoEdgeHandler:
                 {
                     "key": "mac_address",
                     "translation_key": "mac_address",
-                    "icon": "mdi:network",
                     "value_fn": lambda: self.video_edge.mac_address,
                     "enabled_by_default": True,
                     "entity_category": "diagnostic",
@@ -132,7 +126,6 @@ class VideoEdgeHandler:
                 {
                     "key": "firmware",
                     "translation_key": "firmware_version",
-                    "icon": "mdi:chip",
                     "value_fn": lambda: self.video_edge.firmware_version,
                     "enabled_by_default": True,
                     "entity_category": "diagnostic",

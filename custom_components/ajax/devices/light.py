@@ -113,7 +113,6 @@ class LightHandler(AjaxDeviceHandler):
                     "native_unit_of_measurement": SIGNAL_STRENGTH_DECIBELS_MILLIWATT,
                     "state_class": SensorStateClass.MEASUREMENT,
                     "value_fn": lambda: self.device.attributes.get("signal_strength"),
-                    "icon": "mdi:wifi",
                     "enabled_by_default": False,
                 }
             )
@@ -126,7 +125,6 @@ class LightHandler(AjaxDeviceHandler):
                 "native_unit_of_measurement": PERCENTAGE,
                 "state_class": SensorStateClass.MEASUREMENT,
                 "value_fn": lambda: self.device.attributes.get("brightness", 0),
-                "icon": "mdi:brightness-6",
                 "enabled_by_default": False,
             }
         )

@@ -202,10 +202,6 @@ class AjaxBinarySensor(CoordinatorEntity[AjaxDataCoordinator], BinarySensorEntit
             # No device_class, use sensor_key as fallback translation key
             self._attr_translation_key = sensor_key
 
-        # Set icon if provided
-        if "icon" in sensor_desc:
-            self._attr_icon = sensor_desc["icon"]
-
         # Set enabled by default
         if "enabled_by_default" in sensor_desc:
             self._attr_entity_registry_enabled_default = sensor_desc[
@@ -351,10 +347,6 @@ class AjaxVideoEdgeBinarySensor(
 
         # Set translation key
         self._attr_translation_key = sensor_desc.get("translation_key", sensor_key)
-
-        # Set icon if provided
-        if "icon" in sensor_desc:
-            self._attr_icon = sensor_desc["icon"]
 
         # Set enabled by default
         if "enabled_by_default" in sensor_desc:

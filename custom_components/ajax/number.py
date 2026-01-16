@@ -103,7 +103,6 @@ class AjaxTiltDegreesNumber(AjaxDoorPlusBaseNumber):
         self._attr_unique_id = f"{device_id}_tilt_degrees"
         self._attr_translation_key = "tilt_degrees"
         self._attr_entity_category = EntityCategory.CONFIG
-        self._attr_icon = "mdi:angle-acute"
 
     @property
     def native_value(self) -> float | None:

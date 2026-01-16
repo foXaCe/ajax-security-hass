@@ -2,6 +2,7 @@
   "config": {
     "abort": {
       "already_configured": "Esta integración Ajax ya está configurada.",
+      "no_spaces_available": "No spaces available. Please reload the integration.",
       "reauth_failed": "Re-autenticación fallida. Por favor, reconfigure la integración.",
       "reauth_successful": "Re-autenticación exitosa."
     },
@@ -13,6 +14,7 @@
       "invalid_auth": "Credenciales API inválidas. Verifique su clave API, correo y contraseña.",
       "invalid_password": "Correo o contraseña incorrectos. Verifique sus credenciales de cuenta Ajax.",
       "invalid_proxy_url": "URL del proxy inválida. La URL debe comenzar con http:// o https://",
+      "no_spaces_selected": "Please select at least one space to enable.",
       "unknown": "Error inesperado. Consulte los registros para más detalles."
     },
     "step": {
@@ -66,6 +68,13 @@
         },
         "description": "Su sesión ha expirado. Por favor, ingrese nuevamente su contraseña para {email}.",
         "title": "Re-autenticación"
+      },
+      "select_spaces": {
+        "data": {
+          "enabled_spaces": "Enabled Spaces"
+        },
+        "description": "Found {space_count} spaces. Select which spaces to enable in Home Assistant.\n\nUnselected spaces will not create any devices or entities.",
+        "title": "Select Spaces"
       },
       "user": {
         "data": {
@@ -125,20 +134,14 @@
       }
     },
     "binary_sensor": {
-      "always_active": {
-        "name": "Siempre activo"
-      },
-      "armed_in_night_mode": {
-        "name": "Armado en modo nocturno"
-      },
       "battery_connected": {
         "name": "Batería Hub"
       },
-      "cellular_signal": {
-        "name": "Señal celular"
+      "beep_on_arm": {
+        "name": "Beep on arm/disarm"
       },
-      "cms_connection": {
-        "name": "Conexión CMS"
+      "beep_on_delay": {
+        "name": "Beep on entry/exit delay"
       },
       "connection": {
         "name": "Conexión hub",
@@ -146,9 +149,6 @@
           "off": "Desconectado",
           "on": "Conectado"
         }
-      },
-      "door": {
-        "name": "Detector de apertura de puerta"
       },
       "doorbell_ring": {
         "name": "Timbre"
@@ -159,12 +159,6 @@
       "external_power": {
         "name": "Alimentación externa"
       },
-      "externally_powered": {
-        "name": "Alimentación externa"
-      },
-      "gas": {
-        "name": "Detector de gas"
-      },
       "glass_break": {
         "name": "Detector de rotura de cristal"
       },
@@ -173,12 +167,6 @@
       },
       "jeweller_radio": {
         "name": "Radio Jeweller"
-      },
-      "moisture": {
-        "name": "Humedad"
-      },
-      "motion": {
-        "name": "Detector de movimiento"
       },
       "problem": {
         "name": "Problema detectado",
@@ -196,12 +184,6 @@
       },
       "shock": {
         "name": "Sensor de golpe"
-      },
-      "smoke": {
-        "name": "Detector de humo"
-      },
-      "system_health": {
-        "name": "Estado del sistema"
       },
       "system_problems": {
         "name": "Problemas del sistema",
@@ -221,24 +203,20 @@
           }
         }
       },
-      "tamper": {
-        "name": "Tapa",
-        "state": {
-          "off": "Cerrada",
-          "on": "Abierta"
-        }
-      },
-      "tampered": {
-        "name": "Sabotaje"
-      },
       "tilt": {
         "name": "Sensor de inclinación"
       },
-      "water": {
-        "name": "Detector de inundación"
+      "video_human": {
+        "name": "Human detected"
       },
-      "window": {
-        "name": "Detector de apertura de ventana"
+      "video_motion": {
+        "name": "Motion detected"
+      },
+      "video_pet": {
+        "name": "Pet detected"
+      },
+      "video_vehicle": {
+        "name": "Vehicle detected"
       },
       "wings_radio": {
         "name": "Radio Wings"
@@ -297,9 +275,6 @@
           "very_loud": "Muy fuerte"
         }
       },
-      "battery": {
-        "name": "Batería"
-      },
       "battery_state": {
         "name": "Estado de la batería"
       },
@@ -316,22 +291,11 @@
       "bypassed_devices": {
         "name": "Dispositivos omitidos"
       },
-      "co2": {
-        "name": "CO2"
-      },
-      "color": {
-        "name": "Color"
-      },
-      "connection_type": {
-        "name": "Tipo de conexión"
-      },
       "device_color": {
         "name": "Color del dispositivo",
         "state": {
-          "BLACK": "Negro",
-          "Black": "Negro",
-          "WHITE": "Blanco",
-          "White": "Blanco"
+          "black": "Black",
+          "white": "White"
         }
       },
       "device_label": {
@@ -352,10 +316,10 @@
       "gsm_connection_status": {
         "name": "Estado de conexión GSM",
         "state": {
-          "CONNECTED": "Conectado",
-          "CONNECTING": "Conectando",
-          "DISCONNECTED": "Desconectado",
-          "ERROR": "Error"
+          "connected": "Connected",
+          "connecting": "Connecting",
+          "disconnected": "Disconnected",
+          "error": "Error"
         }
       },
       "gsm_signal_level": {
@@ -364,11 +328,11 @@
       "gsm_type": {
         "name": "Tipo GSM",
         "state": {
-          "2G": "2G",
-          "3G": "3G",
-          "4G": "4G",
-          "5G": "5G",
-          "UNKNOWN": "Desconocido"
+          "2g": "2G",
+          "3g": "3G",
+          "4g": "4G",
+          "5g": "5G",
+          "unknown": "Unknown"
         }
       },
       "hardware_version": {
@@ -423,6 +387,13 @@
       },
       "hub_gsm": {
         "name": "GSM / SIM",
+        "state": {
+          "good": "Good",
+          "none": "None",
+          "normal": "Normal",
+          "strong": "Strong",
+          "weak": "Weak"
+        },
         "state_attributes": {
           "active_sim": {
             "name": "SIM activa"
@@ -593,14 +564,24 @@
           }
         }
       },
-      "humidity": {
-        "name": "Humedad"
-      },
       "image_resolution": {
         "name": "Resolución de foto"
       },
       "indicator_light_mode": {
         "name": "Modo LED"
+      },
+      "ip_address": {
+        "name": "IP address"
+      },
+      "last_action": {
+        "name": "Last action",
+        "state": {
+          "double_press": "Double press",
+          "emergency": "Emergency",
+          "long_press": "Long press",
+          "panic": "Panic",
+          "single_press": "Single press"
+        }
       },
       "last_alert": {
         "name": "Última alerta",
@@ -619,8 +600,14 @@
           }
         }
       },
+      "last_ring": {
+        "name": "Last ring"
+      },
       "led_indication": {
         "name": "Indicación LED"
+      },
+      "mac_address": {
+        "name": "MAC address"
       },
       "malfunctions": {
         "name": "Mal funcionamientos"
@@ -650,9 +637,6 @@
       },
       "online_devices": {
         "name": "Dispositivos en línea"
-      },
-      "operating_mode": {
-        "name": "Modo de operación"
       },
       "photos_per_alarm": {
         "name": "Fotos por alarma"
@@ -702,9 +686,6 @@
           }
         }
       },
-      "temperature": {
-        "name": "Temperatura"
-      },
       "total_devices": {
         "name": "Número total de dispositivos"
       },
@@ -721,14 +702,6 @@
         "state": {
           "off": "Desactivadas",
           "on": "Activadas"
-        },
-        "state_attributes": {
-          "device_id": {
-            "name": "ID del dispositivo"
-          },
-          "device_type": {
-            "name": "Tipo de dispositivo"
-          }
         }
       },
       "always_active": {
@@ -780,13 +753,6 @@
           "on": "Activado"
         }
       },
-      "external_contact": {
-        "name": "Contacto externo",
-        "state": {
-          "off": "Desactivado",
-          "on": "Activado"
-        }
-      },
       "external_contact_enabled": {
         "name": "Contacto externo",
         "state": {
@@ -806,17 +772,6 @@
         "state": {
           "off": "Desactivada",
           "on": "Activada"
-        },
-        "state_attributes": {
-          "device_id": {
-            "name": "ID del dispositivo"
-          },
-          "device_type": {
-            "name": "Tipo de dispositivo"
-          },
-          "mode": {
-            "name": "Modo"
-          }
         }
       },
       "night_mode": {
@@ -824,14 +779,6 @@
         "state": {
           "off": "Desactivado",
           "on": "Activado"
-        },
-        "state_attributes": {
-          "device_id": {
-            "name": "ID del dispositivo"
-          },
-          "device_type": {
-            "name": "Tipo de dispositivo"
-          }
         }
       },
       "security_group": {
@@ -921,6 +868,20 @@
       }
     }
   },
+  "exceptions": {
+    "failed_to_change": {
+      "message": "Failed to change {entity}: {error}"
+    },
+    "invalid_target": {
+      "message": "Invalid target for service."
+    },
+    "space_not_found": {
+      "message": "Space not found."
+    },
+    "system_armed": {
+      "message": "System armed. Please disarm."
+    }
+  },
   "options": {
     "step": {
       "aws_credentials": {
@@ -937,11 +898,20 @@
         "description": "Configure las credenciales AWS para recibir eventos en tiempo real.\n\n**Configuración actual:**\n- Clave de acceso: {current_access_key}\n- Clave secreta: {current_secret_key}\n- Cola SQS: {current_queue}\n\nDeje un campo vacío para conservar el valor actual.",
         "title": "Credenciales AWS SQS"
       },
+      "enabled_spaces": {
+        "data": {
+          "enabled_spaces": "Enabled Spaces"
+        },
+        "description": "Select which spaces to enable in Home Assistant.\n\nDisabled spaces will not create any devices or entities. Changing this will reload the integration.",
+        "title": "Enabled Spaces"
+      },
       "init": {
         "description": "Elija una categoría para configurar",
         "menu_options": {
           "aws_credentials": "Credenciales AWS SQS",
+          "enabled_spaces": "Enabled Spaces",
           "notifications": "Notificaciones",
+          "polling_settings": "Polling Settings",
           "proxy_settings": "Configuración del proxy"
         },
         "title": "Opciones Ajax"
@@ -954,6 +924,16 @@
         },
         "description": "Configure las notificaciones de su integración Ajax",
         "title": "Opciones de notificaciones"
+      },
+      "polling_settings": {
+        "data": {
+          "door_sensor_fast_poll": "Door sensor fast polling"
+        },
+        "data_description": {
+          "door_sensor_fast_poll": "Poll door sensors every 5 seconds when disarmed. Disable to reduce API calls."
+        },
+        "description": "Configure API polling behavior to optimize performance.\n\n**Current behavior:**\n- Light polling (hub state + devices): every 30-60s\n- Full metadata refresh (rooms, users, groups): hourly",
+        "title": "Polling Settings"
       },
       "proxy_settings": {
         "data": {
@@ -984,41 +964,21 @@
     }
   },
   "services": {
-    "arm": {
-      "description": "Arma el sistema Ajax",
-      "name": "Armar"
-    },
-    "arm_night": {
-      "description": "Activa el modo nocturno",
-      "name": "Modo nocturno"
-    },
-    "arm_partial": {
-      "description": "Activa el armado parcial",
-      "name": "Armado parcial"
-    },
-    "disarm": {
-      "description": "Desarma el sistema Ajax",
-      "name": "Desarmar"
-    },
     "force_arm": {
-      "description": "Fuerza el armado del sistema de seguridad, ignorando sensores abiertos y problemas",
-      "fields": {
-        "entity_id": {
-          "description": "La entidad del panel de alarma a forzar armar",
-          "name": "Entidad"
-        }
-      },
-      "name": "Armado forzado"
+      "description": "Force arm the security system, ignoring open sensors and problems.",
+      "name": "Force arm"
     },
     "force_arm_night": {
-      "description": "Fuerza la activación del modo nocturno, ignorando sensores abiertos y problemas",
-      "fields": {
-        "entity_id": {
-          "description": "La entidad del panel de alarma a forzar en modo nocturno",
-          "name": "Entidad"
-        }
-      },
-      "name": "Modo nocturno forzado"
+      "description": "Force activate night mode, ignoring open sensors and problems.",
+      "name": "Force arm night mode"
+    },
+    "get_raw_devices": {
+      "description": "Get raw API JSON data for all devices. Saves the complete API response to ajax_raw_devices.json.",
+      "name": "Get raw devices"
+    },
+    "refresh_metadata": {
+      "description": "Force a full refresh of rooms, users, and groups from Ajax.",
+      "name": "Refresh metadata"
     }
   }
 }

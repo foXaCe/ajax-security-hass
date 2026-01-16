@@ -137,6 +137,12 @@
       "battery_connected": {
         "name": "Hub-Batterie"
       },
+      "beep_on_arm": {
+        "name": "Ton bei Scharf/Unscharf"
+      },
+      "beep_on_delay": {
+        "name": "Ton bei Ein-/Ausgangsverzögerung"
+      },
       "connection": {
         "name": "Hub-Verbindung",
         "state": {
@@ -863,8 +869,17 @@
     }
   },
   "exceptions": {
+    "failed_to_change": {
+      "message": "Fehler beim Ändern von {entity}: {error}"
+    },
     "invalid_target": {
       "message": "Ungültiges Ziel für den Dienst."
+    },
+    "space_not_found": {
+      "message": "Bereich nicht gefunden."
+    },
+    "system_armed": {
+      "message": "System ist scharf. Bitte deaktivieren."
     }
   },
   "options": {

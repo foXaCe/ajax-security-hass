@@ -17,6 +17,6 @@ repos:
           exclude: (.vscode|.devcontainer)
         - id: pretty-format-json
           args: ['--autofix', '--no-ensure-ascii']
-          files: 'translations/.+\.json$'
+          files: (icons.json|translations/.+\.json$)
         - id: check-yaml
           args: ['--unsafe']

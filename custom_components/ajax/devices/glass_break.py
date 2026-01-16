@@ -34,7 +34,6 @@ class GlassBreakHandler(AjaxDeviceHandler):
                 "key": "glass_break",
                 "translation_key": "glass_break",
                 "device_class": BinarySensorDeviceClass.SAFETY,
-                "icon": "mdi:glass-fragile",
                 "value_fn": lambda: self.device.attributes.get("state") == "ALARM",
                 "enabled_by_default": True,
                 "name": None,
@@ -95,7 +94,6 @@ class GlassBreakHandler(AjaxDeviceHandler):
             {
                 "key": "signal_strength",
                 "translation_key": "signal_strength",
-                "icon": "mdi:signal",
                 "native_unit_of_measurement": PERCENTAGE,
                 "state_class": SensorStateClass.MEASUREMENT,
                 "value_fn": lambda: self.device.signal_strength
@@ -125,7 +123,6 @@ class GlassBreakHandler(AjaxDeviceHandler):
                 {
                     "key": "sensitivity",
                     "translation_key": "sensitivity",
-                    "icon": "mdi:tune",
                     "value_fn": lambda: {0: "low", 1: "normal", 2: "high"}.get(
                         self.device.attributes.get("sensitivity"),
                         self.device.attributes.get("sensitivity"),
@@ -145,7 +142,6 @@ class GlassBreakHandler(AjaxDeviceHandler):
             {
                 "key": "always_active",
                 "translation_key": "always_active",
-                "icon": "mdi:shield-alert",
                 "value_fn": lambda: self.device.attributes.get("always_active", False),
                 "api_key": "alwaysActive",
                 "enabled_by_default": True,
@@ -158,7 +154,6 @@ class GlassBreakHandler(AjaxDeviceHandler):
                 {
                     "key": "indicator_light",
                     "translation_key": "indicator_light",
-                    "icon": "mdi:led-on",
                     "value_fn": lambda: self.device.attributes.get("indicatorLightMode")
                     == "STANDARD",
                     "api_key": "indicatorLightMode",
@@ -173,7 +168,6 @@ class GlassBreakHandler(AjaxDeviceHandler):
             {
                 "key": "night_mode",
                 "translation_key": "night_mode",
-                "icon": "mdi:weather-night",
                 "value_fn": lambda: self.device.attributes.get("night_mode_arm", False),
                 "api_key": "nightModeArm",
                 "enabled_by_default": True,
@@ -185,7 +179,6 @@ class GlassBreakHandler(AjaxDeviceHandler):
             {
                 "key": "external_contact_enabled",
                 "translation_key": "external_contact_enabled",
-                "icon": "mdi:electric-switch",
                 "value_fn": lambda: self.device.attributes.get(
                     "extra_contact_aware", False
                 ),
@@ -199,7 +192,6 @@ class GlassBreakHandler(AjaxDeviceHandler):
             {
                 "key": "siren_trigger_glass",
                 "translation_key": "siren_trigger_glass",
-                "icon": "mdi:glass-fragile",
                 "value_fn": lambda: "GLASS"
                 in self.device.attributes.get("siren_triggers", []),
                 "api_key": "sirenTriggers",

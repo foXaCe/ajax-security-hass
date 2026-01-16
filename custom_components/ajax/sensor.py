@@ -244,7 +244,6 @@ SPACE_SENSORS: tuple[AjaxSpaceSensorDescription, ...] = (
     AjaxSpaceSensorDescription(
         key="total_devices",
         translation_key="total_devices",
-        icon="mdi:devices",
         state_class=SensorStateClass.MEASUREMENT,
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda space: len(space.devices),
@@ -252,7 +251,6 @@ SPACE_SENSORS: tuple[AjaxSpaceSensorDescription, ...] = (
     AjaxSpaceSensorDescription(
         key="online_devices",
         translation_key="online_devices",
-        icon="mdi:check-network",
         state_class=SensorStateClass.MEASUREMENT,
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda space: len(space.get_online_devices()),
@@ -260,7 +258,6 @@ SPACE_SENSORS: tuple[AjaxSpaceSensorDescription, ...] = (
     AjaxSpaceSensorDescription(
         key="devices_with_malfunctions",
         translation_key="devices_with_malfunctions",
-        icon="mdi:alert-circle",
         state_class=SensorStateClass.MEASUREMENT,
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda space: space.hub_details.get("warnings", {}).get(
@@ -272,7 +269,6 @@ SPACE_SENSORS: tuple[AjaxSpaceSensorDescription, ...] = (
     AjaxSpaceSensorDescription(
         key="bypassed_devices",
         translation_key="bypassed_devices",
-        icon="mdi:shield-off",
         state_class=SensorStateClass.MEASUREMENT,
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda space: len(space.get_bypassed_devices()),
@@ -280,7 +276,6 @@ SPACE_SENSORS: tuple[AjaxSpaceSensorDescription, ...] = (
     AjaxSpaceSensorDescription(
         key="recent_events",
         translation_key="recent_events",
-        icon="mdi:bell-ring",
         value_fn=lambda space: get_last_event_text(space),
     ),
     AjaxSpaceSensorDescription(
@@ -299,7 +294,6 @@ SPACE_SENSORS: tuple[AjaxSpaceSensorDescription, ...] = (
     AjaxSpaceSensorDescription(
         key="hub_external_power",
         translation_key="hub_external_power",
-        icon="mdi:power-plug",
         value_fn=lambda space: "connected"
         if space.hub_details.get("externallyPowered")
         else "disconnected"
@@ -309,7 +303,6 @@ SPACE_SENSORS: tuple[AjaxSpaceSensorDescription, ...] = (
     AjaxSpaceSensorDescription(
         key="hub_ethernet_ip",
         translation_key="hub_ethernet_ip",
-        icon="mdi:ethernet",
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda space: space.hub_details.get("ethernet", {}).get("ip")
         if space.hub_details and space.hub_details.get("ethernet", {}).get("enabled")
@@ -318,7 +311,6 @@ SPACE_SENSORS: tuple[AjaxSpaceSensorDescription, ...] = (
     AjaxSpaceSensorDescription(
         key="hub_wifi",
         translation_key="hub_wifi",
-        icon="mdi:wifi",
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda space: format_signal_level(
             space.hub_details.get("wifi", {}).get("signalLevel")
@@ -331,7 +323,6 @@ SPACE_SENSORS: tuple[AjaxSpaceSensorDescription, ...] = (
     AjaxSpaceSensorDescription(
         key="hub_gsm",
         translation_key="hub_gsm",
-        icon="mdi:sim",
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda space: format_signal_level(
             space.hub_details.get("gsm", {}).get("signalLevel")
@@ -344,7 +335,6 @@ SPACE_SENSORS: tuple[AjaxSpaceSensorDescription, ...] = (
     AjaxSpaceSensorDescription(
         key="hub_led_brightness",
         translation_key="hub_led_brightness",
-        icon="mdi:brightness-6",
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda space: space.hub_details.get("ledBrightnessLevel")
         if space.hub_details
@@ -353,7 +343,6 @@ SPACE_SENSORS: tuple[AjaxSpaceSensorDescription, ...] = (
     AjaxSpaceSensorDescription(
         key="hub_timezone",
         translation_key="hub_timezone",
-        icon="mdi:clock-outline",
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda space: format_timezone(space.hub_details.get("timeZone"))
         if space.hub_details
@@ -363,7 +352,6 @@ SPACE_SENSORS: tuple[AjaxSpaceSensorDescription, ...] = (
     AjaxSpaceSensorDescription(
         key="hub_rooms",
         translation_key="hub_rooms",
-        icon="mdi:door",
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda space: len(space.rooms) if space.rooms else 0,
     ),
@@ -371,7 +359,6 @@ SPACE_SENSORS: tuple[AjaxSpaceSensorDescription, ...] = (
     AjaxSpaceSensorDescription(
         key="hub_users",
         translation_key="hub_users",
-        icon="mdi:account-group",
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda space: len(getattr(space, "_users", []))
         if hasattr(space, "_users")
@@ -383,7 +370,6 @@ SPACE_SENSORS: tuple[AjaxSpaceSensorDescription, ...] = (
     AjaxSpaceSensorDescription(
         key="hub_grade_mode",
         translation_key="hub_grade_mode",
-        icon="mdi:shield-check",
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda space: {
             "GRADE_1": "Grade 1",
@@ -399,7 +385,6 @@ SPACE_SENSORS: tuple[AjaxSpaceSensorDescription, ...] = (
     AjaxSpaceSensorDescription(
         key="hub_active_channels",
         translation_key="hub_active_channels",
-        icon="mdi:access-point-network",
         entity_category=EntityCategory.DIAGNOSTIC,
         entity_registry_enabled_default=False,
         value_fn=lambda space: ", ".join(space.hub_details.get("activeChannels", []))
@@ -412,7 +397,6 @@ SPACE_SENSORS: tuple[AjaxSpaceSensorDescription, ...] = (
     AjaxSpaceSensorDescription(
         key="hub_ping_period",
         translation_key="hub_ping_period",
-        icon="mdi:timer-outline",
         native_unit_of_measurement="s",
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda space: space.hub_details.get("pingPeriodSeconds")
@@ -425,7 +409,6 @@ SPACE_SENSORS: tuple[AjaxSpaceSensorDescription, ...] = (
     AjaxSpaceSensorDescription(
         key="hub_offline_delay",
         translation_key="hub_offline_delay",
-        icon="mdi:timer-alert-outline",
         native_unit_of_measurement="s",
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda space: space.hub_details.get("offlineAlarmSeconds")
@@ -438,7 +421,6 @@ SPACE_SENSORS: tuple[AjaxSpaceSensorDescription, ...] = (
     AjaxSpaceSensorDescription(
         key="hub_noise_level",
         translation_key="hub_noise_level",
-        icon="mdi:signal-off",
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda space: "high"
         if space.hub_details.get("noiseLevel", {}).get("high", False)
@@ -452,7 +434,6 @@ SPACE_SENSORS: tuple[AjaxSpaceSensorDescription, ...] = (
     AjaxSpaceSensorDescription(
         key="hub_limits",
         translation_key="hub_limits",
-        icon="mdi:counter",
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda space: f"{len(space.devices)}/{space.hub_details.get('limits', {}).get('sensors', 0)}"
         if space.hub_details and space.hub_details.get("limits")
@@ -740,9 +721,6 @@ class AjaxDeviceSensor(CoordinatorEntity[AjaxDataCoordinator], SensorEntity):
         if "state_class" in sensor_desc:
             self._attr_state_class = sensor_desc["state_class"]
 
-        if "icon" in sensor_desc:
-            self._attr_icon = sensor_desc["icon"]
-
         if "enabled_by_default" in sensor_desc:
             self._attr_entity_registry_enabled_default = sensor_desc[
                 "enabled_by_default"
@@ -840,10 +818,6 @@ class AjaxVideoEdgeSensor(CoordinatorEntity[AjaxDataCoordinator], SensorEntity):
 
         # Set translation key
         self._attr_translation_key = sensor_desc.get("translation_key", sensor_key)
-
-        # Set icon if provided
-        if "icon" in sensor_desc:
-            self._attr_icon = sensor_desc["icon"]
 
         # Set entity category if provided (diagnostic, config, etc.)
         if "entity_category" in sensor_desc:
@@ -956,7 +930,6 @@ def _get_hub_sensors(space: AjaxSpace) -> list[dict]:
             {
                 "key": "gsm_signal",
                 "translation_key": "gsm_signal_level",
-                "icon": "mdi:signal-cellular-3",
                 "value_fn": lambda hd=hub_details: hd.get("gsm", {})
                 .get("signalLevel", "")
                 .lower()
@@ -972,7 +945,6 @@ def _get_hub_sensors(space: AjaxSpace) -> list[dict]:
             {
                 "key": "gsm_network",
                 "translation_key": "gsm_type",
-                "icon": "mdi:signal-cellular-3",
                 "value_fn": lambda hd=hub_details: hd.get("gsm", {})
                 .get("networkStatus", "")
                 .lower()
@@ -988,7 +960,6 @@ def _get_hub_sensors(space: AjaxSpace) -> list[dict]:
             {
                 "key": "sim_status",
                 "translation_key": "sim_status",
-                "icon": "mdi:sim",
                 "value_fn": lambda hd=hub_details: hd.get("gsm", {})
                 .get("simCardState", "")
                 .lower()
@@ -1004,7 +975,6 @@ def _get_hub_sensors(space: AjaxSpace) -> list[dict]:
             {
                 "key": "active_connection",
                 "translation_key": "active_connection",
-                "icon": "mdi:connection",
                 "value_fn": lambda hd=hub_details: ", ".join(
                     hd.get("activeChannels", [])
                 )
@@ -1021,7 +991,6 @@ def _get_hub_sensors(space: AjaxSpace) -> list[dict]:
             {
                 "key": "hub_firmware",
                 "translation_key": "firmware_version",
-                "icon": "mdi:chip",
                 "value_fn": lambda hd=hub_details: hd.get("firmware", {}).get(
                     "version"
                 ),
@@ -1080,10 +1049,6 @@ class AjaxHubSensor(CoordinatorEntity[AjaxDataCoordinator], SensorEntity):
         # Set state class
         if "state_class" in sensor_desc:
             self._attr_state_class = sensor_desc["state_class"]
-
-        # Set icon
-        if "icon" in sensor_desc:
-            self._attr_icon = sensor_desc["icon"]
 
         # Set enabled by default
         if "enabled_by_default" in sensor_desc:

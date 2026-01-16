@@ -42,7 +42,6 @@ class AjaxDeviceHandler(ABC):
                 {
                     "key": "room",
                     "translation_key": "room",
-                    "icon": "mdi:door",
                     "value_fn": lambda: self.device.room_name,
                     "enabled_by_default": True,
                 }
@@ -60,7 +59,6 @@ class AjaxDeviceHandler(ABC):
                 - name: Display name
                 - device_class: BinarySensorDeviceClass
                 - value_fn: Function to get the value from device
-                - icon: Optional icon
                 - enabled_by_default: Whether enabled by default
         """
         return []
@@ -77,7 +75,6 @@ class AjaxDeviceHandler(ABC):
                 - native_unit_of_measurement: Optional unit
                 - state_class: Optional SensorStateClass
                 - value_fn: Function to get the value from device
-                - icon: Optional icon
                 - enabled_by_default: Whether enabled by default
         """
         return []
@@ -105,7 +102,6 @@ class AjaxDeviceHandler(ABC):
                 - key: Unique key for the button
                 - name: Display name
                 - press_fn: Function to press the button
-                - icon: Optional icon
                 - enabled_by_default: Whether enabled by default
         """
         return []

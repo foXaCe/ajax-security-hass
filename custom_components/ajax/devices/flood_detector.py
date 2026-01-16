@@ -68,7 +68,6 @@ class FloodDetectorHandler(AjaxDeviceHandler):
             {
                 "key": "signal_strength",
                 "translation_key": "signal_strength",
-                "icon": "mdi:signal",
                 "native_unit_of_measurement": PERCENTAGE,
                 "state_class": SensorStateClass.MEASUREMENT,
                 "value_fn": lambda: self.device.signal_strength
@@ -98,7 +97,6 @@ class FloodDetectorHandler(AjaxDeviceHandler):
                 {
                     "key": "malfunctions",
                     "translation_key": "malfunctions",
-                    "icon": "mdi:alert-circle",
                     "value_fn": lambda: ", ".join(self.device.malfunctions)
                     if self.device.malfunctions
                     else "None",
@@ -112,7 +110,6 @@ class FloodDetectorHandler(AjaxDeviceHandler):
                 {
                     "key": "firmware_version",
                     "translation_key": "firmware_version",
-                    "icon": "mdi:chip",
                     "value_fn": lambda: self.device.attributes.get("firmware_version"),
                     "enabled_by_default": False,
                 }
@@ -130,7 +127,6 @@ class FloodDetectorHandler(AjaxDeviceHandler):
                 {
                     "key": "indicator_light",
                     "translation_key": "indicator_light",
-                    "icon": "mdi:led-on",
                     "value_fn": lambda: self.device.attributes.get("indicatorLightMode")
                     == "STANDARD",
                     "api_key": "indicatorLightMode",
@@ -145,7 +141,6 @@ class FloodDetectorHandler(AjaxDeviceHandler):
             {
                 "key": "night_mode",
                 "translation_key": "night_mode",
-                "icon": "mdi:weather-night",
                 "value_fn": lambda: self.device.attributes.get("night_mode_arm", False),
                 "api_key": "nightModeArm",
                 "enabled_by_default": True,

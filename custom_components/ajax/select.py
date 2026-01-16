@@ -112,7 +112,6 @@ class AjaxShockSensitivitySelect(AjaxDoorPlusBaseSelect):
         super().__init__(coordinator, space_id, device_id)
         self._attr_unique_id = f"{device_id}_shock_sensitivity"
         self._attr_translation_key = "shock_sensitivity"
-        self._attr_icon = "mdi:vibrate"
 
     @property
     def current_option(self) -> str | None:

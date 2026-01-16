@@ -27,7 +27,6 @@ class DoorbellHandler(AjaxDeviceHandler):
                 "key": "doorbell_ring",
                 "translation_key": "doorbell_ring",
                 "device_class": BinarySensorDeviceClass.OCCUPANCY,
-                "icon": "mdi:doorbell",
                 "value_fn": lambda: self.device.attributes.get("doorbell_ring", False),
                 "enabled_by_default": True,
             },
@@ -65,7 +64,6 @@ class DoorbellHandler(AjaxDeviceHandler):
             {
                 "key": "signal_strength",
                 "translation_key": "signal_strength",
-                "icon": "mdi:signal",
                 "native_unit_of_measurement": PERCENTAGE,
                 "state_class": SensorStateClass.MEASUREMENT,
                 "value_fn": lambda: self.device.signal_strength
@@ -80,7 +78,6 @@ class DoorbellHandler(AjaxDeviceHandler):
             {
                 "key": "last_ring",
                 "translation_key": "last_ring",
-                "icon": "mdi:doorbell",
                 "device_class": SensorDeviceClass.TIMESTAMP,
                 "value_fn": lambda: self.device.attributes.get("last_ring"),
                 "enabled_by_default": True,

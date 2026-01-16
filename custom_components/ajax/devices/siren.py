@@ -48,7 +48,6 @@ class SirenHandler(AjaxDeviceHandler):
                 {
                     "key": "beep_on_arm",
                     "translation_key": "beep_on_arm",
-                    "icon": "mdi:volume-high",
                     "value_fn": lambda: self.device.attributes.get(
                         "beep_on_arm_disarm", False
                     ),
@@ -62,7 +61,6 @@ class SirenHandler(AjaxDeviceHandler):
                 {
                     "key": "beep_on_delay",
                     "translation_key": "beep_on_delay",
-                    "icon": "mdi:timer-sand",
                     "value_fn": lambda: self.device.attributes.get(
                         "beep_on_delay", False
                     ),
@@ -96,7 +94,6 @@ class SirenHandler(AjaxDeviceHandler):
                 {
                     "key": "signal_strength",
                     "translation_key": "signal_strength",
-                    "icon": "mdi:signal",
                     "native_unit_of_measurement": PERCENTAGE,
                     "state_class": SensorStateClass.MEASUREMENT,
                     "value_fn": lambda: self.device.signal_strength,
@@ -124,7 +121,6 @@ class SirenHandler(AjaxDeviceHandler):
                 {
                     "key": "alarm_volume_level",
                     "translation_key": "alarm_volume_level",
-                    "icon": "mdi:volume-high",
                     "value_fn": lambda: self._format_volume(
                         self.device.attributes.get("siren_volume_level")
                     ),
@@ -138,7 +134,6 @@ class SirenHandler(AjaxDeviceHandler):
                 {
                     "key": "beep_volume_level",
                     "translation_key": "beep_volume_level",
-                    "icon": "mdi:volume-medium",
                     "value_fn": lambda: self._format_volume(
                         self.device.attributes.get("beep_volume_level")
                     ),
@@ -152,7 +147,6 @@ class SirenHandler(AjaxDeviceHandler):
                 {
                     "key": "alarm_duration",
                     "translation_key": "alarm_duration",
-                    "icon": "mdi:timer-outline",
                     "value_fn": lambda: self._format_duration(
                         self.device.attributes.get("alarm_duration")
                     ),
@@ -195,7 +189,6 @@ class SirenHandler(AjaxDeviceHandler):
                 {
                     "key": "night_mode",
                     "translation_key": "night_mode",
-                    "icon": "mdi:weather-night",
                     "value_fn": lambda: self.device.attributes.get(
                         "night_mode_arm", False
                     ),
@@ -215,7 +208,6 @@ class SirenHandler(AjaxDeviceHandler):
                 {
                     "key": "blink_while_armed",
                     "translation_key": "blink_while_armed",
-                    "icon": "mdi:led-on",
                     "value_fn": lambda: self._get_blink_state(),
                     "api_key": "v2sirenIndicatorLightMode",
                     "api_value_on": "BLINK_WHILE_ARMED",
@@ -232,7 +224,6 @@ class SirenHandler(AjaxDeviceHandler):
                 {
                     "key": "chimes",
                     "translation_key": "chimes",
-                    "icon": "mdi:bell-ring",
                     "value_fn": lambda: self.device.attributes.get(
                         "chimes_enabled", False
                     ),

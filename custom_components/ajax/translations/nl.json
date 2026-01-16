@@ -137,6 +137,12 @@
       "battery_connected": {
         "name": "Hub-batterij"
       },
+      "beep_on_arm": {
+        "name": "Piep bij in-/uitschakelen"
+      },
+      "beep_on_delay": {
+        "name": "Piep bij in-/uitloopvertraging"
+      },
       "connection": {
         "name": "Hub-verbinding",
         "state": {
@@ -863,8 +869,17 @@
     }
   },
   "exceptions": {
+    "failed_to_change": {
+      "message": "Wijzigen van {entity} mislukt: {error}"
+    },
     "invalid_target": {
       "message": "Ongeldig doel voor service."
+    },
+    "space_not_found": {
+      "message": "Ruimte niet gevonden."
+    },
+    "system_armed": {
+      "message": "Systeem ingeschakeld. Schakel uit."
     }
   },
   "options": {

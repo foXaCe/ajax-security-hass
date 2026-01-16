@@ -43,7 +43,6 @@ class AjaxPanicButton(CoordinatorEntity[AjaxDataCoordinator], ButtonEntity):
     """Representation of an Ajax panic button."""
 
     _attr_device_class = ButtonDeviceClass.IDENTIFY
-    _attr_icon = "mdi:alarm-light"
 
     def __init__(
         self, coordinator: AjaxDataCoordinator, entry: AjaxConfigEntry, space_id: str

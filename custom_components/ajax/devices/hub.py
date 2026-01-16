@@ -177,7 +177,6 @@ class HubHandler(AjaxDeviceHandler):
                 {
                     "key": "active_connection",
                     "translation_key": "active_connection",
-                    "icon": "mdi:connection",
                     "value_fn": lambda: self.device.attributes.get("active_connection"),
                     "enabled_by_default": True,
                 }
@@ -189,7 +188,6 @@ class HubHandler(AjaxDeviceHandler):
                 {
                     "key": "network_status",
                     "translation_key": "network_status",
-                    "icon": "mdi:network",
                     "value_fn": lambda: self.device.attributes.get("network_status"),
                     "enabled_by_default": True,
                 }
@@ -201,7 +199,6 @@ class HubHandler(AjaxDeviceHandler):
                 {
                     "key": "gsm_type",
                     "translation_key": "gsm_type",
-                    "icon": "mdi:signal-cellular-3",
                     "value_fn": lambda: (
                         self.device.attributes.get("gsm_type", "").lower()
                         if self.device.attributes.get("gsm_type")
@@ -217,7 +214,6 @@ class HubHandler(AjaxDeviceHandler):
                 {
                     "key": "total_devices",
                     "translation_key": "total_devices",
-                    "icon": "mdi:devices",
                     "value_fn": lambda: self.device.attributes.get("total_devices"),
                     "state_class": SensorStateClass.MEASUREMENT,
                     "enabled_by_default": True,
@@ -230,7 +226,6 @@ class HubHandler(AjaxDeviceHandler):
                 {
                     "key": "online_devices",
                     "translation_key": "online_devices",
-                    "icon": "mdi:check-network",
                     "value_fn": lambda: self.device.attributes.get("online_devices"),
                     "state_class": SensorStateClass.MEASUREMENT,
                     "enabled_by_default": True,
@@ -243,7 +238,6 @@ class HubHandler(AjaxDeviceHandler):
                 {
                     "key": "devices_with_malfunctions",
                     "translation_key": "devices_with_malfunctions",
-                    "icon": "mdi:alert-circle-outline",
                     "value_fn": lambda: self.device.attributes.get(
                         "devices_with_malfunctions"
                     ),
@@ -258,7 +252,6 @@ class HubHandler(AjaxDeviceHandler):
                 {
                     "key": "unread_notifications",
                     "translation_key": "unread_notifications",
-                    "icon": "mdi:bell-badge",
                     "value_fn": lambda: self.device.attributes.get(
                         "unread_notifications"
                     ),
@@ -273,7 +266,6 @@ class HubHandler(AjaxDeviceHandler):
                 {
                     "key": "sim_status",
                     "translation_key": "sim_status",
-                    "icon": "mdi:sim",
                     "value_fn": lambda: str(self.device.attributes.get("sim_status")),
                     "enabled_by_default": True,
                 }
@@ -285,7 +277,6 @@ class HubHandler(AjaxDeviceHandler):
                 {
                     "key": "malfunctions",
                     "translation_key": "malfunctions",
-                    "icon": "mdi:alert-circle",
                     "value_fn": lambda: ", ".join(self.device.malfunctions)
                     if self.device.malfunctions
                     else "None",
@@ -299,7 +290,6 @@ class HubHandler(AjaxDeviceHandler):
                 {
                     "key": "firmware_version",
                     "translation_key": "firmware_version",
-                    "icon": "mdi:chip",
                     "value_fn": lambda: self.device.attributes.get("firmware_version"),
                     "enabled_by_default": False,
                 }

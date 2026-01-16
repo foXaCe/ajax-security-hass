@@ -137,6 +137,12 @@
       "battery_connected": {
         "name": "Batterie Hub"
       },
+      "beep_on_arm": {
+        "name": "Bip à l'armement/désarmement"
+      },
+      "beep_on_delay": {
+        "name": "Bip au délai d'entrée/sortie"
+      },
       "connection": {
         "name": "Connexion hub",
         "state": {
@@ -285,12 +291,6 @@
       "bypassed_devices": {
         "name": "Dispositifs bypassés"
       },
-      "color": {
-        "name": "Couleur"
-      },
-      "connection_type": {
-        "name": "Type de connexion"
-      },
       "device_color": {
         "name": "Couleur du dispositif",
         "state": {
@@ -387,6 +387,13 @@
       },
       "hub_gsm": {
         "name": "GSM / SIM",
+        "state": {
+          "good": "Bon",
+          "none": "Aucun",
+          "normal": "Normal",
+          "strong": "Fort",
+          "weak": "Faible"
+        },
         "state_attributes": {
           "active_sim": {
             "name": "SIM active"
@@ -631,9 +638,6 @@
       "online_devices": {
         "name": "Dispositifs en ligne"
       },
-      "operating_mode": {
-        "name": "Mode de fonctionnement"
-      },
       "photos_per_alarm": {
         "name": "Photos par alarme"
       },
@@ -698,14 +702,6 @@
         "state": {
           "off": "Désactivées",
           "on": "Activées"
-        },
-        "state_attributes": {
-          "device_id": {
-            "name": "ID de l'appareil"
-          },
-          "device_type": {
-            "name": "Type d'appareil"
-          }
         }
       },
       "always_active": {
@@ -776,17 +772,6 @@
         "state": {
           "off": "Désactivée",
           "on": "Activée"
-        },
-        "state_attributes": {
-          "device_id": {
-            "name": "ID de l'appareil"
-          },
-          "device_type": {
-            "name": "Type d'appareil"
-          },
-          "mode": {
-            "name": "Mode"
-          }
         }
       },
       "night_mode": {
@@ -794,14 +779,6 @@
         "state": {
           "off": "Désactivé",
           "on": "Activé"
-        },
-        "state_attributes": {
-          "device_id": {
-            "name": "ID de l'appareil"
-          },
-          "device_type": {
-            "name": "Type d'appareil"
-          }
         }
       },
       "security_group": {
@@ -892,8 +869,17 @@
     }
   },
   "exceptions": {
+    "failed_to_change": {
+      "message": "Échec de la modification de {entity} : {error}"
+    },
     "invalid_target": {
       "message": "Cible invalide pour le service."
+    },
+    "space_not_found": {
+      "message": "Espace non trouvé."
+    },
+    "system_armed": {
+      "message": "Système armé. Veuillez désarmer."
     }
   },
   "options": {

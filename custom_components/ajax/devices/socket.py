@@ -135,7 +135,6 @@ class SocketHandler(AjaxDeviceHandler):
                 {
                     "key": "malfunctions",
                     "translation_key": "malfunctions",
-                    "icon": "mdi:alert-circle",
                     "value_fn": lambda: ", ".join(self.device.malfunctions)
                     if self.device.malfunctions
                     else "None",
@@ -149,7 +148,6 @@ class SocketHandler(AjaxDeviceHandler):
                 {
                     "key": "firmware_version",
                     "translation_key": "firmware_version",
-                    "icon": "mdi:chip",
                     "value_fn": lambda: self.device.attributes.get("firmware_version"),
                     "enabled_by_default": False,
                 }
@@ -172,7 +170,6 @@ class SocketHandler(AjaxDeviceHandler):
                 "value_fn": lambda: self.device.attributes.get("is_on", False),
                 "turn_on_fn": lambda: {"action": "turn_on"},
                 "turn_off_fn": lambda: {"action": "turn_off"},
-                "icon": "mdi:power-socket-eu",
                 "enabled_by_default": True,
             }
         ]

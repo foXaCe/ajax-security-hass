@@ -4,6 +4,16 @@
   "codeowners": ["@foXaCe"],
   "config_flow": true,
   "dependencies": [],
+  "dhcp": [
+    {
+      "hostname": "ajax-*",
+      "macaddress": "9C756E*"
+    },
+    {
+      "hostname": "ajax-*",
+      "macaddress": "38B8EB*"
+    }
+  ],
   "documentation": "https://github.com/foXaCe/ajax-security-hass",
   "integration_type": "hub",
   "iot_class": "cloud_push",

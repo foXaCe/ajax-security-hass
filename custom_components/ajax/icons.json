@@ -1,0 +1,248 @@
+{
+  "entity": {
+    "binary_sensor": {
+      "beep_on_arm": {
+        "default": "mdi:volume-high"
+      },
+      "beep_on_delay": {
+        "default": "mdi:timer-sand"
+      },
+      "doorbell_ring": {
+        "default": "mdi:doorbell"
+      },
+      "glass_break": {
+        "default": "mdi:glass-fragile"
+      },
+      "sensitivity": {
+        "default": "mdi:tune"
+      },
+      "shock": {
+        "default": "mdi:vibrate"
+      },
+      "tilt": {
+        "default": "mdi:angle-acute"
+      },
+      "video_human": {
+        "default": "mdi:human"
+      },
+      "video_motion": {
+        "default": "mdi:motion-sensor"
+      },
+      "video_pet": {
+        "default": "mdi:dog"
+      },
+      "video_vehicle": {
+        "default": "mdi:car"
+      }
+    },
+    "button": {
+      "panic": {
+        "default": "mdi:alarm-light"
+      }
+    },
+    "device_tracker": {
+      "position": {
+        "default": "mdi:map-marker-radius"
+      }
+    },
+    "number": {
+      "tilt_degrees": {
+        "default": "mdi:angle-acute"
+      }
+    },
+    "select": {
+      "shock_sensitivity": {
+        "default": "mdi:vibrate"
+      }
+    },
+    "sensor": {
+      "active_connection": {
+        "default": "mdi:connection"
+      },
+      "alarm_duration": {
+        "default": "mdi:timer-outline"
+      },
+      "alarm_volume_level": {
+        "default": "mdi:volume-high"
+      },
+      "always_active": {
+        "default": "mdi:shield-alert"
+      },
+      "battery_state": {
+        "default": "mdi:battery-heart-variant"
+      },
+      "beep_volume_level": {
+        "default": "mdi:volume-medium"
+      },
+      "bypassed_devices": {
+        "default": "mdi:shield-off"
+      },
+      "connection_type": {
+        "default": "mdi:wifi"
+      },
+      "devices_with_malfunctions": {
+        "default": "mdi:alert-circle"
+      },
+      "firmware_version": {
+        "default": "mdi:chip"
+      },
+      "gsm_signal_level": {
+        "default": "mdi:signal-cellular-3"
+      },
+      "gsm_type": {
+        "default": "mdi:signal-cellular-3"
+      },
+      "hub_active_channels": {
+        "default": "mdi:access-point-network"
+      },
+      "hub_ethernet_ip": {
+        "default": "mdi:ethernet"
+      },
+      "hub_external_power": {
+        "default": "mdi:power-plug"
+      },
+      "hub_grade_mode": {
+        "default": "mdi:shield-check"
+      },
+      "hub_gsm": {
+        "default": "mdi:sim"
+      },
+      "hub_led_brightness": {
+        "default": "mdi:brightness-6"
+      },
+      "hub_limits": {
+        "default": "mdi:counter"
+      },
+      "hub_noise_level": {
+        "default": "mdi:signal-off"
+      },
+      "hub_offline_delay": {
+        "default": "mdi:timer-alert-outline"
+      },
+      "hub_ping_period": {
+        "default": "mdi:timer-outline"
+      },
+      "hub_rooms": {
+        "default": "mdi:door"
+      },
+      "hub_timezone": {
+        "default": "mdi:clock-outline"
+      },
+      "hub_users": {
+        "default": "mdi:account-group"
+      },
+      "hub_wifi": {
+        "default": "mdi:wifi"
+      },
+      "ip_address": {
+        "default": "mdi:ip-network"
+      },
+      "last_action": {
+        "default": "mdi:gesture-tap-button"
+      },
+      "last_ring": {
+        "default": "mdi:doorbell"
+      },
+      "mac_address": {
+        "default": "mdi:ip-network"
+      },
+      "malfunctions": {
+        "default": "mdi:alert-circle"
+      },
+      "network_status": {
+        "default": "mdi:network"
+      },
+      "online_devices": {
+        "default": "mdi:check-network"
+      },
+      "operating_mode": {
+        "default": "mdi:cog"
+      },
+      "recent_events": {
+        "default": "mdi:bell-ring"
+      },
+      "room": {
+        "default": "mdi:door"
+      },
+      "signal_strength": {
+        "default": "mdi:signal"
+      },
+      "sim_status": {
+        "default": "mdi:sim"
+      },
+      "total_devices": {
+        "default": "mdi:devices"
+      },
+      "unread_notifications": {
+        "default": "mdi:bell-badge"
+      }
+    },
+    "switch": {
+      "always_active": {
+        "default": "mdi:shield-alert"
+      },
+      "blink_while_armed": {
+        "default": "mdi:led-on",
+        "state": {
+          "off": "mdi:led-off"
+        }
+      },
+      "chimes": {
+        "default": "mdi:bell-ring",
+        "state": {
+          "off": "mdi:bell"
+        }
+      },
+      "external_contact_enabled": {
+        "default": "mdi:electric-switch"
+      },
+      "ignore_impact": {
+        "default": "mdi:shield-off"
+      },
+      "indicator_light": {
+        "default": "mdi:led-on",
+        "state": {
+          "off": "mdi:led-off"
+        }
+      },
+      "night_mode": {
+        "default": "mdi:weather-night"
+      },
+      "shock_sensor": {
+        "default": "mdi:vibrate"
+      },
+      "siren_trigger_glass": {
+        "default": "mdi:glass-fragile"
+      },
+      "siren_trigger_reed": {
+        "default": "mdi:door-open"
+      },
+      "siren_trigger_shock": {
+        "default": "mdi:vibrate"
+      },
+      "siren_trigger_tilt": {
+        "default": "mdi:vibrate"
+      },
+      "socket": {
+        "default": "mdi:power-socket-eu"
+      },
+      "tilt_sensor": {
+        "default": "mdi:angle-acute"
+      }
+    }
+  },
+  "services": {
+    "force_arm": {
+      "service": "mdi:shield-lock"
+    },
+    "force_arm_night": {
+      "service": "mdi:shield-moon"
+    },
+    "get_raw_devices": {
+      "service": "mdi:tray-arrow-down"
+    },
+    "refresh_metadata": {
+      "service": "mdi:refresh"
+    }
+  }
+}

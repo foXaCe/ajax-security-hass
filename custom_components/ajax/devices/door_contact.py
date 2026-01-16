@@ -77,7 +77,6 @@ class DoorContactHandler(AjaxDeviceHandler):
                     "key": "tilt",
                     "translation_key": "tilt",
                     "device_class": BinarySensorDeviceClass.MOVING,
-                    "icon": "mdi:angle-acute",
                     "value_fn": lambda: self.device.attributes.get(
                         "tilt_detected", self.device.attributes.get("tilt", False)
                     ),
@@ -93,7 +92,6 @@ class DoorContactHandler(AjaxDeviceHandler):
                     "key": "shock",
                     "translation_key": "shock",
                     "device_class": BinarySensorDeviceClass.VIBRATION,
-                    "icon": "mdi:vibrate",
                     "value_fn": lambda: self.device.attributes.get(
                         "shock_detected", self.device.attributes.get("shock", False)
                     ),
@@ -127,7 +125,6 @@ class DoorContactHandler(AjaxDeviceHandler):
             {
                 "key": "signal_strength",
                 "translation_key": "signal_strength",
-                "icon": "mdi:signal",
                 "native_unit_of_measurement": PERCENTAGE,
                 "state_class": SensorStateClass.MEASUREMENT,
                 "value_fn": lambda: self.device.signal_strength
@@ -160,7 +157,6 @@ class DoorContactHandler(AjaxDeviceHandler):
                 {
                     "key": "connection_type",
                     "translation_key": "connection_type",
-                    "icon": "mdi:wifi",
                     "value_fn": lambda: self.device.attributes.get("connection_type"),
                     "enabled_by_default": True,
                 }
@@ -172,7 +168,6 @@ class DoorContactHandler(AjaxDeviceHandler):
                 {
                     "key": "operating_mode",
                     "translation_key": "operating_mode",
-                    "icon": "mdi:cog",
                     "value_fn": lambda: self.device.attributes.get("operating_mode"),
                     "enabled_by_default": True,
                 }
@@ -184,7 +179,6 @@ class DoorContactHandler(AjaxDeviceHandler):
                 {
                     "key": "battery_state",
                     "translation_key": "battery_state",
-                    "icon": "mdi:battery-heart-variant",
                     "value_fn": lambda: self.device.battery_state,
                     "enabled_by_default": True,
                 }
@@ -201,7 +195,6 @@ class DoorContactHandler(AjaxDeviceHandler):
             {
                 "key": "always_active",
                 "translation_key": "always_active",
-                "icon": "mdi:shield-alert",
                 "value_fn": lambda: self.device.attributes.get("always_active", False),
                 "api_key": "alwaysActive",
                 "enabled_by_default": True,
@@ -214,7 +207,6 @@ class DoorContactHandler(AjaxDeviceHandler):
                 {
                     "key": "indicator_light",
                     "translation_key": "indicator_light",
-                    "icon": "mdi:led-on",
                     "value_fn": lambda: self.device.attributes.get("indicatorLightMode")
                     == "STANDARD",
                     "api_key": "indicatorLightMode",
@@ -229,7 +221,6 @@ class DoorContactHandler(AjaxDeviceHandler):
             {
                 "key": "night_mode",
                 "translation_key": "night_mode",
-                "icon": "mdi:weather-night",
                 "value_fn": lambda: self.device.attributes.get("night_mode_arm", False),
                 "api_key": "nightModeArm",
                 "enabled_by_default": True,
@@ -244,7 +235,6 @@ class DoorContactHandler(AjaxDeviceHandler):
                 {
                     "key": "external_contact_enabled",
                     "translation_key": "external_contact_enabled",
-                    "icon": "mdi:electric-switch",
                     "value_fn": lambda: self.device.attributes.get(
                         "extra_contact_aware", False
                     ),
@@ -258,7 +248,6 @@ class DoorContactHandler(AjaxDeviceHandler):
                 {
                     "key": "shock_sensor",
                     "translation_key": "shock_sensor",
-                    "icon": "mdi:vibrate",
                     "value_fn": lambda: self.device.attributes.get(
                         "shock_sensor_aware", False
                     ),
@@ -272,7 +261,6 @@ class DoorContactHandler(AjaxDeviceHandler):
                 {
                     "key": "ignore_impact",
                     "translation_key": "ignore_impact",
-                    "icon": "mdi:shield-off",
                     "value_fn": lambda: self.device.attributes.get(
                         "ignore_simple_impact", False
                     ),
@@ -286,7 +274,6 @@ class DoorContactHandler(AjaxDeviceHandler):
                 {
                     "key": "tilt_sensor",
                     "translation_key": "tilt_sensor",
-                    "icon": "mdi:angle-acute",
                     "value_fn": lambda: self.device.attributes.get(
                         "accelerometer_aware", False
                     ),
@@ -300,7 +287,6 @@ class DoorContactHandler(AjaxDeviceHandler):
                 {
                     "key": "siren_trigger_reed",
                     "translation_key": "siren_trigger_reed",
-                    "icon": "mdi:door-open",
                     "value_fn": lambda: "REED"
                     in self.device.attributes.get("siren_triggers", []),
                     "api_key": "sirenTriggers",
@@ -313,7 +299,6 @@ class DoorContactHandler(AjaxDeviceHandler):
                 {
                     "key": "siren_trigger_shock",
                     "translation_key": "siren_trigger_shock",
-                    "icon": "mdi:vibrate",
                     "value_fn": lambda: "SHOCK"
                     in self.device.attributes.get("siren_triggers", []),
                     "api_key": "sirenTriggers",
@@ -326,7 +311,6 @@ class DoorContactHandler(AjaxDeviceHandler):
                 {
                     "key": "siren_trigger_tilt",
                     "translation_key": "siren_trigger_tilt",
-                    "icon": "mdi:angle-acute",
                     "value_fn": lambda: "TILT"
                     in self.device.attributes.get("siren_triggers", []),
                     "api_key": "sirenTriggers",
@@ -412,7 +396,6 @@ class WireInputHandler(DoorContactHandler):
             {
                 "key": "always_active",
                 "translation_key": "always_active",
-                "icon": "mdi:shield-alert",
                 "value_fn": lambda: self.device.attributes.get("always_active", False),
                 "api_key": "alwaysActive",
                 "api_nested_key": "wiredDeviceSettings",
@@ -425,7 +408,6 @@ class WireInputHandler(DoorContactHandler):
             {
                 "key": "night_mode",
                 "translation_key": "night_mode",
-                "icon": "mdi:weather-night",
                 "value_fn": lambda: self.device.attributes.get("night_mode_arm", False),
                 "api_key": "nightModeArm",
                 "api_nested_key": "wiredDeviceSettings",

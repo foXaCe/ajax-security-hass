@@ -1,0 +1,993 @@
+{
+  "config": {
+    "abort": {
+      "already_configured": "This Ajax integration is already configured.",
+      "no_spaces_available": "No spaces available. Please reload the integration.",
+      "reauth_failed": "Re-authentication failed. Please reconfigure the integration.",
+      "reauth_successful": "Re-authentication successful."
+    },
+    "error": {
+      "cannot_connect": "Failed to connect to Ajax API. Check your internet connection.",
+      "invalid_2fa": "Invalid verification code. Please try again.",
+      "invalid_account_type": "Account type not supported. Use a user account (not a PRO/Enterprise account).",
+      "invalid_api_key": "Invalid or missing API key. Check your enterprise API key.",
+      "invalid_auth": "Invalid API credentials. Check your API Key, email, and password.",
+      "invalid_password": "Invalid email or password. Check your Ajax account credentials.",
+      "invalid_proxy_url": "Invalid proxy URL. URL must start with http:// or https://",
+      "no_spaces_selected": "Please select at least one space to enable.",
+      "unknown": "Unexpected error. Check the logs for more details."
+    },
+    "step": {
+      "2fa": {
+        "data": {
+          "code": "Verification Code"
+        },
+        "data_description": {
+          "code": "6-digit code from your authenticator app or SMS"
+        },
+        "description": "Enter the 6-digit verification code sent to your device for {email}",
+        "title": "Two-Factor Authentication"
+      },
+      "direct": {
+        "data": {
+          "api_key": "API Key",
+          "aws_access_key_id": "AWS Access Key ID (Optional)",
+          "aws_secret_access_key": "AWS Secret Access Key (Optional)",
+          "email": "Email Address",
+          "password": "Password",
+          "queue_name": "SQS Queue Name (Optional)"
+        },
+        "data_description": {
+          "api_key": "Your API Key provided by Ajax Systems",
+          "aws_access_key_id": "AWS Access Key ID for real-time SQS events",
+          "aws_secret_access_key": "AWS Secret Access Key for real-time SQS events",
+          "email": "Your Ajax account email address",
+          "password": "Your Ajax account password",
+          "queue_name": "SQS Queue name (e.g., ajax-events-xxxxx-prod.fifo)"
+        },
+        "description": "Enter your Ajax API credentials.\n\n⚠️ **User account only** (not PRO/Enterprise accounts).\n\nOptional: Add AWS credentials for real-time event notifications.",
+        "title": "Direct Connection"
+      },
+      "proxy": {
+        "data": {
+          "email": "Email Address",
+          "password": "Password",
+          "proxy_url": "Proxy URL"
+        },
+        "data_description": {
+          "email": "Your Ajax account email address",
+          "password": "Your Ajax account password",
+          "proxy_url": "Ajax proxy server URL"
+        },
+        "description": "Connect via an Ajax proxy server.\n\n⚠️ **User account only** (not PRO/Enterprise accounts).\n\nEvents will be received in real-time via SSE.",
+        "title": "Proxy Connection"
+      },
+      "reauth_confirm": {
+        "data": {
+          "password": "Password"
+        },
+        "description": "Your session has expired. Please re-enter your password for {email}.",
+        "title": "Re-authenticate"
+      },
+      "select_spaces": {
+        "data": {
+          "enabled_spaces": "Enabled Spaces"
+        },
+        "description": "Found {space_count} spaces. Select which spaces to enable in Home Assistant.\n\nUnselected spaces will not create any devices or entities.",
+        "title": "Select Spaces"
+      },
+      "user": {
+        "data": {
+          "auth_mode": "Authentication Mode"
+        },
+        "data_description": {
+          "auth_mode": "Proxy: connect via Ajax proxy server. Direct: enterprise API key only."
+        },
+        "description": "Choose how to connect to Ajax Systems.",
+        "title": "Connection Mode"
+      }
+    }
+  },
+  "entity": {
+    "alarm_control_panel": {
+      "ajax": {
+        "name": "Ajax",
+        "state": {
+          "armed": "Armed",
+          "arming": "Arming",
+          "disarmed": "Disarmed",
+          "disarming": "Disarming",
+          "pending": "Pending",
+          "triggered": "Triggered"
+        },
+        "state_attributes": {
+          "hub_connection_status": {
+            "name": "Hub connection status",
+            "state": {
+              "offline": "Offline",
+              "online": "Online",
+              "unknown": "Unknown"
+            }
+          },
+          "malfunctions_count": {
+            "name": "Malfunctions"
+          },
+          "new_notifications_count": {
+            "name": "New notifications"
+          },
+          "security_state": {
+            "name": "Security state",
+            "state": {
+              "armed": "Armed",
+              "arming_incomplete": "Arming Incomplete",
+              "awaiting_confirmation": "Awaiting confirmation",
+              "awaiting_exit_timer": "Awaiting exit timer",
+              "awaiting_vds_arming_completion": "Awaiting VDS arming completion",
+              "disarmed": "Disarmed",
+              "night_mode": "Night Mode",
+              "none": "None",
+              "partially_armed": "Part Armed",
+              "two_stage_arming_incomplete": "Two-stage arming incomplete"
+            }
+          }
+        }
+      }
+    },
+    "binary_sensor": {
+      "battery_connected": {
+        "name": "Hub battery"
+      },
+      "beep_on_arm": {
+        "name": "Beep on arm/disarm"
+      },
+      "beep_on_delay": {
+        "name": "Beep on entry/exit delay"
+      },
+      "connection": {
+        "name": "Hub connection",
+        "state": {
+          "off": "Disconnected",
+          "on": "Connected"
+        }
+      },
+      "doorbell_ring": {
+        "name": "Doorbell"
+      },
+      "external_contact": {
+        "name": "Door (external contact)"
+      },
+      "external_power": {
+        "name": "External power"
+      },
+      "glass_break": {
+        "name": "Glass break detector"
+      },
+      "gsm_antenna": {
+        "name": "GSM antenna"
+      },
+      "jeweller_radio": {
+        "name": "Jeweller radio"
+      },
+      "problem": {
+        "name": "Problem detected",
+        "state_attributes": {
+          "devices_with_problems": {
+            "name": "Devices with problems"
+          },
+          "problem_devices": {
+            "name": "Problem devices list"
+          },
+          "total_malfunctions": {
+            "name": "Total malfunctions"
+          }
+        }
+      },
+      "shock": {
+        "name": "Shock"
+      },
+      "system_problems": {
+        "name": "System problems",
+        "state": {
+          "off": "No problems",
+          "on": "Problems detected"
+        },
+        "state_attributes": {
+          "devices_with_problems": {
+            "name": "Devices with problems"
+          },
+          "problem_devices": {
+            "name": "Device list"
+          },
+          "total_malfunctions": {
+            "name": "Total malfunctions"
+          }
+        }
+      },
+      "tilt": {
+        "name": "Tilt"
+      },
+      "video_human": {
+        "name": "Human detected"
+      },
+      "video_motion": {
+        "name": "Motion detected"
+      },
+      "video_pet": {
+        "name": "Pet detected"
+      },
+      "video_vehicle": {
+        "name": "Vehicle detected"
+      },
+      "wings_radio": {
+        "name": "Wings radio"
+      }
+    },
+    "button": {
+      "panic": {
+        "name": "Panic Button"
+      }
+    },
+    "device_tracker": {
+      "position": {
+        "name": "Position"
+      }
+    },
+    "number": {
+      "tilt_degrees": {
+        "name": "Tilt threshold"
+      }
+    },
+    "select": {
+      "shock_sensitivity": {
+        "name": "Shock sensitivity",
+        "state": {
+          "high": "High",
+          "low": "Low",
+          "normal": "Normal"
+        }
+      }
+    },
+    "sensor": {
+      "active_connection": {
+        "name": "Active connection"
+      },
+      "alarm_duration": {
+        "name": "Alarm Duration",
+        "state": {
+          "10_minutes": "10 minutes",
+          "15_minutes": "15 minutes",
+          "1_minute": "1 minute",
+          "2_minutes": "2 minutes",
+          "3_minutes": "3 minutes",
+          "5_minutes": "5 minutes",
+          "continuous": "Continuous"
+        }
+      },
+      "alarm_volume_level": {
+        "name": "Alarm Volume",
+        "state": {
+          "disabled": "Disabled",
+          "loud": "Loud",
+          "mute": "Mute",
+          "normal": "Normal",
+          "off": "Off",
+          "quiet": "Quiet",
+          "very_loud": "Very loud"
+        }
+      },
+      "battery_state": {
+        "name": "Battery state"
+      },
+      "beep_volume_level": {
+        "name": "Beep Volume",
+        "state": {
+          "loud": "Loud",
+          "normal": "Normal",
+          "off": "Off",
+          "quiet": "Quiet",
+          "very_loud": "Very loud"
+        }
+      },
+      "bypassed_devices": {
+        "name": "Bypassed devices"
+      },
+      "device_color": {
+        "name": "Device color",
+        "state": {
+          "black": "Black",
+          "white": "White"
+        }
+      },
+      "device_label": {
+        "name": "Device label"
+      },
+      "device_marketing_id": {
+        "name": "Device marketing ID"
+      },
+      "device_state": {
+        "name": "Device state"
+      },
+      "devices_with_malfunctions": {
+        "name": "Devices with malfunctions"
+      },
+      "firmware_version": {
+        "name": "Firmware version"
+      },
+      "gsm_connection_status": {
+        "name": "GSM connection status",
+        "state": {
+          "connected": "Connected",
+          "connecting": "Connecting",
+          "disconnected": "Disconnected",
+          "error": "Error"
+        }
+      },
+      "gsm_signal_level": {
+        "name": "Cellular signal (GSM)"
+      },
+      "gsm_type": {
+        "name": "GSM type",
+        "state": {
+          "2g": "2G",
+          "3g": "3G",
+          "4g": "4G",
+          "5g": "5G",
+          "unknown": "Unknown"
+        }
+      },
+      "hardware_version": {
+        "name": "Hardware version"
+      },
+      "hub_active_channels": {
+        "name": "Active channels",
+        "state_attributes": {
+          "channels": {
+            "name": "Channel list"
+          },
+          "ethernet": {
+            "name": "Ethernet"
+          },
+          "gsm": {
+            "name": "GSM"
+          },
+          "wifi": {
+            "name": "WiFi"
+          }
+        }
+      },
+      "hub_battery": {
+        "name": "Hub battery"
+      },
+      "hub_ethernet_ip": {
+        "name": "Internal IP Address"
+      },
+      "hub_external_power": {
+        "name": "Hub external power",
+        "state": {
+          "connected": "Connected",
+          "disconnected": "Disconnected"
+        }
+      },
+      "hub_geofence": {
+        "name": "GPS Location",
+        "state_attributes": {
+          "latitude": {
+            "name": "Latitude"
+          },
+          "longitude": {
+            "name": "Longitude"
+          },
+          "radius_meters": {
+            "name": "Radius (meters)"
+          }
+        }
+      },
+      "hub_grade_mode": {
+        "name": "Security grade"
+      },
+      "hub_gsm": {
+        "name": "Hub GSM / SIM",
+        "state": {
+          "good": "Good",
+          "none": "None",
+          "normal": "Normal",
+          "strong": "Strong",
+          "weak": "Weak"
+        },
+        "state_attributes": {
+          "active_sim": {
+            "name": "Active SIM"
+          },
+          "modem_imei": {
+            "name": "Modem IMEI"
+          },
+          "network_status": {
+            "name": "Network status"
+          },
+          "signal_level": {
+            "name": "Signal level"
+          },
+          "sim1_active": {
+            "name": "SIM 1 active"
+          },
+          "sim1_apn": {
+            "name": "SIM 1 APN"
+          },
+          "sim1_traffic_rx_kb": {
+            "name": "SIM 1 received (KB)"
+          },
+          "sim1_traffic_tx_kb": {
+            "name": "SIM 1 sent (KB)"
+          },
+          "sim2_active": {
+            "name": "SIM 2 active"
+          },
+          "sim2_apn": {
+            "name": "SIM 2 APN"
+          },
+          "sim2_traffic_rx_kb": {
+            "name": "SIM 2 received (KB)"
+          },
+          "sim2_traffic_tx_kb": {
+            "name": "SIM 2 sent (KB)"
+          },
+          "total_sims": {
+            "name": "Total SIMs"
+          }
+        }
+      },
+      "hub_hardware_version": {
+        "name": "Hardware version",
+        "state_attributes": {
+          "cpu": {
+            "name": "CPU"
+          },
+          "ethernet": {
+            "name": "Ethernet"
+          },
+          "flash": {
+            "name": "Flash"
+          },
+          "modem": {
+            "name": "Modem"
+          },
+          "pcb": {
+            "name": "PCB"
+          },
+          "rfm": {
+            "name": "RFM"
+          },
+          "wifi": {
+            "name": "WiFi"
+          }
+        }
+      },
+      "hub_led_brightness": {
+        "name": "Hub LED brightness"
+      },
+      "hub_limits": {
+        "name": "Hub Limits",
+        "state_attributes": {
+          "max_cameras": {
+            "name": "Max Cameras"
+          },
+          "max_groups": {
+            "name": "Max Groups"
+          },
+          "max_rooms": {
+            "name": "Max Rooms"
+          },
+          "max_sensors": {
+            "name": "Max Devices"
+          },
+          "max_users": {
+            "name": "Max Users"
+          }
+        }
+      },
+      "hub_noise_level": {
+        "name": "Radio noise level",
+        "state": {
+          "high": "High",
+          "normal": "Normal"
+        },
+        "state_attributes": {
+          "channel_1_dbm": {
+            "name": "Channel 1 (dBm)"
+          },
+          "channel_2_dbm": {
+            "name": "Channel 2 (dBm)"
+          },
+          "data_channel_dbm": {
+            "name": "Data channel (dBm)"
+          },
+          "high": {
+            "name": "High noise"
+          }
+        }
+      },
+      "hub_offline_delay": {
+        "name": "Offline alarm delay"
+      },
+      "hub_ping_period": {
+        "name": "Ping period"
+      },
+      "hub_rooms": {
+        "name": "Rooms",
+        "state_attributes": {
+          "room_names": {
+            "name": "Room list"
+          },
+          "rooms": {
+            "name": "Room details"
+          }
+        }
+      },
+      "hub_timezone": {
+        "name": "Hub timezone"
+      },
+      "hub_users": {
+        "name": "Users",
+        "state_attributes": {
+          "user_names": {
+            "name": "User names"
+          },
+          "users": {
+            "name": "User details"
+          }
+        }
+      },
+      "hub_wifi": {
+        "name": "Hub Wi-Fi",
+        "state": {
+          "good": "Good",
+          "none": "None",
+          "normal": "Normal",
+          "strong": "Strong",
+          "weak": "Weak"
+        },
+        "state_attributes": {
+          "channel": {
+            "name": "Channel"
+          },
+          "ip": {
+            "name": "IP Address"
+          },
+          "security": {
+            "name": "Security"
+          },
+          "signal_level": {
+            "name": "Signal level"
+          },
+          "ssid": {
+            "name": "Network"
+          }
+        }
+      },
+      "image_resolution": {
+        "name": "Image resolution"
+      },
+      "indicator_light_mode": {
+        "name": "LED mode"
+      },
+      "ip_address": {
+        "name": "IP address"
+      },
+      "last_action": {
+        "name": "Last action",
+        "state": {
+          "double_press": "Double press",
+          "emergency": "Emergency",
+          "long_press": "Long press",
+          "panic": "Panic",
+          "single_press": "Single press"
+        }
+      },
+      "last_alert": {
+        "name": "Last alert",
+        "state_attributes": {
+          "device_name": {
+            "name": "Device"
+          },
+          "event_type": {
+            "name": "Event type"
+          },
+          "notification_type": {
+            "name": "Notification type"
+          },
+          "room_name": {
+            "name": "Room"
+          }
+        }
+      },
+      "last_ring": {
+        "name": "Last ring"
+      },
+      "led_indication": {
+        "name": "LED indication"
+      },
+      "mac_address": {
+        "name": "MAC address"
+      },
+      "malfunctions": {
+        "name": "Malfunctions"
+      },
+      "network_status": {
+        "name": "Mobile network"
+      },
+      "noise_level_avg": {
+        "name": "Average noise level",
+        "state_attributes": {
+          "always_active": {
+            "name": "Always active"
+          },
+          "armed_in_night_mode": {
+            "name": "Armed in night mode"
+          },
+          "channel1": {
+            "name": "Channel 1"
+          },
+          "channel2": {
+            "name": "Channel 2"
+          },
+          "high": {
+            "name": "High noise"
+          }
+        }
+      },
+      "online_devices": {
+        "name": "Online devices"
+      },
+      "photos_per_alarm": {
+        "name": "Photos per alarm"
+      },
+      "recent_events": {
+        "name": "Recent events",
+        "state": {
+          "no_event": "No event"
+        },
+        "state_attributes": {
+          "event_count": {
+            "name": "Event count"
+          },
+          "events": {
+            "name": "Recent events"
+          },
+          "events_raw": {
+            "name": "Raw data"
+          }
+        }
+      },
+      "room": {
+        "name": "Room"
+      },
+      "sensitivity": {
+        "name": "Sensitivity",
+        "state": {
+          "high": "High",
+          "low": "Low",
+          "normal": "Normal"
+        }
+      },
+      "signal_strength": {
+        "name": "Signal strength"
+      },
+      "sim_status": {
+        "name": "SIM cards status",
+        "state_attributes": {
+          "sim_cards": {
+            "name": "SIM cards details"
+          },
+          "sim_slots_total": {
+            "name": "Total SIM slots"
+          },
+          "sim_slots_used": {
+            "name": "Used SIM slots"
+          }
+        }
+      },
+      "total_devices": {
+        "name": "Total devices"
+      },
+      "unread_notifications": {
+        "name": "Unread notifications"
+      },
+      "wifi_signal_level": {
+        "name": "Wi-Fi signal"
+      }
+    },
+    "switch": {
+      "alerts_by_sirens": {
+        "name": "Alerts by sirens",
+        "state": {
+          "off": "Disabled",
+          "on": "Enabled"
+        }
+      },
+      "always_active": {
+        "name": "Always active",
+        "state": {
+          "off": "Disabled",
+          "on": "Enabled"
+        }
+      },
+      "beep_on_arm": {
+        "name": "Beep on arm/disarm",
+        "state": {
+          "off": "Disabled",
+          "on": "Enabled"
+        }
+      },
+      "beep_on_arm_disarm": {
+        "name": "Beep on arming/disarming",
+        "state": {
+          "off": "Disabled",
+          "on": "Enabled"
+        }
+      },
+      "beep_on_delay": {
+        "name": "Beep on entry/exit delay",
+        "state": {
+          "off": "Disabled",
+          "on": "Enabled"
+        }
+      },
+      "blink_while_armed": {
+        "name": "Blink while armed",
+        "state": {
+          "off": "Disabled",
+          "on": "Enabled"
+        }
+      },
+      "chimes": {
+        "name": "Chimes",
+        "state": {
+          "off": "Disabled",
+          "on": "Enabled"
+        }
+      },
+      "chimes_enabled": {
+        "name": "Chime",
+        "state": {
+          "off": "Disabled",
+          "on": "Enabled"
+        }
+      },
+      "external_contact_enabled": {
+        "name": "External contact",
+        "state": {
+          "off": "Disabled",
+          "on": "Enabled"
+        }
+      },
+      "ignore_impact": {
+        "name": "Ignore simple impact",
+        "state": {
+          "off": "Disabled",
+          "on": "Enabled"
+        }
+      },
+      "indicator_light": {
+        "name": "Indicator light",
+        "state": {
+          "off": "Disabled",
+          "on": "Enabled"
+        }
+      },
+      "night_mode": {
+        "name": "Active in night mode",
+        "state": {
+          "off": "Disabled",
+          "on": "Enabled"
+        }
+      },
+      "security_group": {
+        "name": "Security Group",
+        "state_attributes": {
+          "bulk_arm_involved": {
+            "name": "Involved in bulk arm"
+          },
+          "bulk_disarm_involved": {
+            "name": "Involved in bulk disarm"
+          },
+          "device_count": {
+            "name": "Device count"
+          },
+          "group_id": {
+            "name": "Group ID"
+          },
+          "group_name": {
+            "name": "Group name"
+          },
+          "night_mode_enabled": {
+            "name": "Night mode enabled"
+          },
+          "space_id": {
+            "name": "Space ID"
+          },
+          "space_name": {
+            "name": "Space name"
+          }
+        }
+      },
+      "shock_sensor": {
+        "name": "Shock sensor",
+        "state": {
+          "off": "Disabled",
+          "on": "Enabled"
+        }
+      },
+      "siren_trigger_glass": {
+        "name": "Siren on glass break",
+        "state": {
+          "off": "Disabled",
+          "on": "Enabled"
+        }
+      },
+      "siren_trigger_reed": {
+        "name": "Siren on door open",
+        "state": {
+          "off": "Disabled",
+          "on": "Enabled"
+        }
+      },
+      "siren_trigger_shock": {
+        "name": "Siren on shock",
+        "state": {
+          "off": "Disabled",
+          "on": "Enabled"
+        }
+      },
+      "siren_trigger_tilt": {
+        "name": "Siren on tilt",
+        "state": {
+          "off": "Disabled",
+          "on": "Enabled"
+        }
+      },
+      "socket": {
+        "name": "Socket",
+        "state_attributes": {
+          "channel_id": {
+            "name": "Channel ID"
+          },
+          "operating_mode": {
+            "name": "Operating mode"
+          },
+          "output_mode": {
+            "name": "Output mode"
+          }
+        }
+      },
+      "tilt_sensor": {
+        "name": "Tilt sensor",
+        "state": {
+          "off": "Disabled",
+          "on": "Enabled"
+        }
+      }
+    }
+  },
+  "exceptions": {
+    "failed_to_change": {
+      "message": "Failed to change {entity}: {error}"
+    },
+    "force_arm_failed": {
+      "message": "Failed to force arm hub {hub_id}: {error}"
+    },
+    "force_arm_night_failed": {
+      "message": "Failed to force arm night mode hub {hub_id}: {error}"
+    },
+    "invalid_target": {
+      "message": "Invalid target for service."
+    },
+    "no_hubs_found": {
+      "message": "No hubs found."
+    },
+    "space_not_found": {
+      "message": "Space not found."
+    },
+    "system_armed": {
+      "message": "System armed. Please disarm."
+    }
+  },
+  "options": {
+    "step": {
+      "aws_credentials": {
+        "data": {
+          "aws_access_key_id": "AWS Access Key ID",
+          "aws_secret_access_key": "AWS Secret Access Key",
+          "queue_name": "SQS Queue Name"
+        },
+        "data_description": {
+          "aws_access_key_id": "Example: AKIA3SFSAKBHLDDOCGFG",
+          "aws_secret_access_key": "Secret key provided by Ajax (40 characters)",
+          "queue_name": "Example: ajax-events-V6WHbk3e-prod.fifo"
+        },
+        "description": "Configure AWS credentials for real-time event notifications.\n\n**Current configuration:**\n- Access Key: {current_access_key}\n- Secret Key: {current_secret_key}\n- SQS Queue: {current_queue}\n\nLeave a field empty to keep current value.",
+        "title": "AWS SQS Credentials"
+      },
+      "enabled_spaces": {
+        "data": {
+          "enabled_spaces": "Enabled Spaces"
+        },
+        "description": "Select which spaces to enable in Home Assistant.\n\nDisabled spaces will not create any devices or entities. Changing this will reload the integration.",
+        "title": "Enabled Spaces"
+      },
+      "init": {
+        "description": "Choose a category to configure",
+        "menu_options": {
+          "aws_credentials": "AWS SQS Credentials",
+          "enabled_spaces": "Enabled Spaces",
+          "notifications": "Notifications",
+          "polling_settings": "Polling Settings",
+          "proxy_settings": "Proxy Settings"
+        },
+        "title": "Ajax Options"
+      },
+      "notifications": {
+        "data": {
+          "monitored_spaces": "Spaces to monitor",
+          "notification_filter": "Notification filter",
+          "persistent_notification": "Show persistent notifications"
+        },
+        "description": "Configure your Ajax integration notifications",
+        "title": "Notification Options"
+      },
+      "polling_settings": {
+        "data": {
+          "door_sensor_fast_poll": "Door sensor fast polling"
+        },
+        "data_description": {
+          "door_sensor_fast_poll": "Poll door sensors every 5 seconds when disarmed. Disable to reduce API calls."
+        },
+        "description": "Configure API polling behavior to optimize performance.\n\n**Current behavior:**\n- Light polling (hub state + devices): every 30-60s\n- Full metadata refresh (rooms, users, groups): hourly",
+        "title": "Polling Settings"
+      },
+      "proxy_settings": {
+        "data": {
+          "proxy_url": "Proxy URL"
+        },
+        "data_description": {
+          "proxy_url": "Example: https://my-proxy.example.com"
+        },
+        "description": "Change your Ajax proxy server URL.",
+        "title": "Proxy Settings"
+      }
+    }
+  },
+  "selector": {
+    "auth_mode": {
+      "options": {
+        "direct": "Direct (Enterprise API key only)",
+        "proxy_secure": "Ajax Proxy"
+      }
+    },
+    "notification_filter": {
+      "options": {
+        "alarms_only": "Alarms only",
+        "all": "All notifications",
+        "none": "None",
+        "security_events": "Security events (alarms + arming)"
+      }
+    }
+  },
+  "services": {
+    "force_arm": {
+      "description": "Force arm the security system, ignoring open sensors and problems.",
+      "name": "Force arm"
+    },
+    "force_arm_night": {
+      "description": "Force activate night mode, ignoring open sensors and problems.",
+      "name": "Force arm night mode"
+    },
+    "get_raw_devices": {
+      "description": "Get raw API JSON data for all devices. Saves the complete API response to ajax_raw_devices.json.",
+      "name": "Get raw devices"
+    },
+    "refresh_metadata": {
+      "description": "Force a full refresh of rooms, users, and groups from Ajax.",
+      "name": "Refresh metadata"
+    }
+  }
+}

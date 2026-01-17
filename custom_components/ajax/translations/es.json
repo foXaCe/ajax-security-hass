@@ -2,7 +2,7 @@
   "config": {
     "abort": {
       "already_configured": "Esta integración Ajax ya está configurada.",
-      "no_spaces_available": "No spaces available. Please reload the integration.",
+      "no_spaces_available": "No hay espacios disponibles. Por favor, recargue la integración.",
       "reauth_failed": "Re-autenticación fallida. Por favor, reconfigure la integración.",
       "reauth_successful": "Re-autenticación exitosa."
     },
@@ -14,7 +14,7 @@
       "invalid_auth": "Credenciales API inválidas. Verifique su clave API, correo y contraseña.",
       "invalid_password": "Correo o contraseña incorrectos. Verifique sus credenciales de cuenta Ajax.",
       "invalid_proxy_url": "URL del proxy inválida. La URL debe comenzar con http:// o https://",
-      "no_spaces_selected": "Please select at least one space to enable.",
+      "no_spaces_selected": "Por favor, seleccione al menos un espacio para activar.",
       "unknown": "Error inesperado. Consulte los registros para más detalles."
     },
     "step": {
@@ -71,10 +71,10 @@
       },
       "select_spaces": {
         "data": {
-          "enabled_spaces": "Enabled Spaces"
+          "enabled_spaces": "Espacios activados"
         },
-        "description": "Found {space_count} spaces. Select which spaces to enable in Home Assistant.\n\nUnselected spaces will not create any devices or entities.",
-        "title": "Select Spaces"
+        "description": "Se encontraron {space_count} espacios. Seleccione qué espacios activar en Home Assistant.\n\nLos espacios no seleccionados no crearán dispositivos ni entidades.",
+        "title": "Seleccionar espacios"
       },
       "user": {
         "data": {
@@ -138,10 +138,10 @@
         "name": "Batería Hub"
       },
       "beep_on_arm": {
-        "name": "Beep on arm/disarm"
+        "name": "Pitido al armar/desarmar"
       },
       "beep_on_delay": {
-        "name": "Beep on entry/exit delay"
+        "name": "Pitido en retardo de entrada/salida"
       },
       "connection": {
         "name": "Conexión hub",
@@ -207,16 +207,16 @@
         "name": "Sensor de inclinación"
       },
       "video_human": {
-        "name": "Human detected"
+        "name": "Persona detectada"
       },
       "video_motion": {
-        "name": "Motion detected"
+        "name": "Movimiento detectado"
       },
       "video_pet": {
-        "name": "Pet detected"
+        "name": "Mascota detectada"
       },
       "video_vehicle": {
-        "name": "Vehicle detected"
+        "name": "Vehículo detectado"
       },
       "wings_radio": {
         "name": "Radio Wings"
@@ -294,8 +294,8 @@
       "device_color": {
         "name": "Color del dispositivo",
         "state": {
-          "black": "Black",
-          "white": "White"
+          "black": "Negro",
+          "white": "Blanco"
         }
       },
       "device_label": {
@@ -316,9 +316,9 @@
       "gsm_connection_status": {
         "name": "Estado de conexión GSM",
         "state": {
-          "connected": "Connected",
-          "connecting": "Connecting",
-          "disconnected": "Disconnected",
+          "connected": "Conectado",
+          "connecting": "Conectando",
+          "disconnected": "Desconectado",
           "error": "Error"
         }
       },
@@ -332,7 +332,7 @@
           "3g": "3G",
           "4g": "4G",
           "5g": "5G",
-          "unknown": "Unknown"
+          "unknown": "Desconocido"
         }
       },
       "hardware_version": {
@@ -388,11 +388,11 @@
       "hub_gsm": {
         "name": "GSM / SIM",
         "state": {
-          "good": "Good",
-          "none": "None",
+          "good": "Bueno",
+          "none": "Ninguno",
           "normal": "Normal",
-          "strong": "Strong",
-          "weak": "Weak"
+          "strong": "Fuerte",
+          "weak": "Débil"
         },
         "state_attributes": {
           "active_sim": {
@@ -571,16 +571,16 @@
         "name": "Modo LED"
       },
       "ip_address": {
-        "name": "IP address"
+        "name": "Dirección IP"
       },
       "last_action": {
-        "name": "Last action",
+        "name": "Última acción",
         "state": {
-          "double_press": "Double press",
-          "emergency": "Emergency",
-          "long_press": "Long press",
-          "panic": "Panic",
-          "single_press": "Single press"
+          "double_press": "Doble pulsación",
+          "emergency": "Emergencia",
+          "long_press": "Pulsación larga",
+          "panic": "Pánico",
+          "single_press": "Pulsación simple"
         }
       },
       "last_alert": {
@@ -601,13 +601,13 @@
         }
       },
       "last_ring": {
-        "name": "Last ring"
+        "name": "Última llamada"
       },
       "led_indication": {
         "name": "Indicación LED"
       },
       "mac_address": {
-        "name": "MAC address"
+        "name": "Dirección MAC"
       },
       "malfunctions": {
         "name": "Mal funcionamientos"
@@ -909,18 +909,18 @@
       },
       "enabled_spaces": {
         "data": {
-          "enabled_spaces": "Enabled Spaces"
+          "enabled_spaces": "Espacios activados"
         },
-        "description": "Select which spaces to enable in Home Assistant.\n\nDisabled spaces will not create any devices or entities. Changing this will reload the integration.",
-        "title": "Enabled Spaces"
+        "description": "Seleccione qué espacios activar en Home Assistant.\n\nLos espacios desactivados no crearán dispositivos ni entidades. Cambiar esto recargará la integración.",
+        "title": "Espacios activados"
       },
       "init": {
         "description": "Elija una categoría para configurar",
         "menu_options": {
           "aws_credentials": "Credenciales AWS SQS",
-          "enabled_spaces": "Enabled Spaces",
+          "enabled_spaces": "Espacios activados",
           "notifications": "Notificaciones",
-          "polling_settings": "Polling Settings",
+          "polling_settings": "Configuración de polling",
           "proxy_settings": "Configuración del proxy"
         },
         "title": "Opciones Ajax"
@@ -936,13 +936,13 @@
       },
       "polling_settings": {
         "data": {
-          "door_sensor_fast_poll": "Door sensor fast polling"
+          "door_sensor_fast_poll": "Polling rápido de sensores de puerta"
         },
         "data_description": {
-          "door_sensor_fast_poll": "Poll door sensors every 5 seconds when disarmed. Disable to reduce API calls."
+          "door_sensor_fast_poll": "Consultar sensores de puerta cada 5 segundos cuando está desarmado. Desactivar para reducir llamadas API."
         },
-        "description": "Configure API polling behavior to optimize performance.\n\n**Current behavior:**\n- Light polling (hub state + devices): every 30-60s\n- Full metadata refresh (rooms, users, groups): hourly",
-        "title": "Polling Settings"
+        "description": "Configure el comportamiento del polling API para optimizar el rendimiento.\n\n**Comportamiento actual:**\n- Polling ligero (estado del hub + dispositivos): cada 30-60s\n- Actualización completa de metadatos (habitaciones, usuarios, grupos): cada hora",
+        "title": "Configuración de polling"
       },
       "proxy_settings": {
         "data": {
@@ -974,20 +974,20 @@
   },
   "services": {
     "force_arm": {
-      "description": "Force arm the security system, ignoring open sensors and problems.",
-      "name": "Force arm"
+      "description": "Fuerza el armado del sistema de seguridad, ignorando sensores abiertos y problemas.",
+      "name": "Armado forzado"
     },
     "force_arm_night": {
-      "description": "Force activate night mode, ignoring open sensors and problems.",
-      "name": "Force arm night mode"
+      "description": "Fuerza la activación del modo nocturno, ignorando sensores abiertos y problemas.",
+      "name": "Modo nocturno forzado"
     },
     "get_raw_devices": {
-      "description": "Get raw API JSON data for all devices. Saves the complete API response to ajax_raw_devices.json.",
-      "name": "Get raw devices"
+      "description": "Obtiene los datos JSON brutos de la API para todos los dispositivos. Guarda la respuesta completa en ajax_raw_devices.json.",
+      "name": "Obtener dispositivos brutos"
     },
     "refresh_metadata": {
-      "description": "Force a full refresh of rooms, users, and groups from Ajax.",
-      "name": "Refresh metadata"
+      "description": "Fuerza una actualización completa de habitaciones, usuarios y grupos desde Ajax.",
+      "name": "Actualizar metadatos"
     }
   }
 }

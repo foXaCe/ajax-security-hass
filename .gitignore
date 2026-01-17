@@ -21,6 +21,7 @@ docker-compose.yml
 .coderabbit.yaml
 .pre-commit-config.yaml
 ruff.toml
+.github/
 
 # Python
 __pycache__/

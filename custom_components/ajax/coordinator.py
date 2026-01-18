@@ -2038,6 +2038,8 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
             "fire_protect_2_plus": DeviceType.SMOKE_DETECTOR,
             "fireprotect2": DeviceType.SMOKE_DETECTOR,
             "fire_protect_2": DeviceType.SMOKE_DETECTOR,
+            "fire_protect_2_base": DeviceType.SMOKE_DETECTOR,
+            "fireprotect2base": DeviceType.SMOKE_DETECTOR,
             "smoke": DeviceType.SMOKE_DETECTOR,
             "fire": DeviceType.SMOKE_DETECTOR,
             # Flood detectors

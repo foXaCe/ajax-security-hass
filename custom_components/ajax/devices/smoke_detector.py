@@ -31,8 +31,11 @@ class SmokeDetectorHandler(AjaxDeviceHandler):
             {
                 "key": "smoke",
                 "device_class": BinarySensorDeviceClass.SMOKE,
-                # Note: Ajax API uses 'state' field - ALARM when smoke detected
-                "value_fn": lambda: self.device.attributes.get("state") == "ALARM",
+                # Check both REST API state and SSE event attribute
+                "value_fn": lambda: (
+                    self.device.attributes.get("state") == "ALARM"
+                    or self.device.attributes.get("smoke_detected", False)
+                ),
                 "enabled_by_default": True,
             },
             # Note: "armed_in_night_mode" is now a switch, not a binary sensor
@@ -46,13 +49,20 @@ class SmokeDetectorHandler(AjaxDeviceHandler):
 
         # CO detector (FireProtect Plus, FireProtect 2)
         # CO alarm is separate from smoke - check for CO-specific state
-        if self.device.raw_type in ["FireProtect2", "FireProtectPlus"]:
+        if self.device.raw_type in [
+            "FireProtect2",
+            "FireProtectPlus",
+            "FIRE_PROTECT_2_BASE",
+        ]:
             sensors.append(
                 {
                     "key": "co",
                     "device_class": BinarySensorDeviceClass.CO,
-                    # CO alarm indicated by specific state or attribute
-                    "value_fn": lambda: self.device.attributes.get("co_alarm", False),
+                    # Check both REST API attribute and SSE event attribute
+                    "value_fn": lambda: (
+                        self.device.attributes.get("co_alarm", False)
+                        or self.device.attributes.get("co_detected", False)
+                    ),
                     "enabled_by_default": True,
                 }
             )

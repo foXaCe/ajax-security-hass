@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.7.75] - 2026-01-19
+
+### Added
+- **Video Edge camera entities** with RTSP streaming support
+  - TurretCam, TurretCam HL, BulletCam, BulletCam HL, MiniDome, MiniDome HL
+  - Ajax-specific RTSP URL format: `/{mac}-{channel}_{stream}`
+  - Port 8554 (Ajax default)
+- **Firmware update entities** for Video Edge devices and Hub
+- **RTSP/ONVIF credentials configuration** in integration options
+- LeaksProtect siren on leak switch
+
+### Fixed
+- Video Edge iteration bug (was iterating over keys instead of values)
+
 ## [0.7.68] - 2026-01-14
 
 ### Fixed

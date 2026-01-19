@@ -26,10 +26,14 @@
 ---
 
 > [!WARNING]
-> ## No Public Proxy Available
-> There is currently **no public proxy server available**. The integration requires either:
-> - An **enterprise API key** from Ajax Systems (Direct mode)
-> - A **self-hosted proxy server** (Proxy mode)
+> ## Prerequisites - API Access Required
+> **This integration requires API credentials that are not publicly available.**
+>
+> To use this integration, you need **one of the following**:
+> - An **enterprise API key** from Ajax Systems (Direct mode) - available through Ajax partnership program
+> - Access to a **community proxy server** (Proxy mode) - **no public proxy currently available**
+>
+> ⚠️ **Regular users without API access cannot use this integration at this time.** Self-hosting a proxy is not possible without Ajax API credentials.
 >
 > For discussions and updates, join the community: [HACF Forum](https://forum.hacf.fr/t/alarme-ajax-sur-home-assistant/29511/160)
 
@@ -148,14 +152,14 @@ Issues, pull requests, and feedback are welcome!
 3. Search for **"Ajax Security System"**
 4. Choose your connection mode:
 
-#### Proxy Ajax (Recommended)
-Connect via the Ajax community proxy server. Real-time events via SSE (Server-Sent Events).
+#### Proxy Mode
+Connect via a community proxy server. Real-time events via SSE (Server-Sent Events).
 
-- **Proxy URL**: URL of the Ajax proxy server
+- **Proxy URL**: URL of the community proxy server
 - **Email**: Your Ajax account email
 - **Password**: Your Ajax account password
 
-> **Note**: This is the recommended mode for most users. No API key required.
+> **Note**: No API key required for end users, but requires access to a community proxy server. **No public proxy is currently available** - check the [HACF Forum](https://forum.hacf.fr/t/alarme-ajax-sur-home-assistant/29511/160) for updates.
 
 > ⚠️ **User accounts only**: This integration only supports **user accounts**. PRO/Enterprise accounts are not supported.
 

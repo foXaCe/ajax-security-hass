@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.7.78] - 2026-01-20
+
+### Added
+- **Reconfigure flow**: Update credentials without removing the integration (Gold)
+- **Repair issues**: Framework for firmware update and device offline notifications (Gold)
+
+### Fixed
+- Typos in diagnostics.py TO_REDACT (`aws_acces_key_id` → `aws_access_key_id`, `que_name` → `queue_name`)
+
+### Changed
+- Moved `AjaxConfigEntry` type alias from `__init__.py` to `const.py` (Platinum pattern)
+
 ## [0.7.77] - 2026-01-20
 
 ### Added

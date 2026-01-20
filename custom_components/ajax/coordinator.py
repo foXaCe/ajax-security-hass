@@ -1506,6 +1506,7 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
         if not space.real_space_id:
             _LOGGER.debug("No real_space_id for space %s, skipping video edges", space_id)
             return
+        _LOGGER.debug("Fetching video edges for space %s with real_space_id %s", space_id, space.real_space_id)
 
         try:
             video_edges_data = await self.api.async_get_video_edges(space.real_space_id)

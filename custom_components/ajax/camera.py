@@ -58,27 +58,60 @@ async def async_setup_entry(
         for video_edge in space.video_edges.values():
             # Only create camera if we have an IP address
             if video_edge.ip_address:
-                # Create main stream camera (high quality, enabled by default)
-                entities.append(
-                    AjaxVideoEdgeCamera(
-                        coordinator=coordinator,
-                        entry=entry,
-                        video_edge=video_edge,
-                        space_id=space.id,
-                        stream_type="main",
+                # NVR: create cameras for each channel
+                if video_edge.video_edge_type == VideoEdgeType.NVR and video_edge.channels:
+                    for i, channel in enumerate(video_edge.channels):
+                        channel_name = channel.get("name") if isinstance(channel, dict) else None
+                        channel_id = channel.get("id") if isinstance(channel, dict) else None
+                        # Main stream for this channel
+                        entities.append(
+                            AjaxVideoEdgeCamera(
+                                coordinator=coordinator,
+                                entry=entry,
+                                video_edge=video_edge,
+                                space_id=space.id,
+                                stream_type="main",
+                                channel_index=i,
+                                channel_name=channel_name,
+                                channel_id=channel_id,
+                            )
+                        )
+                        # Sub stream for this channel (disabled by default)
+                        entities.append(
+                            AjaxVideoEdgeCamera(
+                                coordinator=coordinator,
+                                entry=entry,
+                                video_edge=video_edge,
+                                space_id=space.id,
+                                stream_type="sub",
+                                channel_index=i,
+                                channel_name=channel_name,
+                                channel_id=channel_id,
+                            )
+                        )
+                else:
+                    # Single camera (TurretCam, BulletCam, MiniDome, etc.)
+                    # Create main stream camera (high quality, enabled by default)
+                    entities.append(
+                        AjaxVideoEdgeCamera(
+                            coordinator=coordinator,
+                            entry=entry,
+                            video_edge=video_edge,
+                            space_id=space.id,
+                            stream_type="main",
+                        )
                     )
-                )
-                # Create sub stream camera (low quality, disabled by default)
-                # Useful for 3G/4G connections with limited bandwidth
-                entities.append(
-                    AjaxVideoEdgeCamera(
-                        coordinator=coordinator,
-                        entry=entry,
-                        video_edge=video_edge,
-                        space_id=space.id,
-                        stream_type="sub",
+                    # Create sub stream camera (low quality, disabled by default)
+                    # Useful for 3G/4G connections with limited bandwidth
+                    entities.append(
+                        AjaxVideoEdgeCamera(
+                            coordinator=coordinator,
+                            entry=entry,
+                            video_edge=video_edge,
+                            space_id=space.id,
+                            stream_type="sub",
+                        )
                     )
-                )
 
     if entities:
         _LOGGER.debug("Adding %d camera entities", len(entities))
@@ -99,6 +132,9 @@ class AjaxVideoEdgeCamera(CoordinatorEntity[AjaxDataCoordinator], Camera):
         video_edge: AjaxVideoEdge,
         space_id: str,
         stream_type: str = "main",
+        channel_index: int | None = None,
+        channel_name: str | None = None,
+        channel_id: str | None = None,
     ) -> None:
         """Initialize the camera entity."""
         CoordinatorEntity.__init__(self, coordinator)
@@ -108,10 +144,25 @@ class AjaxVideoEdgeCamera(CoordinatorEntity[AjaxDataCoordinator], Camera):
         self._video_edge_id = video_edge.id
         self._space_id = space_id
         self._stream_type = stream_type
-        self._attr_unique_id = f"{video_edge.id}_camera_{stream_type}"
+        self._channel_index = channel_index if channel_index is not None else 0
+        self._channel_id = channel_id  # NVR channel ID for RTSP path
+
+        # Build unique ID
+        if channel_index is not None:
+            self._attr_unique_id = f"{video_edge.id}_camera_ch{channel_index}_{stream_type}"
+        else:
+            self._attr_unique_id = f"{video_edge.id}_camera_{stream_type}"
 
         # Camera name and default enabled state
-        if stream_type == "main":
+        if channel_index is not None:
+            # NVR with multiple channels
+            ch_label = channel_name or f"Channel {channel_index + 1}"
+            if stream_type == "main":
+                self._attr_name = ch_label
+            else:
+                self._attr_name = f"{ch_label} Sub"
+                self._attr_entity_registry_enabled_default = False
+        elif stream_type == "main":
             self._attr_name = None  # Use device name
         else:
             self._attr_name = "Sub stream"
@@ -188,31 +239,35 @@ class AjaxVideoEdgeCamera(CoordinatorEntity[AjaxDataCoordinator], Camera):
         """Return the RTSP stream source URL.
 
         Ajax cameras use a specific RTSP URL format:
-        Format: rtsp://[user:pass@]IP:8554/{mac_without_colons}-{channel}_{stream}
-        Where:
-        - mac_without_colons: MAC address in lowercase without colons
-        - channel: 0 for first channel
-        - stream: 'm' for main stream, 's' for sub stream
+        Format: rtsp://[user:pass@]IP:8554/{path}_{stream}
+        Where for single cameras:
+        - path: {mac_without_colons}-{channel} (e.g., 9c756e2ae22d-0)
+        For NVR channels:
+        - path: {channel_id} (e.g., mhzE3YtuK8-9c756e2ae22d-0)
+        Stream suffix:
+        - 'm' for main stream, 's' for sub stream
         """
         video_edge = self._video_edge
         if not video_edge or not video_edge.ip_address:
             return None
 
-        # Need MAC address to build the stream path
-        if not video_edge.mac_address:
-            _LOGGER.warning("No MAC address for %s, cannot build RTSP URL", video_edge.name)
-            return None
-
         # Build RTSP URL
         ip = video_edge.ip_address
         port = DEFAULT_RTSP_PORT
-
-        # Build stream path from MAC address
-        # Format: {mac_without_colons}-{channel}_{stream_type}
-        mac_clean = video_edge.mac_address.replace(":", "").lower()
-        channel_num = "0"  # First channel
         stream_suffix = "m" if self._stream_type == "main" else "s"
-        stream_path = f"{mac_clean}-{channel_num}_{stream_suffix}"
+
+        # Build stream path
+        if self._channel_id:
+            # NVR channel: use the channel ID directly
+            stream_path = f"{self._channel_id}_{stream_suffix}"
+        else:
+            # Single camera: use MAC address format
+            if not video_edge.mac_address:
+                _LOGGER.warning("No MAC address for %s, cannot build RTSP URL", video_edge.name)
+                return None
+            mac_clean = video_edge.mac_address.replace(":", "").lower()
+            channel_num = str(self._channel_index)
+            stream_path = f"{mac_clean}-{channel_num}_{stream_suffix}"
 
         # Get RTSP credentials from options
         username = self._entry.options.get(CONF_RTSP_USERNAME, "")

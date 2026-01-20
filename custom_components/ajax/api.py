@@ -787,7 +787,7 @@ class AjaxRestApi:
         """Get all video edge devices for a space.
 
         Args:
-            space_id: Space ID
+            space_id: Space ID (real_space_id from spaceBinding)
 
         Returns:
             List of video edge dictionaries

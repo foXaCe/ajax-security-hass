@@ -150,8 +150,8 @@ class AjaxVideoEdgeFirmwareUpdate(CoordinatorEntity[AjaxDataCoordinator], Update
         if not video_edge:
             return None
 
-        firmware_info = video_edge.raw_data.get("firmware", {})
-        update_status = firmware_info.get("updateStatus", {})
+        firmware_info = video_edge.raw_data.get("firmware") or {}
+        update_status = firmware_info.get("updateStatus") or {}
 
         # Check if critical update is available
         if firmware_info.get("criticalUpdateAvailable", False):
@@ -177,8 +177,8 @@ class AjaxVideoEdgeFirmwareUpdate(CoordinatorEntity[AjaxDataCoordinator], Update
         if not video_edge:
             return False
 
-        firmware_info = video_edge.raw_data.get("firmware", {})
-        update_status = firmware_info.get("updateStatus", {})
+        firmware_info = video_edge.raw_data.get("firmware") or {}
+        update_status = firmware_info.get("updateStatus") or {}
         state = update_status.get("state", "IDLE")
 
         if state in ("DOWNLOADING", "INSTALLING"):
@@ -197,12 +197,12 @@ class AjaxVideoEdgeFirmwareUpdate(CoordinatorEntity[AjaxDataCoordinator], Update
         if not video_edge:
             return None
 
-        firmware_info = video_edge.raw_data.get("firmware", {})
+        firmware_info = video_edge.raw_data.get("firmware") or {}
 
         if firmware_info.get("criticalUpdateAvailable", False):
             return "Critical security update available"
 
-        update_status = firmware_info.get("updateStatus", {})
+        update_status = firmware_info.get("updateStatus") or {}
         state = update_status.get("state", "IDLE")
 
         if state == "DOWNLOADING":
@@ -278,7 +278,7 @@ class AjaxHubFirmwareUpdate(CoordinatorEntity[AjaxDataCoordinator], UpdateEntity
         space = self._space
         if not space or not space.hub_details:
             return {}
-        return space.hub_details.get("firmware", {})
+        return space.hub_details.get("firmware") or {}
 
     @property
     def installed_version(self) -> str | None:

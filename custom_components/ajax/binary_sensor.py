@@ -126,12 +126,17 @@ async def async_setup_entry(
                     )
 
         # Create binary sensors for video edges (surveillance cameras)
-        for ve_id, video_edge in space.video_edges.items():
-            handler = VideoEdgeHandler(video_edge)
+        # Pass all video edges so we can find NVR links for each camera
+        all_video_edges = space.video_edges
+        for ve_id, video_edge in all_video_edges.items():
+            handler = VideoEdgeHandler(video_edge, all_video_edges)
             binary_sensors = handler.get_binary_sensors()
 
             for sensor_desc in binary_sensors:
-                unique_id = f"{ve_id}_{sensor_desc['key']}"
+                # Use target_video_edge_id if present (for NVR channels linked to cameras)
+                # This attaches the entity to the camera device instead of NVR
+                target_ve_id = sensor_desc.get("target_video_edge_id") or ve_id
+                unique_id = f"{target_ve_id}_{sensor_desc['key']}"
 
                 if unique_id in seen_unique_ids:
                     continue
@@ -141,16 +146,27 @@ async def async_setup_entry(
                     AjaxVideoEdgeBinarySensor(
                         coordinator=coordinator,
                         space_id=space_id,
-                        video_edge_id=ve_id,
+                        video_edge_id=target_ve_id,
                         sensor_key=sensor_desc["key"],
                         sensor_desc=sensor_desc,
                     )
                 )
-                _LOGGER.debug(
-                    "Created video edge binary sensor '%s' for: %s",
-                    sensor_desc["key"],
-                    video_edge.name,
-                )
+                # Log with target device name if different from source
+                if sensor_desc.get("target_video_edge_id"):
+                    target_ve = all_video_edges.get(target_ve_id)
+                    target_name = target_ve.name if target_ve else target_ve_id
+                    _LOGGER.debug(
+                        "Created video edge binary sensor '%s' for camera: %s (data from NVR: %s)",
+                        sensor_desc["key"],
+                        target_name,
+                        video_edge.name,
+                    )
+                else:
+                    _LOGGER.debug(
+                        "Created video edge binary sensor '%s' for: %s",
+                        sensor_desc["key"],
+                        video_edge.name,
+                    )
 
         # Create hub-level binary sensors from hub_details
         if space.hub_details:
@@ -354,6 +370,10 @@ class AjaxVideoEdgeBinarySensor(CoordinatorEntity[AjaxDataCoordinator], BinarySe
         # Set translation key
         self._attr_translation_key = sensor_desc.get("translation_key", sensor_key)
 
+        # Set device class if provided
+        if "device_class" in sensor_desc:
+            self._attr_device_class = sensor_desc["device_class"]
+
         # Set enabled by default
         if "enabled_by_default" in sensor_desc:
             self._attr_entity_registry_enabled_default = sensor_desc["enabled_by_default"]
@@ -385,6 +405,12 @@ class AjaxVideoEdgeBinarySensor(CoordinatorEntity[AjaxDataCoordinator], BinarySe
         if video_edge is None:
             return False
         return video_edge.online
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any] | None:
+        """Return extra state attributes (e.g., linked_nvr for cameras recorded by NVR)."""
+        attrs = self._sensor_desc.get("extra_state_attributes")
+        return attrs if attrs else None
 
     @property
     def device_info(self) -> dict[str, Any]:

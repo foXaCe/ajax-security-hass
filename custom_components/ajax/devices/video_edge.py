@@ -75,9 +75,16 @@ RECORD_POLICY_TRANSLATIONS = {
 class VideoEdgeHandler:
     """Handler for Ajax Video Edge surveillance cameras."""
 
-    def __init__(self, video_edge: AjaxVideoEdge) -> None:
-        """Initialize the handler."""
+    def __init__(self, video_edge: AjaxVideoEdge, all_video_edges: dict | None = None) -> None:
+        """Initialize the handler.
+
+        Args:
+            video_edge: The video edge device to handle.
+            all_video_edges: Optional dict of all video edges in the space.
+                Used to find NVR links for cameras.
+        """
         self.video_edge = video_edge
+        self._all_video_edges = all_video_edges or {}
         # Debug: log raw data to see all available fields
         _LOGGER.debug(
             "VideoEdge %s raw_data: %s",
@@ -94,66 +101,101 @@ class VideoEdgeHandler:
         if not isinstance(channels, list):
             return sensors
 
+        # Check if this camera is recorded by any NVR (skip AI sensors if so)
+        is_recorded_by_nvr = len(self._get_linked_nvrs()) > 0
+
         # For each channel, we can have AI detection sensors
         for i, channel in enumerate(channels):
             channel_id = channel.get("id", str(i)) if isinstance(channel, dict) else str(i)
-            channel_name = f"Channel {i + 1}" if len(channels) > 1 else ""
+
+            # Get linked camera info for NVR channels
+            linked_camera_info = self._get_linked_camera_info(channel)
+
+            # Determine if we should create AI detection sensors for this channel
+            if linked_camera_info:
+                # This is an NVR channel linked to an Ajax camera
+                # Create sensors on the CAMERA device (not NVR) for better UX
+                # The value_fn still reads from NVR data via closure
+                target_ve_id = linked_camera_info["id"]
+                _LOGGER.debug(
+                    "Creating AI detection sensors for camera %s (data from NVR %s)",
+                    linked_camera_info["name"],
+                    self.video_edge.name,
+                )
+            elif is_recorded_by_nvr:
+                # This camera is recorded by an NVR - skip AI sensors here
+                # They will be created when processing the NVR
+                _LOGGER.debug(
+                    "Skipping AI detection sensors for camera %s (recorded by NVR)",
+                    self.video_edge.name,
+                )
+                continue
+            else:
+                # Standalone camera not recorded by NVR - create sensors here
+                target_ve_id = None
+
+            # Use channel name in key if multiple channels
+            use_channel_suffix = len(channels) > 1
 
             # Motion detection
             sensors.append(
                 {
-                    "key": f"motion_{channel_id}" if channel_name else "motion",
+                    "key": f"motion_{channel_id}" if use_channel_suffix else "motion",
                     "translation_key": "video_motion",
                     "value_fn": lambda cid=channel_id: self._has_detection_by_id(cid, "VIDEO_MOTION"),
                     "enabled_by_default": True,
                     "channel_id": channel_id,
+                    "target_video_edge_id": target_ve_id,
                 }
             )
 
             # Human detection
             sensors.append(
                 {
-                    "key": f"human_{channel_id}" if channel_name else "human",
+                    "key": f"human_{channel_id}" if use_channel_suffix else "human",
                     "translation_key": "video_human",
                     "value_fn": lambda cid=channel_id: self._has_detection_by_id(cid, "VIDEO_HUMAN"),
                     "enabled_by_default": True,
                     "channel_id": channel_id,
+                    "target_video_edge_id": target_ve_id,
                 }
             )
 
             # Vehicle detection
             sensors.append(
                 {
-                    "key": f"vehicle_{channel_id}" if channel_name else "vehicle",
+                    "key": f"vehicle_{channel_id}" if use_channel_suffix else "vehicle",
                     "translation_key": "video_vehicle",
                     "value_fn": lambda cid=channel_id: self._has_detection_by_id(cid, "VIDEO_VEHICLE"),
                     "enabled_by_default": True,
                     "channel_id": channel_id,
+                    "target_video_edge_id": target_ve_id,
                 }
             )
 
             # Pet detection
             sensors.append(
                 {
-                    "key": f"pet_{channel_id}" if channel_name else "pet",
+                    "key": f"pet_{channel_id}" if use_channel_suffix else "pet",
                     "translation_key": "video_pet",
                     "value_fn": lambda cid=channel_id: self._has_detection_by_id(cid, "VIDEO_PET"),
                     "enabled_by_default": True,
                     "channel_id": channel_id,
+                    "target_video_edge_id": target_ve_id,
                 }
             )
 
-        # Lid closed sensor (from systemInfo)
-        # API returns lidClosed=True when closed, but we want on=open, off=closed
+        # Lid/tamper sensor (from systemInfo)
+        # API returns lidClosed=True when closed, but we want on=tampered (open), off=ok (closed)
+        # Use device_class TAMPER without translation_key so HA uses automatic translation
         system_info = self.video_edge.raw_data.get("systemInfo", {})
         if "lidClosed" in system_info:
             sensors.append(
                 {
-                    "key": "lid_closed",
-                    "translation_key": "video_edge_lid_closed",
+                    "key": "tamper",
+                    "device_class": "tamper",
                     "value_fn": lambda: not self.video_edge.raw_data.get("systemInfo", {}).get("lidClosed", True),
                     "enabled_by_default": True,
-                    "device_class": "opening",
                 }
             )
 
@@ -419,4 +461,126 @@ class VideoEdgeHandler:
         for state in states:
             if isinstance(state, dict) and state.get("type") == detection_type:
                 return state.get("active", False)
+        return False
+
+    def _get_linked_camera_info(self, channel: dict) -> dict | None:
+        """Get info about the Ajax camera linked to this NVR channel.
+
+        Returns dict with camera info {id, name} if this is an NVR channel
+        linked to an Ajax camera, None otherwise.
+        """
+        if not isinstance(channel, dict):
+            return None
+
+        # Only for NVR devices
+        if self.video_edge.video_edge_type.value != "NVR":
+            return None
+
+        source_aliases = channel.get("sourceAliases", {})
+        if not isinstance(source_aliases, dict):
+            return None
+
+        sources = source_aliases.get("sources", [])
+        if not isinstance(sources, list):
+            return None
+
+        # Ajax camera types
+        ajax_camera_types = {"TURRET", "TURRET_HL", "BULLET", "BULLET_HL", "MINIDOME", "MINIDOME_HL"}
+
+        for source in sources:
+            if not isinstance(source, dict):
+                continue
+            if source.get("sourceType") == "PRIMARY":
+                source_type = source.get("type", "")
+                source_ve_id = source.get("videoEdgeId", "")
+                if source_type in ajax_camera_types and source_ve_id != self.video_edge.id:
+                    # Find the camera name from all_video_edges
+                    camera_name = channel.get("name", f"Camera {source_ve_id[:6]}")
+                    if source_ve_id in self._all_video_edges:
+                        camera_name = self._all_video_edges[source_ve_id].name
+                    return {"id": source_ve_id, "name": camera_name}
+
+        return None
+
+    def _get_linked_nvrs(self) -> list[dict]:
+        """Find all NVRs that record this camera.
+
+        Returns a list of dicts with NVR info: {id, name}.
+        Used to add linked_nvr attribute to detection sensors.
+        """
+        linked_nvrs = []
+
+        # Only search for NVR links if this is a camera (not an NVR itself)
+        if self.video_edge.video_edge_type.value == "NVR":
+            return linked_nvrs
+
+        camera_id = self.video_edge.id
+
+        for _ve_id, ve in self._all_video_edges.items():
+            # Only check NVRs
+            if ve.video_edge_type.value != "NVR":
+                continue
+
+            # Check if any channel of this NVR has our camera as source
+            channels = ve.channels if isinstance(ve.channels, list) else []
+            for channel in channels:
+                if not isinstance(channel, dict):
+                    continue
+                source_aliases = channel.get("sourceAliases", {})
+                if not isinstance(source_aliases, dict):
+                    continue
+                sources = source_aliases.get("sources", [])
+                if not isinstance(sources, list):
+                    continue
+
+                for source in sources:
+                    if not isinstance(source, dict):
+                        continue
+                    if source.get("sourceType") == "PRIMARY" and source.get("videoEdgeId") == camera_id:
+                        linked_nvrs.append({"id": ve.id, "name": ve.name})
+                        break  # Found this NVR, move to next one
+
+        return linked_nvrs
+
+    def _is_channel_linked_to_ajax_camera(self, channel: dict) -> bool:
+        """Check if an NVR channel is linked to an EXTERNAL Ajax camera (via sourceAliases).
+
+        NVR channels that record from Ajax cameras (TurretCam, BulletCam, etc.)
+        have sourceAliases with a PRIMARY source pointing to the Ajax camera.
+        We skip AI detection sensors for these channels because the Ajax camera
+        already has its own detection sensors (avoiding duplicates).
+
+        IMPORTANT: We check that the PRIMARY source's videoEdgeId is DIFFERENT
+        from the current video edge's ID. This ensures we don't skip sensors
+        for cameras that reference themselves in sourceAliases.
+
+        Future NVRs with AI detection on non-Ajax cameras will create sensors
+        since they won't have a PRIMARY source with an Ajax video edge type.
+        """
+        if not isinstance(channel, dict):
+            return False
+
+        source_aliases = channel.get("sourceAliases", {})
+        if not isinstance(source_aliases, dict):
+            return False
+
+        sources = source_aliases.get("sources", [])
+        if not isinstance(sources, list):
+            return False
+
+        # Check if there's a PRIMARY source with an Ajax camera type
+        # that is DIFFERENT from the current video edge (external camera)
+        ajax_camera_types = {"TURRET", "TURRET_HL", "BULLET", "BULLET_HL", "MINIDOME", "MINIDOME_HL"}
+        current_ve_id = self.video_edge.id
+
+        for source in sources:
+            if not isinstance(source, dict):
+                continue
+            if source.get("sourceType") == "PRIMARY":
+                source_type = source.get("type", "")
+                source_ve_id = source.get("videoEdgeId", "")
+                # Only consider it linked if it's an Ajax camera AND it's a different device
+                if source_type in ajax_camera_types and source_ve_id != current_ve_id:
+                    return True
+
         return False

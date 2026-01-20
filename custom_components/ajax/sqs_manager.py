@@ -867,8 +867,33 @@ class SQSManager:
         return None
 
     async def _create_alarm_notification(self, space, event_record: dict[str, Any]) -> None:
-        """Create a Home Assistant notification for alarm events."""
+        """Create a Home Assistant notification for alarm events.
+
+        Respects user notification preferences:
+        - NONE: no notifications
+        - ALARMS_ONLY: show alarm notifications (this method)
+        - SECURITY_EVENTS: show alarm + arm/disarm notifications
+        - ALL: show all notifications
+        """
         from homeassistant.components.persistent_notification import async_create
+
+        from .const import (
+            CONF_NOTIFICATION_FILTER,
+            CONF_PERSISTENT_NOTIFICATION,
+            NOTIFICATION_FILTER_NONE,
+        )
+
+        # Check notification filter settings
+        options = self.coordinator.config_entry.options if self.coordinator.config_entry else {}
+
+        # Check if persistent notifications are enabled
+        if not options.get(CONF_PERSISTENT_NOTIFICATION, True):
+            return
+
+        # Check notification filter - alarm notifications are shown for all filters except NONE
+        notification_filter = options.get(CONF_NOTIFICATION_FILTER, NOTIFICATION_FILTER_NONE)
+        if notification_filter == NOTIFICATION_FILTER_NONE:
+            return
 
         source = event_record.get("source_name", "")
         room = event_record.get("room_name", "")

@@ -525,8 +525,9 @@ async def async_setup_entry(
                     )
 
         # Create sensors for video edges (surveillance cameras)
-        for ve_id, video_edge in space.video_edges.items():
-            handler = VideoEdgeHandler(video_edge)
+        all_video_edges = space.video_edges
+        for ve_id, video_edge in all_video_edges.items():
+            handler = VideoEdgeHandler(video_edge, all_video_edges)
             sensors = handler.get_sensors()
 
             for sensor_desc in sensors:

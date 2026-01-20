@@ -53,6 +53,7 @@ SERVICE_FORCE_ARM = "force_arm"
 SERVICE_FORCE_ARM_NIGHT = "force_arm_night"
 SERVICE_GET_RAW_DEVICES = "get_raw_devices"
 SERVICE_REFRESH_METADATA = "refresh_metadata"
+SERVICE_GET_NVR_RECORDINGS = "get_nvr_recordings"
 
 PLATFORMS: list[Platform] = [
     Platform.ALARM_CONTROL_PANEL,
@@ -472,6 +473,113 @@ async def _async_setup_services(hass: HomeAssistant) -> None:
             DOMAIN,
             SERVICE_REFRESH_METADATA,
             handle_refresh_metadata,
+        )
+
+    async def handle_get_nvr_recordings(call: ServiceCall) -> None:
+        """Handle get NVR recordings service call - diagnostic tool to test API."""
+        from datetime import datetime, timedelta
+
+        _LOGGER.info("Getting NVR recordings data for diagnostic purposes")
+
+        entries = await _extract_config_entry(call)
+        entry = entries[0]
+        coordinator = entry.runtime_data
+
+        # Find NVRs and their cameras
+        nvr_data = []
+
+        for _space_id, space in coordinator.data.spaces.items():
+            for ve_id, video_edge in space.video_edges.items():
+                if video_edge.video_edge_type.value == "NVR":
+                    # Found an NVR
+                    nvr_info = {
+                        "nvr_id": ve_id,
+                        "nvr_name": video_edge.name,
+                        "channels": video_edge.channels or [],
+                        "recordings": [],
+                    }
+
+                    # Get recordings for the last 24 hours
+                    end_time = datetime.now()
+                    start_time = end_time - timedelta(hours=24)
+
+                    # Try to get recordings for each channel
+                    for channel in video_edge.channels or []:
+                        camera_id = channel.get("id") if isinstance(channel, dict) else None
+                        if camera_id:
+                            try:
+                                recordings = await coordinator.api.async_get_nvr_recordings(
+                                    nvr_id=ve_id,
+                                    camera_id=camera_id,
+                                    start=start_time.isoformat(),
+                                    end=end_time.isoformat(),
+                                )
+                                nvr_info["recordings"].append(
+                                    {
+                                        "camera_id": camera_id,
+                                        "camera_name": channel.get("name", "Unknown"),
+                                        "data": recordings,
+                                    }
+                                )
+                                _LOGGER.info(
+                                    "Got %d recordings for camera %s",
+                                    len(recordings) if isinstance(recordings, list) else 1,
+                                    camera_id,
+                                )
+                            except Exception as err:
+                                _LOGGER.warning(
+                                    "Failed to get recordings for camera %s: %s",
+                                    camera_id,
+                                    err,
+                                )
+                                nvr_info["recordings"].append(
+                                    {
+                                        "camera_id": camera_id,
+                                        "camera_name": channel.get("name", "Unknown"),
+                                        "error": str(err),
+                                    }
+                                )
+
+                    nvr_data.append(nvr_info)
+
+        # Write to file
+        output_path = Path(hass.config.path("ajax_nvr_recordings.json"))
+
+        def write_json():
+            with open(output_path, "w", encoding="utf-8") as f:
+                json.dump(nvr_data, f, indent=2, default=str, ensure_ascii=False)
+
+        await hass.async_add_executor_job(write_json)
+
+        # Create notification
+        nvr_count = len(nvr_data)
+        total_recordings = sum(
+            len(rec.get("data", [])) if isinstance(rec.get("data"), list) else 0
+            for nvr in nvr_data
+            for rec in nvr.get("recordings", [])
+        )
+
+        message = (
+            f"**NVRs found:** {nvr_count}\n"
+            f"**Total recordings (last 24h):** {total_recordings}\n\n"
+            f"Saved to: {output_path}\n\n"
+            "Check the JSON file for the full API response structure."
+        )
+
+        async_create(
+            hass,
+            message,
+            title="Ajax NVR Recordings",
+            notification_id="ajax_nvr_recordings",
+        )
+
+        _LOGGER.info("NVR recordings data written to %s", output_path)
+
+    if not hass.services.has_service(DOMAIN, SERVICE_GET_NVR_RECORDINGS):
+        hass.services.async_register(
+            DOMAIN,
+            SERVICE_GET_NVR_RECORDINGS,
+            handle_get_nvr_recordings,
         )
 
 

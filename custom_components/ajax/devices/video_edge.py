@@ -85,11 +85,12 @@ class VideoEdgeHandler:
         """
         self.video_edge = video_edge
         self._all_video_edges = all_video_edges or {}
-        # Debug: log raw data to see all available fields
+        # Debug: log raw data keys to see all available fields
         _LOGGER.debug(
-            "VideoEdge %s raw_data: %s",
+            "VideoEdge %s (%s) raw_data keys: %s",
             video_edge.name,
-            video_edge.raw_data,
+            video_edge.video_edge_type.value,
+            list(video_edge.raw_data.keys()) if video_edge.raw_data else [],
         )
 
     def get_binary_sensors(self) -> list[dict]:
@@ -188,13 +189,29 @@ class VideoEdgeHandler:
         # Lid/tamper sensor (from systemInfo)
         # API returns lidClosed=True when closed, but we want on=tampered (open), off=ok (closed)
         # Use device_class TAMPER without translation_key so HA uses automatic translation
-        system_info = self.video_edge.raw_data.get("systemInfo", {})
+        system_info = self.video_edge.raw_data.get("systemInfo", {}) or {}
         if "lidClosed" in system_info:
             sensors.append(
                 {
                     "key": "tamper",
                     "device_class": "tamper",
                     "value_fn": lambda: not self.video_edge.raw_data.get("systemInfo", {}).get("lidClosed", True),
+                    "enabled_by_default": True,
+                }
+            )
+
+        # ONVIF integration enabled
+        raw_data = self.video_edge.raw_data
+        onvif_settings = raw_data.get("onvif", {}) or {}
+        if "userAuthEnabled" in onvif_settings or "enabled" in onvif_settings:
+            sensors.append(
+                {
+                    "key": "onvif_enabled",
+                    "translation_key": "video_edge_onvif_enabled",
+                    "value_fn": lambda: (
+                        self.video_edge.raw_data.get("onvif", {}).get("userAuthEnabled", False)
+                        or self.video_edge.raw_data.get("onvif", {}).get("enabled", False)
+                    ),
                     "enabled_by_default": True,
                 }
             )
@@ -400,6 +417,48 @@ class VideoEdgeHandler:
                                 "entity_category": "diagnostic",
                             }
                         )
+
+        # NVR-specific sensors
+        if self.video_edge.video_edge_type.value == "NVR":
+            # Archive depth (current archive duration in days)
+            if storage_devices and len(storage_devices) > 0:
+                storage = storage_devices[0]
+                if "archiveDepth" in storage:
+                    sensors.append(
+                        {
+                            "key": "archive_depth",
+                            "translation_key": "video_edge_archive_depth",
+                            "native_unit_of_measurement": "d",
+                            "value_fn": lambda: self.video_edge.raw_data.get("storageDevices", [{}])[0].get(
+                                "archiveDepth"
+                            ),
+                            "enabled_by_default": True,
+                        }
+                    )
+
+            # LED brightness level
+            if "ledBrightnessLevel" in raw_data:
+                sensors.append(
+                    {
+                        "key": "led_brightness",
+                        "translation_key": "video_edge_led_brightness",
+                        "native_unit_of_measurement": "%",
+                        "value_fn": lambda: self.video_edge.raw_data.get("ledBrightnessLevel"),
+                        "enabled_by_default": True,
+                    }
+                )
+
+            # Max display duration (maxPreviewDuration in seconds -> minutes)
+            if "maxPreviewDuration" in raw_data:
+                sensors.append(
+                    {
+                        "key": "max_preview_duration",
+                        "translation_key": "video_edge_max_preview_duration",
+                        "native_unit_of_measurement": "min",
+                        "value_fn": lambda: (self.video_edge.raw_data.get("maxPreviewDuration") or 0) // 60,
+                        "enabled_by_default": True,
+                    }
+                )
 
         return sensors
 

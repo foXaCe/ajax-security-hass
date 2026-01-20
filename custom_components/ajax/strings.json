@@ -262,6 +262,13 @@
           "on": "Open"
         }
       },
+      "video_edge_onvif_enabled": {
+        "name": "ONVIF integration",
+        "state": {
+          "on": "Enabled",
+          "off": "Disabled"
+        }
+      },
       "wings_radio": {
         "name": "Wings radio"
       }
@@ -822,6 +829,15 @@
           "when_requested": "When requested",
           "unknown": "Unknown"
         }
+      },
+      "video_edge_archive_depth": {
+        "name": "Archive duration"
+      },
+      "video_edge_led_brightness": {
+        "name": "LED brightness"
+      },
+      "video_edge_max_preview_duration": {
+        "name": "Max preview duration"
       }
     },
     "update": {
@@ -1186,6 +1202,10 @@
     "refresh_metadata": {
       "description": "Force a full refresh of rooms, users, and groups from Ajax.",
       "name": "Refresh metadata"
+    },
+    "get_nvr_recordings": {
+      "description": "Get NVR recordings data from the API (last 24 hours). Saves the response to ajax_nvr_recordings.json for diagnostic purposes.",
+      "name": "Get NVR recordings"
     }
   }
 }

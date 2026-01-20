@@ -13,3 +13,5 @@ force_arm_night:
 get_raw_devices:
 
 refresh_metadata:
+
+get_nvr_recordings:

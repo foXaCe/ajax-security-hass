@@ -234,6 +234,13 @@
           "on": "Ouvert"
         }
       },
+      "video_edge_onvif_enabled": {
+        "name": "Intégration ONVIF",
+        "state": {
+          "off": "Désactivée",
+          "on": "Activée"
+        }
+      },
       "video_human": {
         "name": "Détection personne",
         "state": {
@@ -767,6 +774,9 @@
       "unread_notifications": {
         "name": "Notifications non lues"
       },
+      "video_edge_archive_depth": {
+        "name": "Durée d'archivage"
+      },
       "video_edge_connection": {
         "name": "Connexion",
         "state": {
@@ -777,6 +787,12 @@
       },
       "video_edge_cpu_usage": {
         "name": "Utilisation CPU"
+      },
+      "video_edge_led_brightness": {
+        "name": "Luminosité LED"
+      },
+      "video_edge_max_preview_duration": {
+        "name": "Durée max affichage"
       },
       "video_edge_ram_usage": {
         "name": "Utilisation RAM"
@@ -1178,6 +1194,10 @@
     "force_arm_night": {
       "description": "Force l'activation du mode nuit, en ignorant les capteurs ouverts et les problèmes.",
       "name": "Mode nuit forcé"
+    },
+    "get_nvr_recordings": {
+      "description": "Récupère les données d'enregistrements NVR depuis l'API (dernières 24h). Enregistre la réponse dans ajax_nvr_recordings.json à des fins de diagnostic.",
+      "name": "Récupérer les enregistrements NVR"
     },
     "get_raw_devices": {
       "description": "Récupère les données JSON brutes de l'API pour tous les appareils. Enregistre la réponse complète dans ajax_raw_devices.json.",

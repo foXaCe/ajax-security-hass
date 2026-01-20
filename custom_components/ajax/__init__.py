@@ -9,7 +9,6 @@ from typing import TYPE_CHECKING
 
 import voluptuous as vol
 from homeassistant.components.persistent_notification import async_create
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.exceptions import (
@@ -39,6 +38,7 @@ from .const import (
     CONF_PROXY_URL,
     CONF_QUEUE_NAME,
     DOMAIN,
+    AjaxConfigEntry,
 )
 from .coordinator import AjaxDataCoordinator
 from .models import SecurityState
@@ -77,9 +77,6 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     await _async_setup_services(hass)
 
     return True
-
-
-type AjaxConfigEntry = ConfigEntry[AjaxDataCoordinator]
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: AjaxConfigEntry) -> bool:

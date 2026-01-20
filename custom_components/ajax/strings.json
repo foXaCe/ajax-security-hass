@@ -69,6 +69,16 @@
         "description": "Your session has expired. Please re-enter your password for {email}.",
         "title": "Re-authenticate"
       },
+      "reconfigure": {
+        "data": {
+          "api_key": "API Key",
+          "email": "Email",
+          "password": "Password",
+          "proxy_url": "Proxy URL"
+        },
+        "description": "Update your Ajax credentials.",
+        "title": "Reconfigure Ajax"
+      },
       "select_spaces": {
         "data": {
           "enabled_spaces": "Enabled Spaces"
@@ -1184,6 +1194,20 @@
         "none": "None",
         "security_events": "Security events (alarms + arming)"
       }
+    }
+  },
+  "issues": {
+    "firmware_update": {
+      "title": "Firmware update available for {device_name}",
+      "description": "A firmware update is available for **{device_name}**.\n\n- Current version: {current_version}\n- New version: {new_version}\n\nPlease update via the Ajax app."
+    },
+    "critical_firmware_update": {
+      "title": "Critical firmware update for {device_name}",
+      "description": "A **critical security update** is available for **{device_name}**.\n\n- Current version: {current_version}\n- New version: {new_version}\n\nPlease update immediately via the Ajax app."
+    },
+    "device_offline": {
+      "title": "{device_name} is offline",
+      "description": "The device **{device_name}** is currently offline and not responding. Please check the device and its connection."
     }
   },
   "services": {

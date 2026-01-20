@@ -18,9 +18,12 @@ TO_REDACT = {
     "email",
     "password",
     "proxy_url",
-    "aws_acces_key_id",
+    "aws_access_key_id",
     "aws_secret_access_key",
-    "que_name",
+    "queue_name",
+    "api_key",
+    "rtsp_username",
+    "rtsp_password",
 }
 
 

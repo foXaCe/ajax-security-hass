@@ -563,6 +563,95 @@ class AjaxConfigFlow(ConfigFlow, domain=DOMAIN):
             },
         )
 
+    async def async_step_reconfigure(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+        """Handle reconfiguration of the integration."""
+        errors: dict[str, str] = {}
+        reconfigure_entry = self._get_reconfigure_entry()
+
+        if user_input is not None:
+            auth_mode = reconfigure_entry.data.get(CONF_AUTH_MODE, AUTH_MODE_DIRECT)
+
+            try:
+                # Validate new credentials
+                if auth_mode == AUTH_MODE_DIRECT:
+                    self._api = AjaxRestApi(
+                        api_key=user_input.get(CONF_API_KEY, reconfigure_entry.data.get(CONF_API_KEY, "")),
+                        email=user_input[CONF_EMAIL],
+                        password=user_input[CONF_PASSWORD],
+                    )
+                else:
+                    proxy_url = user_input.get(CONF_PROXY_URL, reconfigure_entry.data.get(CONF_PROXY_URL))
+                    self._api = AjaxRestApi(
+                        api_key="",
+                        email=user_input[CONF_EMAIL],
+                        password=user_input[CONF_PASSWORD],
+                        proxy_url=proxy_url,
+                        proxy_mode=auth_mode,
+                    )
+
+                # Test login
+                await self._api.async_login()
+                await self._api.close()
+
+                # Hash new password
+                password_hash = hashlib.sha256(user_input[CONF_PASSWORD].encode()).hexdigest()
+
+                # Prepare new data
+                new_data = {
+                    **reconfigure_entry.data,
+                    CONF_EMAIL: user_input[CONF_EMAIL],
+                    CONF_PASSWORD: password_hash,
+                }
+
+                # Update API key if in direct mode
+                if auth_mode == AUTH_MODE_DIRECT and CONF_API_KEY in user_input:
+                    new_data[CONF_API_KEY] = user_input[CONF_API_KEY]
+
+                # Update proxy URL if in proxy mode
+                if auth_mode != AUTH_MODE_DIRECT and CONF_PROXY_URL in user_input:
+                    new_data[CONF_PROXY_URL] = user_input[CONF_PROXY_URL]
+
+                return self.async_update_reload_and_abort(
+                    reconfigure_entry,
+                    data_updates=new_data,
+                )
+
+            except AjaxRestAuthError as err:
+                _LOGGER.error("Reconfigure failed: %s", err)
+                errors["base"] = "invalid_auth"
+            except AjaxRestApiError as err:
+                _LOGGER.error("Reconfigure failed: %s", err)
+                errors["base"] = "cannot_connect"
+            except Exception as err:
+                _LOGGER.exception("Unexpected error during reconfigure: %s", err)
+                errors["base"] = "unknown"
+
+        # Build schema based on auth mode
+        auth_mode = reconfigure_entry.data.get(CONF_AUTH_MODE, AUTH_MODE_DIRECT)
+
+        if auth_mode == AUTH_MODE_DIRECT:
+            data_schema = vol.Schema(
+                {
+                    vol.Required(CONF_API_KEY, default=reconfigure_entry.data.get(CONF_API_KEY, "")): str,
+                    vol.Required(CONF_EMAIL, default=reconfigure_entry.data.get(CONF_EMAIL, "")): str,
+                    vol.Required(CONF_PASSWORD): str,
+                }
+            )
+        else:
+            data_schema = vol.Schema(
+                {
+                    vol.Required(CONF_PROXY_URL, default=reconfigure_entry.data.get(CONF_PROXY_URL, "")): str,
+                    vol.Required(CONF_EMAIL, default=reconfigure_entry.data.get(CONF_EMAIL, "")): str,
+                    vol.Required(CONF_PASSWORD): str,
+                }
+            )
+
+        return self.async_show_form(
+            step_id="reconfigure",
+            data_schema=data_schema,
+            errors=errors,
+        )
+
 
 class AjaxOptionsFlow(OptionsFlow):
     """Handle Ajax options."""

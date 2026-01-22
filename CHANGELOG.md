@@ -2,6 +2,27 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.8.0] - 2026-01-22
+
+### Added
+- **WaterStop device support**: Valve control switch for water leak protection
+- **SocketOutlet device support**: Smart socket control
+- **Siren controls**: Manual siren activation switches for supported devices
+- **ONVIF real-time events**: Motion, human, vehicle, pet detection via ONVIF protocol
+- **GitHub CI/CD**: HACS validation workflow, issue templates, PR template
+
+### Changed
+- **API resilience improvements**:
+  - Client-side rate limiting (30 req/60s) with non-blocking wait
+  - Retry with exponential backoff for transient errors (5xx, network, timeout)
+  - Reuse Home Assistant aiohttp session for connection pooling
+- **Coordinator**: Added Debouncer (1.5s) to prevent SQS/SSE event flooding
+- **Entity naming**: Use modern `_attr_has_entity_name` pattern
+- **Memory optimization**: Added `__slots__` to entity classes
+
+### Fixed
+- Invalid fields in hacs.json (removed `iot_class` and `description`)
+
 ## [0.7.78] - 2026-01-20
 
 ### Added

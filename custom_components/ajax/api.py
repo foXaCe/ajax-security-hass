@@ -466,14 +466,28 @@ class AjaxRestApi:
                     _LOGGER.error("Access denied (403) - Insufficient permissions")
                     raise AjaxRestAuthError("Access denied")
 
+                # Handle server errors (5xx) as transient - will retry on next poll
+                if response.status >= 500:
+                    _LOGGER.warning(
+                        "API request to %s returned server error: %s (will retry)",
+                        endpoint,
+                        response.status,
+                    )
+                    raise AjaxRestApiError(f"Server error: {response.status}")
+
                 response.raise_for_status()
                 return await response.json()
 
         except aiohttp.ClientError as err:
-            _LOGGER.error("API request to %s failed: %s", endpoint, err)
+            # Transient network errors (DNS, connection, etc.) - warning level
+            _LOGGER.warning("API request to %s failed: %s (will retry)", endpoint, err)
             raise AjaxRestApiError(f"API request failed: {err}") from err
         except TimeoutError as err:
-            _LOGGER.error("API request to %s timed out after %ss", endpoint, AJAX_REST_API_TIMEOUT)
+            _LOGGER.warning(
+                "API request to %s timed out after %ss (will retry)",
+                endpoint,
+                AJAX_REST_API_TIMEOUT,
+            )
             raise AjaxRestApiError("API request timeout") from err
 
     # Hub methods
@@ -699,6 +713,19 @@ class AjaxRestApi:
             payload,
         )
         await self._request_no_response("POST", endpoint, payload)
+
+    async def async_set_waterstop_state(self, hub_id: str, device_id: str, open_valve: bool) -> None:
+        """Set WaterStop valve state.
+
+        Uses the /command endpoint for valve control.
+
+        Args:
+            hub_id: Hub ID
+            device_id: Device ID
+            open_valve: True to open valve, False to close
+        """
+        command = "OPEN" if open_valve else "CLOSE"
+        await self.async_send_device_command(hub_id, device_id, command, "WaterStop")
 
     # Socket methods
     async def async_get_socket_power(self, device_id: str) -> dict[str, Any]:

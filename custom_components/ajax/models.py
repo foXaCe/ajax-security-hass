@@ -60,6 +60,7 @@ class DeviceType(Enum):
     WALLSWITCH = "wallswitch"
     THERMOSTAT = "thermostat"
     LIFE_QUALITY = "life_quality"  # LifeQuality air quality sensor (CO2, temperature, humidity)
+    WATERSTOP = "waterstop"  # WaterStop smart water valve
 
     # Cameras
     CAMERA = "camera"
@@ -262,6 +263,10 @@ class AjaxVideoEdge:
 
     # Raw data from API
     raw_data: dict[str, Any] = field(default_factory=dict)
+
+    # ONVIF detection states (from local ONVIF events)
+    # Keys: video_human, video_vehicle, video_pet, video_motion, doorbell_ring
+    detections: dict[str, bool] = field(default_factory=dict)
 
     @property
     def online(self) -> bool:

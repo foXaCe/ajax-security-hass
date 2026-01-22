@@ -20,9 +20,15 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from . import AjaxConfigEntry
 from .const import DOMAIN
 from .coordinator import AjaxDataCoordinator
+from .devices.siren import SirenHandler
 from .models import DeviceType, SecurityState
 
 _LOGGER = logging.getLogger(__name__)
+
+# Device handlers that support get_selects()
+SELECT_DEVICE_HANDLERS = {
+    DeviceType.SIREN: SirenHandler,
+}
 
 # Device types that support DoorProtect Plus select settings
 DEVICES_WITH_DOOR_PLUS_SELECTS = [
@@ -43,6 +49,14 @@ SHOCK_SENSITIVITY_VALUES = {v: k for k, v in SHOCK_SENSITIVITY_OPTIONS.items()}
 
 # LED brightness options for Socket (lowercase for HA translation keys)
 LED_BRIGHTNESS_OPTIONS = ["min", "max"]
+
+# Indication mode options for SocketOutlet (ENABLED=Always, DISABLED=Off, IF_ON=If activated)
+INDICATION_MODE_OPTIONS = {
+    "ENABLED": "always",
+    "DISABLED": "off",
+    "IF_ON": "if_on",
+}
+INDICATION_MODE_VALUES = {v: k for k, v in INDICATION_MODE_OPTIONS.items()}
 
 
 async def async_setup_entry(
@@ -67,13 +81,36 @@ async def async_setup_entry(
                     device.name,
                 )
 
-            # Socket LED brightness
-            if device.type == DeviceType.SOCKET and "indicationBrightness" in device.attributes:
+            # Socket LED brightness (old Socket model with MIN/MAX)
+            if device.type == DeviceType.SOCKET and device.attributes.get("indicationBrightness") in ["MIN", "MAX"]:
                 entities.append(AjaxLedBrightnessSelect(coordinator, space_id, device_id))
                 _LOGGER.debug(
                     "Created LED brightness select for device: %s",
                     device.name,
                 )
+
+            # SocketOutlet indication mode (ENABLED/DISABLED/IF_ON)
+            if device.type == DeviceType.SOCKET and "indicationMode" in device.attributes:
+                entities.append(AjaxIndicationModeSelect(coordinator, space_id, device_id))
+                _LOGGER.debug(
+                    "Created indication mode select for device: %s",
+                    device.name,
+                )
+
+            # Handler-based selects (sirens, etc.)
+            handler_class = SELECT_DEVICE_HANDLERS.get(device.type)
+            if handler_class:
+                handler = handler_class(device)
+                if hasattr(handler, "get_selects"):
+                    selects = handler.get_selects()
+                    for select_desc in selects:
+                        entities.append(AjaxHandlerSelect(coordinator, space_id, device_id, select_desc))
+                        _LOGGER.debug(
+                            "Created select '%s' for device: %s (type: %s)",
+                            select_desc.get("key"),
+                            device.name,
+                            device.type.value if device.type else "unknown",
+                        )
 
     if entities:
         async_add_entities(entities)
@@ -228,6 +265,152 @@ class AjaxLedBrightnessSelect(CoordinatorEntity[AjaxDataCoordinator], SelectEnti
                 translation_placeholders={
                     "entity": "LED brightness",
                     "error": err,
+                },
+            ) from err
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        self.async_write_ha_state()
+
+
+class AjaxIndicationModeSelect(CoordinatorEntity[AjaxDataCoordinator], SelectEntity):
+    """Select entity for SocketOutlet indication mode (LED backlight mode)."""
+
+    _attr_has_entity_name = True
+    _attr_entity_category = EntityCategory.CONFIG
+    _attr_options = list(INDICATION_MODE_OPTIONS.values())
+
+    def __init__(self, coordinator: AjaxDataCoordinator, space_id: str, device_id: str) -> None:
+        super().__init__(coordinator)
+        self._space_id = space_id
+        self._device_id = device_id
+        self._attr_unique_id = f"{device_id}_indication_mode"
+        self._attr_translation_key = "indication_mode"
+
+    def _get_device(self):
+        space = self.coordinator.get_space(self._space_id)
+        return space.devices.get(self._device_id) if space else None
+
+    @property
+    def available(self) -> bool:
+        device = self._get_device()
+        return device.online if device else False
+
+    @property
+    def device_info(self) -> dict[str, Any]:
+        return {"identifiers": {(DOMAIN, self._device_id)}}
+
+    @property
+    def current_option(self) -> str | None:
+        device = self._get_device()
+        if not device:
+            return None
+        api_value = device.attributes.get("indicationMode", "ENABLED")
+        return INDICATION_MODE_OPTIONS.get(api_value, "always")
+
+    async def async_select_option(self, option: str) -> None:
+        """Change the indication mode."""
+        space = self.coordinator.get_space(self._space_id)
+        if not space:
+            raise HomeAssistantError("space_not_found")
+
+        api_value = INDICATION_MODE_VALUES.get(option, "ENABLED")
+
+        try:
+            await self.coordinator.api.async_update_device(space.hub_id, self._device_id, {"indicationMode": api_value})
+            _LOGGER.info(
+                "Set indicationMode=%s for device %s",
+                api_value,
+                self._device_id,
+            )
+            await self.coordinator.async_request_refresh()
+        except Exception as err:
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="failed_to_change",
+                translation_placeholders={
+                    "entity": "indication mode",
+                    "error": str(err),
+                },
+            ) from err
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        self.async_write_ha_state()
+
+
+class AjaxHandlerSelect(CoordinatorEntity[AjaxDataCoordinator], SelectEntity):
+    """Generic select entity created from device handler definitions."""
+
+    _attr_has_entity_name = True
+    _attr_entity_category = EntityCategory.CONFIG
+
+    def __init__(
+        self,
+        coordinator: AjaxDataCoordinator,
+        space_id: str,
+        device_id: str,
+        select_desc: dict,
+    ) -> None:
+        super().__init__(coordinator)
+        self._space_id = space_id
+        self._device_id = device_id
+        self._select_desc = select_desc
+
+        self._attr_unique_id = f"{device_id}_{select_desc['key']}"
+        self._attr_translation_key = select_desc.get("translation_key", select_desc["key"])
+        self._attr_options = select_desc.get("options", [])
+
+    def _get_device(self):
+        space = self.coordinator.get_space(self._space_id)
+        return space.devices.get(self._device_id) if space else None
+
+    @property
+    def available(self) -> bool:
+        device = self._get_device()
+        return device.online if device else False
+
+    @property
+    def device_info(self) -> dict[str, Any]:
+        return {"identifiers": {(DOMAIN, self._device_id)}}
+
+    @property
+    def current_option(self) -> str | None:
+        value_fn = self._select_desc.get("value_fn")
+        if value_fn:
+            return value_fn()
+        return None
+
+    async def async_select_option(self, option: str) -> None:
+        """Change the select option."""
+        space = self.coordinator.get_space(self._space_id)
+        if not space:
+            raise HomeAssistantError("space_not_found")
+
+        api_key = self._select_desc.get("api_key")
+        if not api_key:
+            raise HomeAssistantError("No API key configured for this select")
+
+        # Transform the option value if needed
+        api_transform = self._select_desc.get("api_transform")
+        api_value = api_transform(option) if api_transform else option
+
+        try:
+            await self.coordinator.api.async_update_device(space.hub_id, self._device_id, {api_key: api_value})
+            _LOGGER.info(
+                "Set %s=%s for device %s",
+                api_key,
+                api_value,
+                self._device_id,
+            )
+            await self.coordinator.async_request_refresh()
+        except Exception as err:
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="failed_to_change",
+                translation_placeholders={
+                    "entity": self._select_desc.get("key", "select"),
+                    "error": str(err),
                 },
             ) from err
 

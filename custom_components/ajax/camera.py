@@ -170,22 +170,12 @@ class AjaxVideoEdgeCamera(CoordinatorEntity[AjaxDataCoordinator], Camera):
             self._attr_entity_registry_enabled_default = False
 
         # Get human-readable model name
-        model_name = VIDEO_EDGE_MODEL_NAMES.get(video_edge.video_edge_type, "Video Edge")
-        color = video_edge.color.title() if video_edge.color else ""
-        model_display = f"{model_name} ({color})" if color else model_name
+        self._model_name = VIDEO_EDGE_MODEL_NAMES.get(video_edge.video_edge_type, "Video Edge")
+        self._color = video_edge.color.title() if video_edge.color else ""
 
         # Snapshot cache
         self._snapshot_cache: bytes | None = None
         self._snapshot_cache_time: float = 0
-
-        # Device info
-        self._attr_device_info = {
-            "identifiers": {(DOMAIN, video_edge.id)},
-            "name": video_edge.name,
-            "manufacturer": MANUFACTURER,
-            "model": model_display,
-            "sw_version": video_edge.firmware_version,
-        }
 
     @property
     def _video_edge(self) -> AjaxVideoEdge | None:
@@ -202,6 +192,75 @@ class AjaxVideoEdgeCamera(CoordinatorEntity[AjaxDataCoordinator], Camera):
         if not video_edge:
             return False
         return video_edge.connection_state == "ONLINE"
+
+    @property
+    def device_info(self) -> dict:
+        """Return device information."""
+        video_edge = self._video_edge
+        if not video_edge:
+            return {}
+
+        model_display = f"{self._model_name} ({self._color})" if self._color else self._model_name
+
+        # Determine via_device: if camera is recorded by NVR, link to NVR
+        # Otherwise link to hub (space_id)
+        via_device_id = self._space_id
+        nvr_id = self._get_recording_nvr_id()
+        if nvr_id:
+            via_device_id = nvr_id
+
+        return {
+            "identifiers": {(DOMAIN, video_edge.id)},
+            "name": video_edge.name,
+            "manufacturer": MANUFACTURER,
+            "model": model_display,
+            "via_device": (DOMAIN, via_device_id),
+            "sw_version": video_edge.firmware_version,
+        }
+
+    def _get_recording_nvr_id(self) -> str | None:
+        """Get the ID of the NVR that records this camera (if any).
+
+        Returns the NVR ID if this camera is recorded by an NVR,
+        None otherwise (standalone camera or NVR itself).
+        """
+        video_edge = self._video_edge
+        if not video_edge:
+            return None
+
+        # NVRs don't have a parent NVR
+        if video_edge.video_edge_type.value == "NVR":
+            return None
+
+        space = self.coordinator.data.spaces.get(self._space_id)
+        if not space:
+            return None
+
+        camera_id = self._video_edge_id
+
+        # Check all NVRs to see if any record this camera
+        for ve_id, ve in space.video_edges.items():
+            if ve.video_edge_type.value != "NVR":
+                continue
+
+            channels = ve.channels if isinstance(ve.channels, list) else []
+            for channel in channels:
+                if not isinstance(channel, dict):
+                    continue
+                source_aliases = channel.get("sourceAliases", {})
+                if not isinstance(source_aliases, dict):
+                    continue
+                sources = source_aliases.get("sources", [])
+                if not isinstance(sources, list):
+                    continue
+
+                for source in sources:
+                    if not isinstance(source, dict):
+                        continue
+                    if source.get("sourceType") == "PRIMARY" and source.get("videoEdgeId") == camera_id:
+                        return ve_id  # Found the NVR that records this camera
+
+        return None
 
     @property
     def is_streaming(self) -> bool:

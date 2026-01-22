@@ -41,6 +41,7 @@ from .devices import (
     SmokeDetectorHandler,
     SocketHandler,
     VideoEdgeHandler,
+    WaterStopHandler,
     WireInputHandler,
 )
 from .models import AjaxDevice, AjaxSpace, AjaxVideoEdge, DeviceType, VideoEdgeType
@@ -454,6 +455,7 @@ DEVICE_HANDLERS = {
     DeviceType.DOORBELL: DoorbellHandler,
     DeviceType.REPEATER: RepeaterHandler,
     DeviceType.HUB: HubHandler,
+    DeviceType.WATERSTOP: WaterStopHandler,
 }
 
 
@@ -850,6 +852,22 @@ class AjaxVideoEdgeSensor(CoordinatorEntity[AjaxDataCoordinator], SensorEntity):
         return video_edge.online
 
     @property
+    def extra_state_attributes(self) -> dict[str, Any] | None:
+        """Return extra state attributes."""
+        extra_fn = self._sensor_desc.get("extra_state_attributes_fn")
+        if extra_fn:
+            try:
+                return extra_fn()
+            except Exception as err:
+                _LOGGER.error(
+                    "Error getting extra attributes for video edge sensor %s: %s",
+                    self._sensor_key,
+                    err,
+                )
+                return None
+        return None
+
+    @property
     def device_info(self) -> dict[str, Any]:
         """Return device information."""
         video_edge = self._get_video_edge()
@@ -861,12 +879,19 @@ class AjaxVideoEdgeSensor(CoordinatorEntity[AjaxDataCoordinator], SensorEntity):
         if video_edge.color:
             model_name = f"{model_name} ({video_edge.color.title()})"
 
+        # Determine via_device: if camera is recorded by NVR, link to NVR
+        # Otherwise link to hub (space_id)
+        via_device_id = self._space_id
+        nvr_id = self._get_recording_nvr_id()
+        if nvr_id:
+            via_device_id = nvr_id
+
         info = {
             "identifiers": {(DOMAIN, self._video_edge_id)},
             "name": video_edge.name,
             "manufacturer": MANUFACTURER,
             "model": model_name,
-            "via_device": (DOMAIN, self._space_id),
+            "via_device": (DOMAIN, via_device_id),
             "sw_version": video_edge.firmware_version,
         }
         if video_edge.room_name:
@@ -879,6 +904,50 @@ class AjaxVideoEdgeSensor(CoordinatorEntity[AjaxDataCoordinator], SensorEntity):
         if not space:
             return None
         return space.video_edges.get(self._video_edge_id)
+
+    def _get_recording_nvr_id(self) -> str | None:
+        """Get the ID of the NVR that records this camera (if any).
+
+        Returns the NVR ID if this camera is recorded by an NVR,
+        None otherwise (standalone camera or NVR itself).
+        """
+        video_edge = self._get_video_edge()
+        if not video_edge:
+            return None
+
+        # NVRs don't have a parent NVR
+        if video_edge.video_edge_type.value == "NVR":
+            return None
+
+        space = self.coordinator.get_space(self._space_id)
+        if not space:
+            return None
+
+        camera_id = self._video_edge_id
+
+        # Check all NVRs to see if any record this camera
+        for ve_id, ve in space.video_edges.items():
+            if ve.video_edge_type.value != "NVR":
+                continue
+
+            channels = ve.channels if isinstance(ve.channels, list) else []
+            for channel in channels:
+                if not isinstance(channel, dict):
+                    continue
+                source_aliases = channel.get("sourceAliases", {})
+                if not isinstance(source_aliases, dict):
+                    continue
+                sources = source_aliases.get("sources", [])
+                if not isinstance(sources, list):
+                    continue
+
+                for source in sources:
+                    if not isinstance(source, dict):
+                        continue
+                    if source.get("sourceType") == "PRIMARY" and source.get("videoEdgeId") == camera_id:
+                        return ve_id  # Found the NVR that records this camera
+
+        return None
 
     @callback
     def _handle_coordinator_update(self) -> None:
@@ -951,12 +1020,15 @@ def _get_hub_sensors(space: AjaxSpace) -> list[dict]:
         )
 
     # Active channels (connection types)
+    # IMPORTANT: sorted() is required - API returns channels in random order
+    # causing state changes every poll (e.g., "GSM, ETHERNET" <-> "ETHERNET, GSM")
+    # See: https://github.com/foXaCe/ajax-security-hass/issues/76
     if "activeChannels" in hub_details:
         sensors.append(
             {
                 "key": "active_connection",
                 "translation_key": "active_connection",
-                "value_fn": lambda hd=hub_details: ", ".join(hd.get("activeChannels", []))
+                "value_fn": lambda hd=hub_details: ", ".join(sorted(hd.get("activeChannels", [])))
                 if hd.get("activeChannels")
                 else None,
                 "enabled_by_default": True,

@@ -16,6 +16,7 @@ Structure:
 - button.py: Button, DoubleButton, SpaceControl
 - repeater.py: Rex, Rex2 range extenders
 - life_quality.py: LifeQuality air quality sensor
+- waterstop.py: WaterStop smart water valve
 """
 
 from .base import AjaxDeviceHandler
@@ -32,6 +33,7 @@ from .siren import SirenHandler
 from .smoke_detector import SmokeDetectorHandler
 from .socket import SocketHandler
 from .video_edge import VideoEdgeHandler
+from .waterstop import WaterStopHandler
 
 __all__ = [
     "AjaxDeviceHandler",
@@ -48,5 +50,6 @@ __all__ = [
     "SmokeDetectorHandler",
     "SocketHandler",
     "VideoEdgeHandler",
+    "WaterStopHandler",
     "WireInputHandler",
 ]

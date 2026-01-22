@@ -29,6 +29,8 @@ from .api import AjaxRestApi, AjaxRestApiError, AjaxRestAuthError
 from .const import (
     CONF_NOTIFICATION_FILTER,
     CONF_PERSISTENT_NOTIFICATION,
+    CONF_RTSP_PASSWORD,
+    CONF_RTSP_USERNAME,
     DOMAIN,
     METADATA_REFRESH_INTERVAL,
     NOTIFICATION_FILTER_ALARMS_ONLY,
@@ -73,6 +75,17 @@ except ImportError:
     SSE_AVAILABLE = False
     SSEManager = None
     AjaxSSEClient = None
+
+# Optional ONVIF support (for local AI detections)
+try:
+    from .onvif_client import OnvifDetectionEvent
+    from .onvif_manager import AjaxOnvifManager
+
+    ONVIF_AVAILABLE = True
+except ImportError:
+    ONVIF_AVAILABLE = False
+    AjaxOnvifManager = None
+    OnvifDetectionEvent = None
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -138,6 +151,11 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
         self.sse_manager: SSEManager | None = None
         self._sse_url = sse_url or (api.sse_url if hasattr(api, "sse_url") else None)
         self._sse_initialized = False
+
+        # ONVIF local AI detections (optional, for video edge cameras)
+        self.onvif_manager: AjaxOnvifManager | None = None
+        self._onvif_initialized = False
+        self.config_entry = None  # Set by __init__.py after coordinator creation
 
         # Device details refresh optimization
         # Battery/signal don't change often, so refresh every 5 minutes instead of every poll
@@ -401,6 +419,10 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
                 elif not self._sqs_initialized and self._aws_access_key_id:
                     # Direct mode: use SQS for real-time events
                     asyncio.create_task(self._async_init_sqs())
+
+                # Initialize ONVIF for local AI detections (works even when disarmed)
+                if not self._onvif_initialized:
+                    asyncio.create_task(self._async_init_onvif())
             else:
                 # Periodic update - optimized polling
                 # Check if we need full metadata refresh (hourly or forced)
@@ -636,6 +658,192 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
 
         finally:
             self._sse_initialized = True
+
+    async def _async_init_onvif(self) -> None:
+        """Initialize ONVIF for local AI detection events.
+
+        ONVIF provides local AI detection events (human, vehicle, pet, motion)
+        directly from Ajax cameras without relying on the cloud API.
+
+        Benefits:
+        - Works even when alarm is DISARMED (unlike SSE/SQS)
+        - 100% local, no cloud dependency for detections
+        - Real-time events via ONVIF PullPoint subscription
+
+        Note:
+            Requires onvif-zeep-async package and RTSP/ONVIF credentials.
+            If ONVIF fails to initialize, detection events fall back to REST API.
+        """
+        # Check if ONVIF is available
+        if not ONVIF_AVAILABLE:
+            _LOGGER.debug("ONVIF not available (onvif-zeep-async not installed)")
+            self._onvif_initialized = True
+            return
+
+        # Check if config entry is available
+        if not self.config_entry:
+            _LOGGER.debug("Config entry not set, cannot get ONVIF credentials")
+            self._onvif_initialized = True
+            return
+
+        # Get RTSP/ONVIF credentials from config entry options
+        username = self.config_entry.options.get(CONF_RTSP_USERNAME, "")
+        password = self.config_entry.options.get(CONF_RTSP_PASSWORD, "")
+
+        if not username or not password:
+            _LOGGER.debug("ONVIF credentials not configured, skipping local AI detections")
+            self._onvif_initialized = True
+            return
+
+        # Collect all video edges with IP addresses
+        video_edges = []
+        for space in self.account.spaces.values():
+            for video_edge in space.video_edges.values():
+                if video_edge.ip_address:
+                    video_edges.append(video_edge)
+
+        if not video_edges:
+            _LOGGER.debug("No video edges with IP addresses found")
+            self._onvif_initialized = True
+            return
+
+        try:
+            _LOGGER.info("Initializing ONVIF for local AI detections...")
+
+            # Create ONVIF manager with event callback
+            self.onvif_manager = AjaxOnvifManager(
+                username=username,
+                password=password,
+                event_callback=self._handle_onvif_event,
+            )
+
+            # Start connections to all cameras
+            await self.onvif_manager.async_start(video_edges)
+
+            if self.onvif_manager.connected_count > 0:
+                _LOGGER.info(
+                    "✓ ONVIF initialized - %d/%d cameras connected for local AI detections",
+                    self.onvif_manager.connected_count,
+                    len(video_edges),
+                )
+            else:
+                _LOGGER.warning("ONVIF: No cameras connected - Check ONVIF credentials and camera network")
+
+        except Exception as err:
+            _LOGGER.warning("Failed to initialize ONVIF: %s", err)
+            self.onvif_manager = None
+
+        finally:
+            self._onvif_initialized = True
+
+    def _handle_onvif_event(self, event: OnvifDetectionEvent) -> None:
+        """Handle ONVIF detection event from a camera or NVR.
+
+        For NVR events, routes the detection to the correct camera based on channel_id.
+        Updates the video edge detection state and triggers coordinator update.
+
+        Args:
+            event: The ONVIF detection event
+        """
+        if not self.account:
+            return
+
+        _LOGGER.debug(
+            "ONVIF event received: %s (channel %s, active=%s)",
+            event.detection_type,
+            event.channel_id,
+            event.active,
+        )
+
+        # Find the source video edge (NVR or camera)
+        for space in self.account.spaces.values():
+            source_ve = space.video_edges.get(event.video_edge_id)
+            if not source_ve:
+                continue
+
+            # Determine target video edge for detection update
+            target_ve = source_ve
+
+            # If source is NVR, find linked camera for this channel
+            if source_ve.video_edge_type == VideoEdgeType.NVR:
+                target_ve = self._find_camera_for_nvr_channel(space, source_ve, event.channel_id)
+                if target_ve and target_ve != source_ve:
+                    _LOGGER.debug(
+                        "Routing NVR event (channel %s) to camera: %s",
+                        event.channel_id,
+                        target_ve.name,
+                    )
+
+            # Update detection state on target video edge
+            detection_key = event.detection_type.lower()  # e.g., "video_human"
+            target_ve.detections[detection_key] = event.active
+
+            # Trigger coordinator update to refresh entities
+            self.async_set_updated_data(self.account)
+            return
+
+    def _find_camera_for_nvr_channel(self, space: AjaxSpace, nvr: AjaxVideoEdge, channel_id: str) -> AjaxVideoEdge:
+        """Find the camera linked to an NVR channel.
+
+        Args:
+            space: The Ajax space
+            nvr: The NVR video edge
+            channel_id: The ONVIF channel ID
+
+        Returns:
+            The linked camera, or the NVR itself if no camera found
+        """
+        channels = nvr.channels
+        if not isinstance(channels, list):
+            return nvr
+
+        # Ajax camera types that can be linked to NVR
+        ajax_camera_types = {"TURRET", "TURRET_HL", "BULLET", "BULLET_HL", "MINIDOME", "MINIDOME_HL"}
+
+        def get_linked_camera_from_channel(channel: dict) -> AjaxVideoEdge | None:
+            """Extract linked camera from channel's sourceAliases."""
+            if not isinstance(channel, dict):
+                return None
+            source_aliases = channel.get("sourceAliases", {})
+            if not isinstance(source_aliases, dict):
+                return None
+            sources = source_aliases.get("sources", [])
+            if not isinstance(sources, list):
+                return None
+            for source in sources:
+                if not isinstance(source, dict):
+                    continue
+                if source.get("sourceType") == "PRIMARY":
+                    source_type = source.get("type", "")
+                    source_ve_id = source.get("videoEdgeId", "")
+                    if source_type in ajax_camera_types and source_ve_id:
+                        linked_camera = space.video_edges.get(source_ve_id)
+                        if linked_camera:
+                            return linked_camera
+            return None
+
+        # Try to find channel by index (channel_id is usually "0", "1", etc.)
+        try:
+            channel_idx = int(channel_id)
+            if 0 <= channel_idx < len(channels):
+                linked = get_linked_camera_from_channel(channels[channel_idx])
+                if linked:
+                    return linked
+        except (ValueError, IndexError):
+            pass
+
+        # Fallback: search all channels for matching ID
+        for channel in channels:
+            if not isinstance(channel, dict):
+                continue
+            ch_id = channel.get("id", "")
+            if str(ch_id) == str(channel_id):
+                linked = get_linked_camera_from_channel(channel)
+                if linked:
+                    return linked
+
+        # No linked camera found, return NVR
+        return nvr
 
     async def _async_update_spaces_from_hubs(self, full_refresh: bool = True) -> None:
         """Update spaces by fetching hubs directly (use hub_id as space_id).
@@ -1173,6 +1381,18 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
                 device.attributes["chimes_enabled"] = device_data.get("chimesEnabled")
             if "buzzerState" in device_data:
                 device.attributes["buzzer_state"] = device_data.get("buzzerState")
+            # StreetSiren specific
+            if "alertIfMoved" in device_data:
+                device.attributes["alert_if_moved"] = device_data.get("alertIfMoved")
+            if "externallyPowered" in device_data:
+                device.attributes["externally_powered"] = device_data.get("externallyPowered")
+            # Siren advanced settings
+            if "postAlarmIndicationMode" in device_data:
+                device.attributes["post_alarm_indication_mode"] = device_data.get("postAlarmIndicationMode")
+            if "alarmRestrictionMode" in device_data:
+                device.attributes["alarm_restriction_mode"] = device_data.get("alarmRestrictionMode")
+            if "blinkWhileArmed" in device_data:
+                device.attributes["blink_while_armed"] = device_data.get("blinkWhileArmed")
 
             # LED indicator mode (all devices)
             if "indicatorLightMode" in device_data:
@@ -1222,6 +1442,15 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
                 else:
                     device.attributes["is_on"] = True
 
+            # SocketOutlet (Type E/F): Parse socketState to is_on
+            # socketState is a list: ["FIRST_CHANNEL_ON"] = on, [] or ["FIRST_CHANNEL_OFF"] = off
+            if "socketState" in device_data:
+                socket_state = device_data["socketState"]
+                if isinstance(socket_state, list):
+                    device.attributes["is_on"] = "FIRST_CHANNEL_ON" in socket_state
+                else:
+                    device.attributes["is_on"] = False
+
             # Socket specific attributes (power monitoring, protection settings)
             if "indicationEnabled" in device_data:
                 device.attributes["indicationEnabled"] = device_data.get("indicationEnabled")
@@ -1238,14 +1467,32 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
             if "lockupRelayTimeSeconds" in device_data:
                 device.attributes["lockupRelayTimeSeconds"] = device_data.get("lockupRelayTimeSeconds")
             # Power monitoring values
+            # powerConsumedWattsPerHour = energy consumed (for Socket without Outlet suffix)
             if "powerConsumedWattsPerHour" in device_data:
-                device.attributes["power"] = device_data.get("powerConsumedWattsPerHour")
+                device.attributes["energy"] = device_data.get("powerConsumedWattsPerHour", 0) / 1000.0  # Wh -> kWh
+            # powerConsumptionWatts = instantaneous power (for SocketOutlet)
+            if "powerConsumptionWatts" in device_data:
+                device.attributes["power"] = device_data.get("powerConsumptionWatts")
+            # currentMilliAmpers (with 's') for Socket
             if "currentMilliAmpers" in device_data:
-                # Convert mA to A
                 ma = device_data.get("currentMilliAmpers", 0)
+                device.attributes["current"] = ma / 1000.0 if ma else 0
+            # currentMilliAmpere (without 's') for SocketOutlet
+            if "currentMilliAmpere" in device_data:
+                ma = device_data.get("currentMilliAmpere", 0)
                 device.attributes["current"] = ma / 1000.0 if ma else 0
             if "voltageVolts" in device_data:
                 device.attributes["voltage"] = device_data.get("voltageVolts")
+            # Current threshold (SocketOutlet)
+            if "currentThresholdAmpere" in device_data:
+                device.attributes["current_threshold"] = device_data.get("currentThresholdAmpere")
+            # Indication settings (SocketOutlet)
+            if "indicationMode" in device_data:
+                device.attributes["indicationMode"] = device_data.get("indicationMode")
+                # indicationEnabled derived from indicationMode
+                device.attributes["indicationEnabled"] = device_data.get("indicationMode") == "ENABLED"
+            if "indicationBrightnessV2" in device_data:
+                device.attributes["indicationBrightness"] = device_data.get("indicationBrightnessV2")
 
             # Button specific attributes (panic button, keyfob)
             if "buttonMode" in device_data:
@@ -1905,6 +2152,8 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
             # Flood detectors
             "leak_protect": DeviceType.FLOOD_DETECTOR,
             "leakprotect": DeviceType.FLOOD_DETECTOR,
+            "leaksprotect": DeviceType.FLOOD_DETECTOR,
+            "leaks_protect": DeviceType.FLOOD_DETECTOR,
             "leak": DeviceType.FLOOD_DETECTOR,
             "water": DeviceType.FLOOD_DETECTOR,
             "flood": DeviceType.FLOOD_DETECTOR,
@@ -2007,6 +2256,12 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
             "linesplitter": DeviceType.LINE_SPLITTER,
             # Smart devices
             "socket": DeviceType.SOCKET,
+            "socketoutlet": DeviceType.SOCKET,
+            "socket_outlet": DeviceType.SOCKET,
+            "socketoutlettypee": DeviceType.SOCKET,
+            "socket_outlet_type_e": DeviceType.SOCKET,
+            "socketoutlettypef": DeviceType.SOCKET,
+            "socket_outlet_type_f": DeviceType.SOCKET,
             "relay": DeviceType.RELAY,
             "wallswitch": DeviceType.WALLSWITCH,
             "lightswitch": DeviceType.WALLSWITCH,
@@ -2015,6 +2270,8 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
             "thermostat": DeviceType.THERMOSTAT,
             "life_quality": DeviceType.LIFE_QUALITY,
             "lifequality": DeviceType.LIFE_QUALITY,
+            "waterstop": DeviceType.WATERSTOP,
+            "water_stop": DeviceType.WATERSTOP,
             # Cameras
             "camera": DeviceType.CAMERA,
             "cam": DeviceType.CAMERA,
@@ -2232,6 +2489,14 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
                 await self.sse_manager.stop()
             except Exception as err:
                 _LOGGER.error("Error stopping SSE Manager: %s", err)
+
+        # Stop ONVIF Manager (local AI detections)
+        if self.onvif_manager:
+            try:
+                _LOGGER.debug("Stopping ONVIF Manager...")
+                await self.onvif_manager.async_stop()
+            except Exception as err:
+                _LOGGER.error("Error stopping ONVIF Manager: %s", err)
 
         # Stop all fast poll tasks
         for task in self._fast_poll_tasks.values():

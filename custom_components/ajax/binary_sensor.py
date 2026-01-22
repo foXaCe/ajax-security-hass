@@ -35,6 +35,7 @@ from .devices import (
     SmokeDetectorHandler,
     SocketHandler,
     VideoEdgeHandler,
+    WaterStopHandler,
     WireInputHandler,
 )
 from .models import AjaxDevice, AjaxVideoEdge, DeviceType, VideoEdgeType
@@ -74,6 +75,7 @@ DEVICE_HANDLERS = {
     DeviceType.DOORBELL: DoorbellHandler,
     DeviceType.REPEATER: RepeaterHandler,
     DeviceType.HUB: HubHandler,
+    DeviceType.WATERSTOP: WaterStopHandler,
 }
 
 
@@ -424,12 +426,19 @@ class AjaxVideoEdgeBinarySensor(CoordinatorEntity[AjaxDataCoordinator], BinarySe
         if video_edge.color:
             model_name = f"{model_name} ({video_edge.color.title()})"
 
+        # Determine via_device: if camera is recorded by NVR, link to NVR
+        # Otherwise link to hub (space_id)
+        via_device_id = self._space_id
+        nvr_id = self._get_recording_nvr_id()
+        if nvr_id:
+            via_device_id = nvr_id
+
         info = {
             "identifiers": {(DOMAIN, self._video_edge_id)},
             "name": video_edge.name,
             "manufacturer": MANUFACTURER,
             "model": model_name,
-            "via_device": (DOMAIN, self._space_id),
+            "via_device": (DOMAIN, via_device_id),
             "sw_version": video_edge.firmware_version,
         }
         if video_edge.room_name:
@@ -442,6 +451,50 @@ class AjaxVideoEdgeBinarySensor(CoordinatorEntity[AjaxDataCoordinator], BinarySe
         if not space:
             return None
         return space.video_edges.get(self._video_edge_id)
+
+    def _get_recording_nvr_id(self) -> str | None:
+        """Get the ID of the NVR that records this camera (if any).
+
+        Returns the NVR ID if this camera is recorded by an NVR,
+        None otherwise (standalone camera or NVR itself).
+        """
+        video_edge = self._get_video_edge()
+        if not video_edge:
+            return None
+
+        # NVRs don't have a parent NVR
+        if video_edge.video_edge_type.value == "NVR":
+            return None
+
+        space = self.coordinator.get_space(self._space_id)
+        if not space:
+            return None
+
+        camera_id = self._video_edge_id
+
+        # Check all NVRs to see if any record this camera
+        for ve_id, ve in space.video_edges.items():
+            if ve.video_edge_type.value != "NVR":
+                continue
+
+            channels = ve.channels if isinstance(ve.channels, list) else []
+            for channel in channels:
+                if not isinstance(channel, dict):
+                    continue
+                source_aliases = channel.get("sourceAliases", {})
+                if not isinstance(source_aliases, dict):
+                    continue
+                sources = source_aliases.get("sources", [])
+                if not isinstance(sources, list):
+                    continue
+
+                for source in sources:
+                    if not isinstance(source, dict):
+                        continue
+                    if source.get("sourceType") == "PRIMARY" and source.get("videoEdgeId") == camera_id:
+                        return ve_id  # Found the NVR that records this camera
+
+        return None
 
 
 class AjaxHubBinarySensor(CoordinatorEntity[AjaxDataCoordinator], BinarySensorEntity):

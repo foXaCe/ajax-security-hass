@@ -169,6 +169,9 @@
       "external_power": {
         "name": "Alimentation externe"
       },
+      "externally_powered": {
+        "name": "Alimentation externe"
+      },
       "glass_break": {
         "name": "Détecteur de bris de vitre"
       },
@@ -279,6 +282,13 @@
           "on": "Véhicule détecté"
         }
       },
+      "waterstop_temp_protect": {
+        "name": "Protection gel",
+        "state": {
+          "off": "Inactive",
+          "on": "Active"
+        }
+      },
       "wings_radio": {
         "name": "Radio Wings"
       }
@@ -294,11 +304,44 @@
       }
     },
     "number": {
+      "current_threshold": {
+        "name": "Limite de courant"
+      },
+      "led_brightness_level": {
+        "name": "Luminosité LED"
+      },
       "tilt_degrees": {
         "name": "Seuil d'inclinaison"
       }
     },
     "select": {
+      "alarm_duration_select": {
+        "name": "Durée alarme",
+        "state": {
+          "1": "1 minute",
+          "10": "10 minutes",
+          "15": "15 minutes",
+          "2": "2 minutes",
+          "3": "3 minutes",
+          "5": "5 minutes"
+        }
+      },
+      "beep_volume": {
+        "name": "Volume bip",
+        "state": {
+          "loud": "Fort",
+          "quiet": "Faible",
+          "very_loud": "Très fort"
+        }
+      },
+      "indication_mode": {
+        "name": "Mode rétroéclairage",
+        "state": {
+          "always": "Toujours",
+          "if_on": "Si activé",
+          "off": "Éteint"
+        }
+      },
       "led_brightness": {
         "name": "Luminosité LED",
         "state": {
@@ -312,6 +355,15 @@
           "high": "Élevé",
           "low": "Faible",
           "normal": "Normal"
+        }
+      },
+      "siren_volume": {
+        "name": "Volume sirène",
+        "state": {
+          "disabled": "Désactivé",
+          "loud": "Fort",
+          "quiet": "Faible",
+          "very_loud": "Très fort"
         }
       }
     },
@@ -727,6 +779,9 @@
           }
         }
       },
+      "nvr_cameras": {
+        "name": "Caméras"
+      },
       "online_devices": {
         "name": "Dispositifs en ligne"
       },
@@ -808,7 +863,7 @@
         "name": "Utilisation RAM"
       },
       "video_edge_record_mode": {
-        "name": "Mode d'enregistrement",
+        "name": "Enregistrement local",
         "state": {
           "disabled": "Désactivé",
           "on_detection": "Sur détection",
@@ -817,7 +872,7 @@
         }
       },
       "video_edge_record_policy": {
-        "name": "Politique d'enregistrement",
+        "name": "Enregistrement NVR",
         "state": {
           "always": "Toujours",
           "unknown": "Inconnu",
@@ -846,11 +901,43 @@
       "video_edge_wifi_signal": {
         "name": "Signal WiFi caméra"
       },
+      "waterstop_external_power": {
+        "name": "Source d'alimentation",
+        "state": {
+          "battery": "Batterie",
+          "supply": "Secteur",
+          "unknown": "Inconnu"
+        }
+      },
+      "waterstop_motor_state": {
+        "name": "État moteur",
+        "state": {
+          "off": "Arrêté",
+          "on": "En marche"
+        }
+      },
+      "waterstop_prevention_period": {
+        "name": "Période de prévention"
+      },
+      "waterstop_prevention_status": {
+        "name": "Prévention",
+        "state": {
+          "disabled": "Désactivée",
+          "enabled": "Activée"
+        }
+      },
       "wifi_signal_level": {
         "name": "Signal Wi-Fi"
       }
     },
     "switch": {
+      "alert_if_moved": {
+        "name": "Alerte si déplacée",
+        "state": {
+          "off": "Désactivé",
+          "on": "Activé"
+        }
+      },
       "alerts_by_sirens": {
         "name": "Alertes par sirènes",
         "state": {
@@ -1076,6 +1163,11 @@
       },
       "video_edge_firmware": {
         "name": "Firmware"
+      }
+    },
+    "valve": {
+      "waterstop_valve": {
+        "name": "Vanne d'eau"
       }
     }
   },

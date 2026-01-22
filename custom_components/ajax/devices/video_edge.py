@@ -13,6 +13,8 @@ import logging
 import re
 from typing import TYPE_CHECKING
 
+from ..models import VideoEdgeType
+
 if TYPE_CHECKING:
     from ..models import AjaxVideoEdge
 
@@ -365,6 +367,19 @@ class VideoEdgeHandler:
             }
         )
 
+        # NVR Cameras sensor - shows connected cameras with detection states
+        if self.video_edge.video_edge_type == VideoEdgeType.NVR:
+            sensors.append(
+                {
+                    "key": "cameras",
+                    "translation_key": "nvr_cameras",
+                    "value_fn": lambda: self._get_nvr_cameras_count(),
+                    "extra_state_attributes_fn": lambda: self._get_nvr_cameras_attributes(),
+                    "enabled_by_default": True,
+                    "entity_category": "diagnostic",
+                }
+            )
+
         # WiFi signal strength
         network = raw_data.get("networkInterface", {})
         wifi = network.get("wifi", {})
@@ -504,7 +519,34 @@ class VideoEdgeHandler:
         return None
 
     def _has_detection_by_id(self, channel_id: str, detection_type: str) -> bool:
-        """Check if channel has a specific detection active by channel ID."""
+        """Check if channel has a specific detection active by channel ID.
+
+        Checks two sources:
+        1. ONVIF local detection (from video_edge.detections dict, updated via ONVIF events)
+        2. REST API state (from channel.state in raw_data)
+
+        ONVIF detections work even when the alarm is disarmed and provide
+        real-time local events without cloud dependency.
+
+        For NVR channels linked to cameras, reads detections from the linked camera.
+        """
+        onvif_key = detection_type.lower()
+
+        # For NVR, check if channel is linked to a camera and read from that camera
+        if self.video_edge.video_edge_type == VideoEdgeType.NVR:
+            channel = self._get_channel_by_id(channel_id)
+            if channel:
+                linked_info = self._get_linked_camera_info(channel)
+                if linked_info:
+                    linked_camera = self._all_video_edges.get(linked_info["id"])
+                    if linked_camera and linked_camera.detections.get(onvif_key, False):
+                        return True
+
+        # Check ONVIF local detection state on this video edge
+        if self.video_edge.detections.get(onvif_key, False):
+            return True
+
+        # Fall back to REST API state
         channel = self._get_channel_by_id(channel_id)
         if not channel:
             return False
@@ -560,6 +602,57 @@ class VideoEdgeHandler:
                     return {"id": source_ve_id, "name": camera_name}
 
         return None
+
+    def _get_nvr_cameras_count(self) -> int:
+        """Get number of cameras connected to this NVR."""
+        if self.video_edge.video_edge_type != VideoEdgeType.NVR:
+            return 0
+
+        count = 0
+        channels = self.video_edge.channels
+        if not isinstance(channels, list):
+            return 0
+
+        for channel in channels:
+            linked_info = self._get_linked_camera_info(channel)
+            if linked_info:
+                count += 1
+
+        return count
+
+    def _get_nvr_cameras_attributes(self) -> dict:
+        """Get detailed attributes for NVR cameras sensor.
+
+        Returns dict with cameras list and their types.
+        Detection states are available on each camera's binary_sensor entities.
+        """
+        if self.video_edge.video_edge_type != VideoEdgeType.NVR:
+            return {}
+
+        cameras = []
+        channels = self.video_edge.channels
+        if not isinstance(channels, list):
+            return {"cameras": cameras}
+
+        for i, channel in enumerate(channels):
+            linked_info = self._get_linked_camera_info(channel)
+            if linked_info:
+                camera_id = linked_info["id"]
+                camera_name = linked_info["name"]
+
+                # Get camera type
+                linked_camera = self._all_video_edges.get(camera_id)
+                camera_type = linked_camera.video_edge_type.value if linked_camera else "unknown"
+
+                cameras.append(
+                    {
+                        "name": camera_name,
+                        "channel": i,
+                        "type": camera_type,
+                    }
+                )
+
+        return {"cameras": cameras}
 
     def _get_linked_nvrs(self) -> list[dict]:
         """Find all NVRs that record this camera.

@@ -28,8 +28,6 @@ class SirenHandler(AjaxDeviceHandler):
         """Return binary sensor entities for sirens."""
         sensors = []
 
-        # Note: "armed_in_night_mode" is now a switch, not a binary sensor
-
         # Tamper / Couvercle - only if device has tamper sensor (not None)
         # Note: No translation_key needed - HA provides automatic translation for TAMPER device_class
         if self.device.attributes.get("tampered") is not None:
@@ -42,24 +40,14 @@ class SirenHandler(AjaxDeviceHandler):
                 }
             )
 
-        # Beep on arm/disarm - read-only (Ajax API doesn't allow modification)
-        if "beep_on_arm_disarm" in self.device.attributes:
+        # Externally powered (StreetSiren only)
+        if "externally_powered" in self.device.attributes:
             sensors.append(
                 {
-                    "key": "beep_on_arm",
-                    "translation_key": "beep_on_arm",
-                    "value_fn": lambda: self.device.attributes.get("beep_on_arm_disarm", False),
-                    "enabled_by_default": True,
-                }
-            )
-
-        # Beep on delay - read-only (Ajax API doesn't allow modification)
-        if "beep_on_delay" in self.device.attributes:
-            sensors.append(
-                {
-                    "key": "beep_on_delay",
-                    "translation_key": "beep_on_delay",
-                    "value_fn": lambda: self.device.attributes.get("beep_on_delay", False),
+                    "key": "externally_powered",
+                    "translation_key": "externally_powered",
+                    "device_class": BinarySensorDeviceClass.PLUG,
+                    "value_fn": lambda: self.device.attributes.get("externally_powered", False),
                     "enabled_by_default": True,
                 }
             )
@@ -111,63 +99,57 @@ class SirenHandler(AjaxDeviceHandler):
                 }
             )
 
-        # Alarm volume level (sirenVolumeLevel from API)
+        # Note: Volume and duration are now selects (controllable)
+
+        return sensors
+
+    def get_selects(self) -> list[dict]:
+        """Return select entities for sirens."""
+        selects = []
+
+        # Siren volume level
         if "siren_volume_level" in self.device.attributes:
-            sensors.append(
+            selects.append(
                 {
-                    "key": "alarm_volume_level",
-                    "translation_key": "alarm_volume_level",
-                    "value_fn": lambda: self._format_volume(self.device.attributes.get("siren_volume_level")),
+                    "key": "siren_volume",
+                    "translation_key": "siren_volume",
+                    "options": ["disabled", "quiet", "loud", "very_loud"],
+                    "value_fn": lambda: str(self.device.attributes.get("siren_volume_level") or "VERY_LOUD").lower(),
+                    "api_key": "v2sirenVolumeLevel",
+                    "api_transform": lambda x: x.upper(),
                     "enabled_by_default": True,
                 }
             )
 
         # Beep volume level
         if "beep_volume_level" in self.device.attributes:
-            sensors.append(
+            selects.append(
                 {
-                    "key": "beep_volume_level",
-                    "translation_key": "beep_volume_level",
-                    "value_fn": lambda: self._format_volume(self.device.attributes.get("beep_volume_level")),
+                    "key": "beep_volume",
+                    "translation_key": "beep_volume",
+                    "options": ["quiet", "loud", "very_loud"],
+                    "value_fn": lambda: str(self.device.attributes.get("beep_volume_level") or "LOUD").lower(),
+                    "api_key": "beepVolumeLevel",
+                    "api_transform": lambda x: x.upper(),
                     "enabled_by_default": True,
                 }
             )
 
-        # Alarm duration
+        # Alarm duration (in minutes)
         if "alarm_duration" in self.device.attributes:
-            sensors.append(
+            selects.append(
                 {
                     "key": "alarm_duration",
-                    "translation_key": "alarm_duration",
-                    "value_fn": lambda: self._format_duration(self.device.attributes.get("alarm_duration")),
+                    "translation_key": "alarm_duration_select",
+                    "options": ["1", "2", "3", "5", "10", "15"],
+                    "value_fn": lambda: str(self.device.attributes.get("alarm_duration", 3)),
+                    "api_key": "alarmDuration",
+                    "api_transform": lambda x: int(x),
                     "enabled_by_default": True,
                 }
             )
 
-        # Note: LED indication is now a switch (switch.sirene_clignoter_quand_arme)
-
-        return sensors
-
-    def _format_volume(self, volume: str | None) -> str | None:
-        """Format volume level to translation key."""
-        if volume is None:
-            return None
-        # Return lowercase keys for translation
-        return volume.lower() if volume else None
-
-    def _format_duration(self, duration: int | str | None) -> str | None:
-        """Format alarm duration to translation key or readable format."""
-        if duration is None:
-            return None
-        # If it's a number (seconds), format as readable duration
-        if isinstance(duration, (int, float)):
-            seconds = int(duration)
-            if seconds >= 60:
-                minutes = seconds // 60
-                return f"{minutes} min"
-            return f"{seconds}s"
-        # Return lowercase key for translation (e.g., "continuous")
-        return str(duration).lower() if duration else None
+        return selects
 
     def get_switches(self) -> list[dict]:
         """Return switch entities for sirens and transmitters."""
@@ -185,7 +167,29 @@ class SirenHandler(AjaxDeviceHandler):
                 }
             )
 
-        # Note: beep_on_arm and beep_on_delay are now binary_sensors (read-only via Ajax API)
+        # Beep on arm/disarm
+        if "beep_on_arm_disarm" in self.device.attributes:
+            switches.append(
+                {
+                    "key": "beep_on_arm_disarm",
+                    "translation_key": "beep_on_arm_disarm",
+                    "value_fn": lambda: self.device.attributes.get("beep_on_arm_disarm", False),
+                    "api_key": "beepOnArmDisarm",
+                    "enabled_by_default": True,
+                }
+            )
+
+        # Beep on delay
+        if "beep_on_delay" in self.device.attributes:
+            switches.append(
+                {
+                    "key": "beep_on_delay",
+                    "translation_key": "beep_on_delay",
+                    "value_fn": lambda: self.device.attributes.get("beep_on_delay", False),
+                    "api_key": "beepOnDelay",
+                    "enabled_by_default": True,
+                }
+            )
 
         # Blink while armed (LED) - only for sirens
         if "led_indication" in self.device.attributes or "blink_while_armed" in self.device.attributes:
@@ -211,6 +215,18 @@ class SirenHandler(AjaxDeviceHandler):
                     "translation_key": "chimes",
                     "value_fn": lambda: self.device.attributes.get("chimes_enabled", False),
                     "api_key": "chimesEnabled",
+                    "enabled_by_default": True,
+                }
+            )
+
+        # Alert if moved (StreetSiren only)
+        if "alert_if_moved" in self.device.attributes:
+            switches.append(
+                {
+                    "key": "alert_if_moved",
+                    "translation_key": "alert_if_moved",
+                    "value_fn": lambda: self.device.attributes.get("alert_if_moved", False),
+                    "api_key": "alertIfMoved",
                     "enabled_by_default": True,
                 }
             )

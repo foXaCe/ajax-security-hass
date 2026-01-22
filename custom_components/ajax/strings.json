@@ -169,6 +169,9 @@
       "external_power": {
         "name": "External power"
       },
+      "externally_powered": {
+        "name": "External power"
+      },
       "glass_break": {
         "name": "Glass break detector"
       },
@@ -279,6 +282,13 @@
           "off": "Disabled"
         }
       },
+      "waterstop_temp_protect": {
+        "name": "Frost protection",
+        "state": {
+          "on": "Active",
+          "off": "Inactive"
+        }
+      },
       "wings_radio": {
         "name": "Wings radio"
       }
@@ -296,6 +306,12 @@
     "number": {
       "tilt_degrees": {
         "name": "Tilt threshold"
+      },
+      "current_threshold": {
+        "name": "Current limit"
+      },
+      "led_brightness_level": {
+        "name": "LED brightness"
       }
     },
     "select": {
@@ -312,6 +328,42 @@
         "state": {
           "min": "Low",
           "max": "High"
+        }
+      },
+      "indication_mode": {
+        "name": "Backlight mode",
+        "state": {
+          "always": "Always on",
+          "off": "Off",
+          "if_on": "When active"
+        }
+      },
+      "siren_volume": {
+        "name": "Siren volume",
+        "state": {
+          "disabled": "Disabled",
+          "quiet": "Quiet",
+          "loud": "Loud",
+          "very_loud": "Very loud"
+        }
+      },
+      "beep_volume": {
+        "name": "Beep volume",
+        "state": {
+          "quiet": "Quiet",
+          "loud": "Loud",
+          "very_loud": "Very loud"
+        }
+      },
+      "alarm_duration_select": {
+        "name": "Alarm duration",
+        "state": {
+          "1": "1 minute",
+          "2": "2 minutes",
+          "3": "3 minutes",
+          "5": "5 minutes",
+          "10": "10 minutes",
+          "15": "15 minutes"
         }
       }
     },
@@ -806,7 +858,7 @@
         "name": "Camera WiFi signal"
       },
       "video_edge_record_mode": {
-        "name": "Recording mode",
+        "name": "Local recording",
         "state": {
           "on_detection": "On detection",
           "permanent": "Permanent",
@@ -832,8 +884,11 @@
           "unknown": "Unknown"
         }
       },
+      "nvr_cameras": {
+        "name": "Cameras"
+      },
       "video_edge_record_policy": {
-        "name": "Recording policy",
+        "name": "NVR recording",
         "state": {
           "always": "Always",
           "when_requested": "When requested",
@@ -848,6 +903,36 @@
       },
       "video_edge_max_preview_duration": {
         "name": "Max preview duration"
+      },
+      "waterstop_motor_state": {
+        "name": "Motor state",
+        "state": {
+          "on": "Running",
+          "off": "Stopped"
+        }
+      },
+      "waterstop_external_power": {
+        "name": "Power source",
+        "state": {
+          "supply": "External power",
+          "battery": "Battery",
+          "unknown": "Unknown"
+        }
+      },
+      "waterstop_prevention_status": {
+        "name": "Prevention",
+        "state": {
+          "enabled": "Enabled",
+          "disabled": "Disabled"
+        }
+      },
+      "waterstop_prevention_period": {
+        "name": "Prevention period"
+      }
+    },
+    "valve": {
+      "waterstop_valve": {
+        "name": "Water valve"
       }
     },
     "update": {
@@ -903,6 +988,13 @@
       },
       "chimes": {
         "name": "Chimes",
+        "state": {
+          "off": "Disabled",
+          "on": "Enabled"
+        }
+      },
+      "alert_if_moved": {
+        "name": "Alert if moved",
         "state": {
           "off": "Disabled",
           "on": "Enabled"

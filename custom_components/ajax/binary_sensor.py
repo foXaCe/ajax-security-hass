@@ -200,6 +200,8 @@ async def async_setup_entry(
 class AjaxBinarySensor(CoordinatorEntity[AjaxDataCoordinator], BinarySensorEntity):
     """Representation of an Ajax binary sensor."""
 
+    __slots__ = ("_space_id", "_device_id", "_sensor_key", "_sensor_desc")
+
     _attr_has_entity_name = True
 
     def __init__(

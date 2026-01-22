@@ -1,0 +1,92 @@
+name: Bug Report
+description: Report a bug with the Ajax Security integration
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug!
+        Please fill out the form below to help us diagnose and fix the issue.
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist
+      options:
+        - label: I have read the [README](https://github.com/foXaCe/ajax-security-hass/blob/main/README.md)
+          required: true
+        - label: I have searched for existing issues (open and closed)
+          required: true
+        - label: I have updated to the latest version of the integration
+          required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Integration Version
+      description: Which version of the integration are you running?
+      placeholder: "0.7.78"
+    validations:
+      required: true
+
+  - type: input
+    id: ha_version
+    attributes:
+      label: Home Assistant Version
+      description: Which version of Home Assistant are you running?
+      placeholder: "2024.1.0"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: auth_mode
+    attributes:
+      label: Authentication Mode
+      description: How are you connecting to Ajax?
+      options:
+        - Direct API (with API key)
+        - Proxy Secure (via proxy server)
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug Description
+      description: Describe the bug clearly and concisely
+      placeholder: When I try to arm the system, the state doesn't update...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: What did you expect to happen?
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant Logs
+      description: |
+        Please provide relevant logs from Home Assistant.
+        Enable debug logging first:
+        ```yaml
+        logger:
+          default: info
+          logs:
+            custom_components.ajax: debug
+        ```
+      render: text
+    validations:
+      required: false
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional Context
+      description: Any other information that might help (screenshots, device types, etc.)
+    validations:
+      required: false

@@ -120,6 +120,8 @@ async def async_setup_entry(
 class AjaxDoorPlusBaseSelect(CoordinatorEntity[AjaxDataCoordinator], SelectEntity):
     """Base class for DoorProtect Plus select entities."""
 
+    __slots__ = ("_space_id", "_device_id")
+
     _attr_has_entity_name = True
 
     def __init__(self, coordinator: AjaxDataCoordinator, space_id: str, device_id: str) -> None:

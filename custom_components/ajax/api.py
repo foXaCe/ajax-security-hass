@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import logging
+import time
 from typing import Any
 
 import aiohttp
@@ -17,6 +18,15 @@ from .const import (
 )
 
 _LOGGER = logging.getLogger(__name__)
+
+# Retry configuration
+MAX_RETRIES = 3
+RETRY_BACKOFF_BASE = 1.0  # Base delay in seconds
+RETRY_BACKOFF_MAX = 30.0  # Maximum delay in seconds
+
+# Rate limiting configuration
+RATE_LIMIT_REQUESTS = 30  # Max requests per window
+RATE_LIMIT_WINDOW = 60  # Window in seconds
 
 
 class AjaxRestApiError(Exception):
@@ -35,6 +45,14 @@ class AjaxRestAuthError(AjaxRestApiError):
         """
         super().__init__(message)
         self.error_type = error_type
+
+
+class AjaxRestConnectionError(AjaxRestApiError):
+    """Connection error (network issues)."""
+
+
+class AjaxRestRateLimitError(AjaxRestApiError):
+    """Rate limit exceeded."""
 
 
 class AjaxRest2FARequiredError(AjaxRestApiError):
@@ -68,6 +86,7 @@ class AjaxRestApi:
         password_is_hashed: bool = False,
         proxy_url: str | None = None,
         proxy_mode: str | None = None,
+        session: aiohttp.ClientSession | None = None,
     ):
         """Initialize the API client.
 
@@ -78,6 +97,7 @@ class AjaxRestApi:
             password_is_hashed: True if password is already SHA256 hashed
             proxy_url: URL of proxy server (for proxy modes)
             proxy_mode: Authentication mode (direct, proxy_secure)
+            session: Optional aiohttp session (use async_get_clientsession(hass) for HA)
         """
         self.api_key = api_key
         self.email = email
@@ -91,11 +111,16 @@ class AjaxRestApi:
         else:
             self.password_hash = hashlib.sha256(password.encode()).hexdigest()
 
-        self.session: aiohttp.ClientSession | None = None
+        self.session: aiohttp.ClientSession | None = session
+        self._owns_session = session is None  # Track if we created the session
         self.session_token: str | None = None  # Session token (15 min TTL)
         self.refresh_token: str | None = None  # Refresh token (7 days TTL)
         self.user_id: str | None = None  # User ID from login
         self._auth_lock: asyncio.Lock = asyncio.Lock()  # Prevent concurrent token refresh
+
+        # Rate limiting state
+        self._request_timestamps: list[float] = []
+        self._rate_limit_lock: asyncio.Lock = asyncio.Lock()
 
         # Base headers with API key (may be empty for proxy modes initially)
         self._base_headers = {
@@ -132,12 +157,58 @@ class AjaxRestApi:
         """Get or create aiohttp session."""
         if self.session is None or self.session.closed:
             self.session = aiohttp.ClientSession()
+            self._owns_session = True
         return self.session
 
     async def close(self):
-        """Close the session."""
-        if self.session and not self.session.closed:
+        """Close the session if we own it."""
+        if self._owns_session and self.session and not self.session.closed:
             await self.session.close()
+
+    async def _check_rate_limit(self) -> None:
+        """Check and enforce rate limiting.
+
+        Releases the lock during sleep to avoid blocking other requests.
+        """
+        wait_time = 0.0
+
+        # Phase 1: Check if we need to wait (under lock)
+        async with self._rate_limit_lock:
+            now = time.time()
+            # Remove timestamps outside the window
+            self._request_timestamps = [ts for ts in self._request_timestamps if now - ts < RATE_LIMIT_WINDOW]
+            # Check if we're at the limit
+            if len(self._request_timestamps) >= RATE_LIMIT_REQUESTS:
+                oldest = self._request_timestamps[0]
+                wait_time = RATE_LIMIT_WINDOW - (now - oldest)
+
+        # Phase 2: Wait outside the lock (allows other requests to proceed)
+        if wait_time > 0:
+            _LOGGER.warning(
+                "Rate limit reached (%d/%d requests in %ds), waiting %.1fs",
+                RATE_LIMIT_REQUESTS,
+                RATE_LIMIT_REQUESTS,
+                RATE_LIMIT_WINDOW,
+                wait_time,
+            )
+            await asyncio.sleep(wait_time)
+
+        # Phase 3: Record this request (under lock)
+        async with self._rate_limit_lock:
+            self._request_timestamps.append(time.time())
+
+    @staticmethod
+    def _calculate_backoff(attempt: int) -> float:
+        """Calculate exponential backoff delay.
+
+        Args:
+            attempt: Current retry attempt (0-based)
+
+        Returns:
+            Delay in seconds
+        """
+        delay = RETRY_BACKOFF_BASE * (2**attempt)
+        return min(delay, RETRY_BACKOFF_MAX)
 
     async def async_login(self) -> str:
         """Login with email and SHA256(password) to get session token.
@@ -397,16 +468,19 @@ class AjaxRestApi:
         endpoint: str,
         data: dict[str, Any] | None = None,
         _retry_on_auth_error: bool = True,
+        _retry_count: int = 0,
     ) -> Any:
         """Make API request with session token.
 
         Automatically renews the token if it expires (401 error).
+        Implements retry with exponential backoff for transient errors.
 
         Args:
             method: HTTP method (GET, POST, etc.)
             endpoint: API endpoint (without base URL)
             data: Optional JSON data for POST/PUT requests
             _retry_on_auth_error: Internal flag to prevent infinite retry loop
+            _retry_count: Current retry attempt (internal)
 
         Returns:
             API response as dict
@@ -417,6 +491,9 @@ class AjaxRestApi:
         """
         if not self.session_token:
             raise AjaxRestApiError("Not logged in. Call async_login() first.")
+
+        # Apply rate limiting
+        await self._check_rate_limit()
 
         url = f"{self._get_base_url()}/{endpoint}"
         session = await self._get_session()
@@ -465,13 +542,31 @@ class AjaxRestApi:
                 elif response.status == 403:
                     _LOGGER.error("Access denied (403) - Insufficient permissions")
                     raise AjaxRestAuthError("Access denied")
+                elif response.status == 429:
+                    # Rate limited by server
+                    retry_after = int(response.headers.get("Retry-After", "60"))
+                    _LOGGER.warning("Rate limited by server, waiting %ds", retry_after)
+                    raise AjaxRestRateLimitError(f"Rate limited, retry after {retry_after}s")
 
-                # Handle server errors (5xx) as transient - will retry on next poll
+                # Handle server errors (5xx) as transient - retry with backoff
                 if response.status >= 500:
-                    _LOGGER.warning(
-                        "API request to %s returned server error: %s (will retry)",
-                        endpoint,
+                    if _retry_count < MAX_RETRIES:
+                        delay = self._calculate_backoff(_retry_count)
+                        _LOGGER.warning(
+                            "Server error %s on %s, retrying in %.1fs (attempt %d/%d)",
+                            response.status,
+                            endpoint,
+                            delay,
+                            _retry_count + 1,
+                            MAX_RETRIES,
+                        )
+                        await asyncio.sleep(delay)
+                        return await self._request(method, endpoint, data, _retry_on_auth_error, _retry_count + 1)
+                    _LOGGER.error(
+                        "Server error %s on %s after %d retries",
                         response.status,
+                        endpoint,
+                        MAX_RETRIES,
                     )
                     raise AjaxRestApiError(f"Server error: {response.status}")
 
@@ -479,16 +574,36 @@ class AjaxRestApi:
                 return await response.json()
 
         except aiohttp.ClientError as err:
-            # Transient network errors (DNS, connection, etc.) - warning level
-            _LOGGER.warning("API request to %s failed: %s (will retry)", endpoint, err)
-            raise AjaxRestApiError(f"API request failed: {err}") from err
+            # Transient network errors - retry with backoff
+            if _retry_count < MAX_RETRIES:
+                delay = self._calculate_backoff(_retry_count)
+                _LOGGER.warning(
+                    "Connection error on %s: %s, retrying in %.1fs (attempt %d/%d)",
+                    endpoint,
+                    err,
+                    delay,
+                    _retry_count + 1,
+                    MAX_RETRIES,
+                )
+                await asyncio.sleep(delay)
+                return await self._request(method, endpoint, data, _retry_on_auth_error, _retry_count + 1)
+            _LOGGER.error("API request to %s failed after %d retries: %s", endpoint, MAX_RETRIES, err)
+            raise AjaxRestConnectionError(f"Connection failed: {err}") from err
         except TimeoutError as err:
-            _LOGGER.warning(
-                "API request to %s timed out after %ss (will retry)",
-                endpoint,
-                AJAX_REST_API_TIMEOUT,
-            )
-            raise AjaxRestApiError("API request timeout") from err
+            # Timeout - retry with backoff
+            if _retry_count < MAX_RETRIES:
+                delay = self._calculate_backoff(_retry_count)
+                _LOGGER.warning(
+                    "Timeout on %s, retrying in %.1fs (attempt %d/%d)",
+                    endpoint,
+                    delay,
+                    _retry_count + 1,
+                    MAX_RETRIES,
+                )
+                await asyncio.sleep(delay)
+                return await self._request(method, endpoint, data, _retry_on_auth_error, _retry_count + 1)
+            _LOGGER.error("API request to %s timed out after %d retries", endpoint, MAX_RETRIES)
+            raise AjaxRestConnectionError("Request timeout") from err
 
     # Hub methods
     async def async_get_hubs(self) -> list[dict[str, Any]]:
@@ -1139,14 +1254,18 @@ class AjaxRestApi:
         endpoint: str,
         data: dict[str, Any] | None = None,
         _retry_on_auth_error: bool = True,
+        _retry_count: int = 0,
     ) -> None:
         """Make API request that returns no content (204).
+
+        Implements retry with exponential backoff for transient errors.
 
         Args:
             method: HTTP method (PUT, DELETE, etc.)
             endpoint: API endpoint (without base URL)
             data: Optional JSON data for request body
             _retry_on_auth_error: Internal flag to prevent infinite retry loop
+            _retry_count: Current retry attempt (internal)
 
         Raises:
             AjaxRestAuthError: If authentication fails
@@ -1154,6 +1273,9 @@ class AjaxRestApi:
         """
         if not self.session_token:
             raise AjaxRestApiError("Not logged in. Call async_login() first.")
+
+        # Apply rate limiting
+        await self._check_rate_limit()
 
         url = f"{self._get_base_url()}/{endpoint}"
         session = await self._get_session()
@@ -1183,17 +1305,68 @@ class AjaxRestApi:
                     else:
                         raise AjaxRestAuthError("Invalid or expired token")
 
+                if response.status == 429:
+                    # Rate limited by server
+                    retry_after = int(response.headers.get("Retry-After", "60"))
+                    _LOGGER.warning("Rate limited by server, waiting %ds", retry_after)
+                    raise AjaxRestRateLimitError(f"Rate limited, retry after {retry_after}s")
+
+                # Handle server errors (5xx) as transient - retry with backoff
+                if response.status >= 500:
+                    if _retry_count < MAX_RETRIES:
+                        delay = self._calculate_backoff(_retry_count)
+                        _LOGGER.warning(
+                            "Server error %s on %s, retrying in %.1fs (attempt %d/%d)",
+                            response.status,
+                            endpoint,
+                            delay,
+                            _retry_count + 1,
+                            MAX_RETRIES,
+                        )
+                        await asyncio.sleep(delay)
+                        return await self._request_no_response(
+                            method, endpoint, data, _retry_on_auth_error, _retry_count + 1
+                        )
+                    error_text = await response.text()
+                    _LOGGER.error("Server error %s after %d retries: %s", response.status, MAX_RETRIES, error_text)
+                    raise AjaxRestApiError(f"Server error {response.status}: {error_text}")
+
                 if response.status not in (200, 202, 204):
                     error_text = await response.text()
                     _LOGGER.error("API error %s: %s", response.status, error_text)
                     raise AjaxRestApiError(f"API error {response.status}: {error_text}")
 
         except aiohttp.ClientError as err:
-            _LOGGER.error("API request to %s failed: %s", endpoint, err)
-            raise AjaxRestApiError(f"API request failed: {err}") from err
+            # Transient network errors - retry with backoff
+            if _retry_count < MAX_RETRIES:
+                delay = self._calculate_backoff(_retry_count)
+                _LOGGER.warning(
+                    "Connection error on %s: %s, retrying in %.1fs (attempt %d/%d)",
+                    endpoint,
+                    err,
+                    delay,
+                    _retry_count + 1,
+                    MAX_RETRIES,
+                )
+                await asyncio.sleep(delay)
+                return await self._request_no_response(method, endpoint, data, _retry_on_auth_error, _retry_count + 1)
+            _LOGGER.error("API request to %s failed after %d retries: %s", endpoint, MAX_RETRIES, err)
+            raise AjaxRestConnectionError(f"Connection failed: {err}") from err
         except TimeoutError as err:
-            _LOGGER.error("API request to %s timed out", endpoint)
-            raise AjaxRestApiError("API request timeout") from err
+            # Timeout - retry with backoff
+            if _retry_count < MAX_RETRIES:
+                delay = self._calculate_backoff(_retry_count)
+                _LOGGER.warning(
+                    "Timeout on %s, retrying in %.1fs (attempt %d/%d)",
+                    endpoint,
+                    delay,
+                    _retry_count + 1,
+                    MAX_RETRIES,
+                )
+                await asyncio.sleep(delay)
+                return await self._request_no_response(method, endpoint, data, _retry_on_auth_error, _retry_count + 1)
+            _LOGGER.error("API request to %s timed out after %d retries", endpoint, MAX_RETRIES)
+            raise AjaxRestConnectionError("Request timeout") from err
 
     # Arming commands
     async def async_arm(self, hub_id: str, ignore_problems: bool = True) -> None:

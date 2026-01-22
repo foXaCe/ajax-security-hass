@@ -18,6 +18,7 @@
   "integration_type": "hub",
   "iot_class": "cloud_push",
   "issue_tracker": "https://github.com/foXaCe/ajax-security-hass/issues",
+  "loggers": ["custom_components.ajax"],
   "requirements": [
     "aiohttp>=3.9.0",
     "aiobotocore>=2.7.0",

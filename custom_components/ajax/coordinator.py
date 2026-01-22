@@ -23,6 +23,7 @@ from typing import Any
 
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed
+from homeassistant.helpers.debounce import Debouncer
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .api import AjaxRestApi, AjaxRestApiError, AjaxRestAuthError
@@ -177,6 +178,14 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
             _LOGGER,
             name=DOMAIN,
             update_interval=timedelta(seconds=UPDATE_INTERVAL),
+            # Debouncer: Wait 1.5s of silence before triggering refresh
+            # Prevents flooding when multiple SQS/SSE events arrive rapidly
+            request_refresh_debouncer=Debouncer(
+                hass,
+                _LOGGER,
+                cooldown=1.5,
+                immediate=False,
+            ),
         )
 
     def _update_polling_interval(self, security_state: SecurityState) -> None:

@@ -1,0 +1,14 @@
+# Code owners for Ajax Security System integration
+# These users will be automatically requested for review on PRs
+
+# Global owner
+* @foXaCe
+
+# Integration code
+/custom_components/ajax/ @foXaCe
+
+# CI/CD and GitHub config
+/.github/ @foXaCe
+
+# Documentation
+/*.md @foXaCe

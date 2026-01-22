@@ -64,6 +64,8 @@ class AjaxAlarmControlPanel(CoordinatorEntity[AjaxDataCoordinator], AlarmControl
     from "unavailable" back to its normal state.
     """
 
+    _attr_has_entity_name = True
+    _attr_name = None  # Use device name as entity name (main entity)
     _attr_supported_features = AlarmControlPanelEntityFeature.ARM_AWAY | AlarmControlPanelEntityFeature.ARM_NIGHT
     _attr_code_arm_required = False
     _attr_available = True  # Always available - keep last known state on API errors
@@ -73,12 +75,6 @@ class AjaxAlarmControlPanel(CoordinatorEntity[AjaxDataCoordinator], AlarmControl
         super().__init__(coordinator)
         self._entry = entry
         self._space_id = space_id
-
-        # Get initial space data
-        space = coordinator.get_space(space_id)
-        space_name = space.name if space else "Unknown"
-
-        self._attr_name = f"Ajax Alarm - {space_name}"
         self._attr_unique_id = f"{entry.entry_id}_alarm_{space_id}"
 
     @property
@@ -339,6 +335,7 @@ class AjaxGroupAlarmControlPanel(CoordinatorEntity[AjaxDataCoordinator], AlarmCo
     allowing users to arm/disarm individual groups independently.
     """
 
+    _attr_has_entity_name = True
     _attr_supported_features = AlarmControlPanelEntityFeature.ARM_AWAY
     _attr_code_arm_required = False
     _attr_available = True  # Always available - keep last known state on API errors
@@ -355,13 +352,11 @@ class AjaxGroupAlarmControlPanel(CoordinatorEntity[AjaxDataCoordinator], AlarmCo
         self._entry = entry
         self._space_id = space_id
         self._group_id = group_id
-
-        # Get initial group data
-        group = coordinator.get_group(space_id, group_id)
-        group_name = group.name if group else "Unknown Group"
-
-        self._attr_name = f"Ajax Group - {group_name}"
         self._attr_unique_id = f"{entry.entry_id}_group_alarm_{group_id}"
+
+        # Get initial group data for name
+        group = coordinator.get_group(space_id, group_id)
+        self._attr_name = group.name if group else "Group"
 
     @property
     def device_info(self) -> dict[str, Any]:

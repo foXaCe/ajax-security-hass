@@ -21,6 +21,7 @@ from homeassistant.helpers import (
     config_validation as cv,
     device_registry as dr,
 )
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.service import async_extract_config_entry_ids
 
 from .api import AjaxRestApi, AjaxRestApiError, AjaxRestAuthError
@@ -82,7 +83,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
 
 async def async_setup_entry(hass: HomeAssistant, entry: AjaxConfigEntry) -> bool:
     """Set up Ajax Security System from a config entry."""
-    _LOGGER.info("Ajax integration v0.7.6 starting...")
+    _LOGGER.info("Ajax integration v0.7.78 starting...")
 
     # Get authentication mode (default to direct for backwards compatibility)
     auth_mode = entry.data.get(CONF_AUTH_MODE, AUTH_MODE_DIRECT)
@@ -114,7 +115,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: AjaxConfigEntry) -> bool
         proxy_mode = AUTH_MODE_PROXY_SECURE
         _LOGGER.info("Using proxy secure authentication mode")
 
-    # Create REST API instance
+    # Create REST API instance with HA session for connection reuse
     # password_is_hashed=True because we store only SHA256 hash, never plain password
     api = AjaxRestApi(
         api_key=api_key,
@@ -123,6 +124,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: AjaxConfigEntry) -> bool
         password_is_hashed=True,  # Password is already SHA256 hash
         proxy_url=proxy_url,
         proxy_mode=proxy_mode,
+        session=async_get_clientsession(hass),
     )
 
     try:
@@ -186,8 +188,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: AjaxConfigEntry) -> bool
     # Set up platforms
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
-    # Create HA Areas from Ajax rooms and assign devices
-    await _async_setup_areas(hass, coordinator)
+    # Background task: Create HA Areas from Ajax rooms (non-blocking)
+    entry.async_create_background_task(
+        hass,
+        _async_setup_areas(hass, coordinator),
+        "ajax_setup_areas",
+    )
 
     # Listen for options updates (takes effect immediately without reboot)
     entry.async_on_unload(entry.add_update_listener(_async_update_options))

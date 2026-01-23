@@ -2,6 +2,28 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.10.0] - 2026-01-23
+
+### Added
+- **Transmitter device handler**: Full support for universal wired sensor modules
+  - Dynamic device class based on alarm type (intrusion, opening, fire, flood, gas, CO)
+  - External contact binary sensor with configurable mode (NC/NO)
+  - Switches: always active, night mode, accelerometer, siren triggers
+  - Sensors: contact mode, alarm type, alarm mode, power supply mode, arm/alarm delays
+- **LifeQuality device handler**: Air quality sensor support
+  - CO2, temperature, humidity sensors
+  - CO2 problem binary sensor
+  - Indicator light switch
+- **Enhanced FireProtect 2 Plus**: Siren trigger switches (smoke, CO, temperature)
+- **Enhanced LeaksProtect**: Always active switch
+- **Enhanced MotionDetector**: Siren trigger for motion switch
+- **Transmitter fast polling**: Real-time updates for wired contact sensors
+
+### Fixed
+- Socket power monitoring sensors using correct attribute names
+- StreetSiren externally powered sensor attribute lookup
+- Consistent use of normalized attribute names across all handlers
+
 ## [0.9.0] - 2026-01-23
 
 ### Added

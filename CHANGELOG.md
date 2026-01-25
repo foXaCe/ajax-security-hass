@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.12.0] - 2026-01-25
+
+### Added
+- X-Client-Version header for proxy mode (required by proxy >= 0.11.2)
+
+### Fixed
+- Multi-gang LightSwitch channel detection (#82)
+
 ## [0.11.2] - 2026-01-25
 
 ### Changed

@@ -83,7 +83,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
 
 async def async_setup_entry(hass: HomeAssistant, entry: AjaxConfigEntry) -> bool:
     """Set up Ajax Security System from a config entry."""
-    _LOGGER.info("Ajax integration v0.11.1 starting...")
+    _LOGGER.info("Ajax integration v0.11.2 starting...")
 
     # Get authentication mode (default to direct for backwards compatibility)
     auth_mode = entry.data.get(CONF_AUTH_MODE, AUTH_MODE_DIRECT)

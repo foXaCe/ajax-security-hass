@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.11.2] - 2026-01-25
+
+### Changed
+- Improved code quality from comprehensive review
+- Narrowed exception handling to specific API errors
+- Added `rooms_map` and `users` fields to AjaxSpace dataclass
+- Refactored WaterStop attributes extraction
+- Added `entity_category: diagnostic` to firmware sensors
+
+### Fixed
+- Resolved all mypy type checking errors
+- Fixed version mismatch in startup log
+- Fixed timezone-aware timestamps using `datetime.now(UTC)`
+- Fixed MAC address validation for RTSP URL building
+- Fixed battery sensor condition for mains-powered WallSwitch
+
 ## [0.11.1] - 2026-01-23
 
 ### Added

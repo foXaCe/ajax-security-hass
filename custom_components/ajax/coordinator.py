@@ -182,6 +182,9 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
         # Flag to skip state change event creation when SQS already created the event
         self._skip_state_change_event: bool = False
 
+        # Flag to bypass proxy cache on next refresh (after SSE event or user action)
+        self._bypass_cache_next_refresh: bool = False
+
         super().__init__(
             hass,
             _LOGGER,
@@ -198,10 +201,11 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
         )
 
     def _update_polling_interval(self, security_state: SecurityState) -> None:
-        """Update polling interval based on security state.
+        """Update polling interval based on security state and proxy suggestion.
 
         - Armed/Night/Partial: 60s (SSE/SQS handles real-time events)
         - Disarmed: 30s (no SSE/SQS, need faster polling)
+        - Proxy suggestion: respected if higher (load balancing)
 
         Also manages door sensor fast polling (5s) when disarmed.
 
@@ -215,18 +219,30 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
             SecurityState.NIGHT_MODE,
             SecurityState.PARTIALLY_ARMED,
         ):
-            new_interval = UPDATE_INTERVAL_ARMED
+            base_interval = UPDATE_INTERVAL_ARMED
         else:
-            new_interval = UPDATE_INTERVAL
+            base_interval = UPDATE_INTERVAL
+
+        # Respect proxy suggested interval if higher (load balancing)
+        # Proxy sends X-Suggested-Interval: 30|60|120 based on rate limit remaining
+        new_interval = base_interval
+        if self.api.suggested_interval and self.api.suggested_interval > base_interval:
+            new_interval = self.api.suggested_interval
+            _LOGGER.debug(
+                "Using proxy suggested interval: %ds (base: %ds)",
+                new_interval,
+                base_interval,
+            )
 
         current_interval = self.update_interval.total_seconds() if self.update_interval else UPDATE_INTERVAL
 
         if new_interval != current_interval:
             self.update_interval = timedelta(seconds=new_interval)
             _LOGGER.info(
-                "Polling interval changed to %ds (security state: %s)",
+                "Polling interval changed to %ds (security state: %s, proxy suggested: %s)",
                 new_interval,
                 security_state.value,
+                self.api.suggested_interval,
             )
 
         # Manage door sensor fast polling based on security state
@@ -410,6 +426,15 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
         self._force_metadata_refresh = True  # Set flag to force refresh
         await self.async_request_refresh()
 
+    async def async_request_refresh_bypass_cache(self) -> None:
+        """Request a refresh that bypasses the proxy cache.
+
+        Use this after SSE events or user actions to get fresh data.
+        The proxy will fetch new data from Ajax API instead of cached data.
+        """
+        self._bypass_cache_next_refresh = True
+        await self.async_request_refresh()
+
     async def _async_update_data(self) -> AjaxAccount:
         """Fetch data from Ajax REST API.
 
@@ -418,6 +443,12 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
         - Full metadata refresh (hourly): Rooms, users, groups
         """
         try:
+            # Check if we need to bypass proxy cache (after SSE event or user action)
+            if self._bypass_cache_next_refresh:
+                self.api._bypass_cache_once = True
+                self._bypass_cache_next_refresh = False
+                _LOGGER.debug("Bypassing proxy cache for this refresh")
+
             # Initialize account if needed
             if self.account is None:
                 await self._async_init_account()
@@ -676,6 +707,7 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
                 session_token=self.api.session_token or "",
                 callback=lambda event: None,  # Will be set by manager
                 hass_loop=self.hass.loop,
+                user_id=self.api.user_id,
             )
 
             # Create SSE manager

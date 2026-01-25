@@ -2,6 +2,26 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.13.0] - 2026-01-25
+
+### Added
+- Proxy cache optimization support:
+  - `X-User-Id` header sent on all requests for per-user rate limiting
+  - `X-Cache-Control: no-cache` support to bypass proxy cache when needed
+  - Reading `X-Suggested-Interval` header to dynamically adjust polling interval
+  - Reading `X-Cache-TTL` and `X-Cache` (HIT/MISS) headers from proxy responses
+- New coordinator method `async_request_refresh_bypass_cache()` for fresh data after events
+- Cache bypass automatically triggered after SSE events (arm/disarm/device changes)
+- SSE client now sends `X-User-Id` header for consistent rate limiting
+
+### Changed
+- Polling interval now respects proxy suggestions (30s/60s/120s based on load)
+- Error recovery in alarm_control_panel uses cache bypass for accurate state
+
+### Technical
+- Requires proxy version >= 0.13.0 with cache support for full optimization
+- Backward compatible with older proxy versions (headers ignored if not supported)
+
 ## [0.12.0] - 2026-01-25
 
 ### Added

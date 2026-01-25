@@ -40,6 +40,7 @@ class AjaxSSEClient:
         session_token: str,
         callback: Callable[[dict[str, Any]], Awaitable[None] | None],
         hass_loop: asyncio.AbstractEventLoop | None = None,
+        user_id: str | None = None,
     ):
         """Initialize the SSE client.
 
@@ -48,9 +49,11 @@ class AjaxSSEClient:
             session_token: Session token for authentication
             callback: Function to call when an event is received
             hass_loop: Home Assistant event loop for thread-safe callbacks
+            user_id: User ID for proxy rate limiting (X-User-Id header)
         """
         self.sse_url = sse_url
         self.session_token = session_token
+        self.user_id = user_id
         self._callback = callback
         self._hass_loop = hass_loop
         self._running = False
@@ -117,6 +120,9 @@ class AjaxSSEClient:
             "Accept": "text/event-stream",
             "Cache-Control": "no-cache",
         }
+        # Add user ID for proxy rate limiting by user (not just IP)
+        if self.user_id:
+            headers["X-User-Id"] = self.user_id
 
         _LOGGER.debug("Connecting to SSE: %s", self.sse_url)
 

@@ -158,8 +158,8 @@ class AjaxAlarmControlPanel(CoordinatorEntity[AjaxDataCoordinator], AlarmControl
             await self.coordinator.async_disarm_space(self._space_id)
         except Exception as err:
             _LOGGER.error("Failed to disarm: %s", err)
-            # Revert on error - refresh from API
-            await self.coordinator.async_request_refresh()
+            # Revert on error - refresh from API with cache bypass
+            await self.coordinator.async_request_refresh_bypass_cache()
             raise
 
     async def async_alarm_arm_away(self, code: str | None = None) -> None:
@@ -176,8 +176,8 @@ class AjaxAlarmControlPanel(CoordinatorEntity[AjaxDataCoordinator], AlarmControl
             await self.coordinator.async_arm_space(self._space_id)
         except Exception as err:
             _LOGGER.error("Failed to arm: %s", err)
-            # Revert on error - refresh from API
-            await self.coordinator.async_request_refresh()
+            # Revert on error - refresh from API with cache bypass
+            await self.coordinator.async_request_refresh_bypass_cache()
             raise
 
     async def async_alarm_arm_night(self, code: str | None = None) -> None:
@@ -194,8 +194,8 @@ class AjaxAlarmControlPanel(CoordinatorEntity[AjaxDataCoordinator], AlarmControl
             await self.coordinator.async_arm_night_mode(self._space_id)
         except Exception as err:
             _LOGGER.error("Failed to arm night mode: %s", err)
-            # Revert on error - refresh from API
-            await self.coordinator.async_request_refresh()
+            # Revert on error - refresh from API with cache bypass
+            await self.coordinator.async_request_refresh_bypass_cache()
             raise
 
     async def async_added_to_hass(self) -> None:
@@ -403,7 +403,7 @@ class AjaxGroupAlarmControlPanel(CoordinatorEntity[AjaxDataCoordinator], AlarmCo
             await self.coordinator.async_disarm_group(self._space_id, self._group_id)
         except Exception as err:
             _LOGGER.error("Failed to disarm group: %s", err)
-            await self.coordinator.async_request_refresh()
+            await self.coordinator.async_request_refresh_bypass_cache()
             raise
 
     async def async_alarm_arm_away(self, code: str | None = None) -> None:
@@ -420,7 +420,7 @@ class AjaxGroupAlarmControlPanel(CoordinatorEntity[AjaxDataCoordinator], AlarmCo
             await self.coordinator.async_arm_group(self._space_id, self._group_id)
         except Exception as err:
             _LOGGER.error("Failed to arm group: %s", err)
-            await self.coordinator.async_request_refresh()
+            await self.coordinator.async_request_refresh_bypass_cache()
             raise
 
     @property

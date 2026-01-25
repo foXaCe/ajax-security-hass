@@ -303,8 +303,9 @@ class SSEManager:
             # Without this delay, the API may return stale state
             await asyncio.sleep(1.0)
             try:
-                await self.coordinator.async_force_metadata_refresh()
-                _LOGGER.info("SSE: Metadata refresh completed after group event")
+                # Bypass proxy cache to get fresh data after state change
+                await self.coordinator.async_request_refresh_bypass_cache()
+                _LOGGER.info("SSE: Refresh with cache bypass completed after group event")
             except Exception as err:
                 _LOGGER.error("SSE: Metadata refresh failed after group event: %s", err)
 

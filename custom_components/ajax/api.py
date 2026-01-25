@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import hashlib
 import logging
 import time
@@ -118,6 +119,14 @@ class AjaxRestApi:
         self.refresh_token: str | None = None  # Refresh token (7 days TTL)
         self.user_id: str | None = None  # User ID from login
         self._auth_lock: asyncio.Lock = asyncio.Lock()  # Prevent concurrent token refresh
+
+        # Proxy suggested polling interval (from X-Suggested-Interval header)
+        self.suggested_interval: int | None = None
+        # Proxy cache info (from X-Cache-TTL and X-Cache headers)
+        self.last_cache_ttl: int | None = None
+        self.last_cache_hit: bool = False
+        # Flag to bypass cache on next request (set by coordinator after SSE event)
+        self._bypass_cache_once: bool = False
 
         # Rate limiting state
         self._request_timestamps: list[float] = []
@@ -474,6 +483,7 @@ class AjaxRestApi:
         data: dict[str, Any] | None = None,
         _retry_on_auth_error: bool = True,
         _retry_count: int = 0,
+        bypass_cache: bool = False,
     ) -> Any:
         """Make API request with session token.
 
@@ -486,6 +496,7 @@ class AjaxRestApi:
             data: Optional JSON data for POST/PUT requests
             _retry_on_auth_error: Internal flag to prevent infinite retry loop
             _retry_count: Current retry attempt (internal)
+            bypass_cache: If True, send X-Cache-Control: no-cache to bypass proxy cache
 
         Returns:
             API response as dict
@@ -508,6 +519,15 @@ class AjaxRestApi:
             **self._base_headers,
             "X-Session-Token": self.session_token,
         }
+        # Add user ID for proxy rate limiting by user (not just IP)
+        if self.user_id and self.proxy_mode == AUTH_MODE_PROXY_SECURE:
+            headers["X-User-Id"] = self.user_id
+        # Bypass proxy cache if requested (after SSE events or user actions)
+        # Check both explicit parameter and one-time flag
+        should_bypass = bypass_cache or self._bypass_cache_once
+        if should_bypass and self.proxy_mode == AUTH_MODE_PROXY_SECURE:
+            headers["X-Cache-Control"] = "no-cache"
+            self._bypass_cache_once = False  # Reset one-time flag
 
         try:
             async with session.request(
@@ -576,6 +596,24 @@ class AjaxRestApi:
                     raise AjaxRestApiError(f"Server error: {response.status}")
 
                 response.raise_for_status()
+
+                # Read proxy cache and rate limit headers
+                if self.proxy_mode == AUTH_MODE_PROXY_SECURE:
+                    # Suggested polling interval (for load balancing)
+                    suggested = response.headers.get("X-Suggested-Interval")
+                    if suggested:
+                        with contextlib.suppress(ValueError):
+                            self.suggested_interval = int(suggested)
+
+                    # Cache TTL (how long this data is valid)
+                    cache_ttl = response.headers.get("X-Cache-TTL")
+                    if cache_ttl:
+                        with contextlib.suppress(ValueError):
+                            self.last_cache_ttl = int(cache_ttl)
+
+                    # Cache hit indicator (for debugging/logging)
+                    self.last_cache_hit = response.headers.get("X-Cache") == "HIT"
+
                 return await response.json()
 
         except aiohttp.ClientError as err:

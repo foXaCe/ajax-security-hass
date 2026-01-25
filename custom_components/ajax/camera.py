@@ -339,7 +339,11 @@ class AjaxVideoEdgeCamera(CoordinatorEntity[AjaxDataCoordinator], Camera):
             if not video_edge.mac_address:
                 _LOGGER.warning("No MAC address for %s, cannot build RTSP URL", video_edge.name)
                 return None
-            mac_clean = video_edge.mac_address.replace(":", "").lower()
+            mac_clean = video_edge.mac_address.replace(":", "").replace("-", "").lower()
+            # Validate MAC format (should be 12 hex characters)
+            if len(mac_clean) != 12 or not all(c in "0123456789abcdef" for c in mac_clean):
+                _LOGGER.warning("Invalid MAC address format for %s: %s", video_edge.name, video_edge.mac_address)
+                return None
             channel_num = str(self._channel_index)
             stream_path = f"{mac_clean}-{channel_num}_{stream_suffix}"
 

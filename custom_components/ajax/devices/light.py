@@ -87,16 +87,15 @@ class LightHandler(AjaxDeviceHandler):
         """Return sensor entities for light monitoring."""
         sensors = []
 
-        # Battery level (if battery powered)
-        if "battery_level" in self.device.attributes:
+        # Battery level (only if battery data available - WallSwitch is mains-powered)
+        if self.device.battery_level is not None:
             sensors.append(
                 {
                     "key": "battery",
-                    "translation_key": "battery",
                     "device_class": SensorDeviceClass.BATTERY,
                     "native_unit_of_measurement": PERCENTAGE,
                     "state_class": SensorStateClass.MEASUREMENT,
-                    "value_fn": lambda: self.device.attributes.get("battery_level"),
+                    "value_fn": lambda: self.device.battery_level,
                     "enabled_by_default": True,
                 }
             )

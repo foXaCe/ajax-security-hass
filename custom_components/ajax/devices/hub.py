@@ -119,19 +119,18 @@ class HubHandler(AjaxDeviceHandler):
         """Return sensor entities for hub."""
         sensors = []
 
-        # Hub battery level
+        # Hub battery level - always create (uses device.battery_level, populated by coordinator)
         # Note: No translation_key needed - HA provides automatic translation for BATTERY device_class
-        if "battery_level" in self.device.attributes:
-            sensors.append(
-                {
-                    "key": "battery",
-                    "device_class": SensorDeviceClass.BATTERY,
-                    "native_unit_of_measurement": PERCENTAGE,
-                    "state_class": SensorStateClass.MEASUREMENT,
-                    "value_fn": lambda: self.device.attributes.get("battery_level"),
-                    "enabled_by_default": True,
-                }
-            )
+        sensors.append(
+            {
+                "key": "battery",
+                "device_class": SensorDeviceClass.BATTERY,
+                "native_unit_of_measurement": PERCENTAGE,
+                "state_class": SensorStateClass.MEASUREMENT,
+                "value_fn": lambda: self.device.battery_level if self.device.battery_level is not None else None,
+                "enabled_by_default": True,
+            }
+        )
 
         # GSM signal level
         if "gsm_signal_level" in self.device.attributes:
@@ -275,14 +274,15 @@ class HubHandler(AjaxDeviceHandler):
                 }
             )
 
-        # Firmware version
-        if "firmware_version" in self.device.attributes:
+        # Firmware version (uses device.firmware_version, populated by coordinator)
+        if self.device.firmware_version:
             sensors.append(
                 {
                     "key": "firmware_version",
                     "translation_key": "firmware_version",
-                    "value_fn": lambda: self.device.attributes.get("firmware_version"),
+                    "value_fn": lambda: self.device.firmware_version,
                     "enabled_by_default": False,
+                    "entity_category": "diagnostic",
                 }
             )
 

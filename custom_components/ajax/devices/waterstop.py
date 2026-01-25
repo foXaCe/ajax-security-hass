@@ -65,18 +65,17 @@ class WaterStopHandler(AjaxDeviceHandler):
         """Return sensor entities for WaterStop."""
         sensors = []
 
-        # Battery level
-        if "batteryChargeLevelPercentage" in self.device.attributes:
-            sensors.append(
-                {
-                    "key": "battery",
-                    "device_class": SensorDeviceClass.BATTERY,
-                    "native_unit_of_measurement": PERCENTAGE,
-                    "state_class": SensorStateClass.MEASUREMENT,
-                    "value_fn": lambda: self.device.attributes.get("batteryChargeLevelPercentage"),
-                    "enabled_by_default": True,
-                }
-            )
+        # Battery level - always create (uses device.battery_level, populated by coordinator)
+        sensors.append(
+            {
+                "key": "battery",
+                "device_class": SensorDeviceClass.BATTERY,
+                "native_unit_of_measurement": PERCENTAGE,
+                "state_class": SensorStateClass.MEASUREMENT,
+                "value_fn": lambda: self.device.battery_level if self.device.battery_level is not None else None,
+                "enabled_by_default": True,
+            }
+        )
 
         # Temperature
         if "temperature" in self.device.attributes:
@@ -158,13 +157,13 @@ class WaterStopHandler(AjaxDeviceHandler):
                 }
             )
 
-        # Firmware version
-        if "firmwareVersion" in self.device.attributes:
+        # Firmware version (uses device.firmware_version, populated by coordinator)
+        if self.device.firmware_version:
             sensors.append(
                 {
                     "key": "firmware_version",
                     "translation_key": "firmware_version",
-                    "value_fn": lambda: self.device.attributes.get("firmwareVersion"),
+                    "value_fn": lambda: self.device.firmware_version,
                     "enabled_by_default": False,
                     "entity_category": "diagnostic",
                 }

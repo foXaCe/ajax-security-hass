@@ -343,6 +343,10 @@ class AjaxSpace:
     # Recent events from SQS (last 5 events)
     recent_events: list[dict[str, Any]] = field(default_factory=list)
 
+    # Internal mappings (populated by coordinator)
+    rooms_map: dict[str, str] = field(default_factory=dict)  # room_id -> room_name
+    users: list[dict[str, Any]] = field(default_factory=list)  # User list for space
+
     def __str__(self) -> str:
         return f"Space({self.name}, state={self.security_state.value}, devices={len(self.devices)})"
 

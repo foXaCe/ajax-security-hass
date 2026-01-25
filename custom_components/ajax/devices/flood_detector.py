@@ -104,14 +104,15 @@ class FloodDetectorHandler(AjaxDeviceHandler):
                 }
             )
 
-        # Firmware version
-        if "firmware_version" in self.device.attributes:
+        # Firmware version (uses device.firmware_version, populated by coordinator)
+        if self.device.firmware_version:
             sensors.append(
                 {
                     "key": "firmware_version",
                     "translation_key": "firmware_version",
-                    "value_fn": lambda: self.device.attributes.get("firmware_version"),
+                    "value_fn": lambda: self.device.firmware_version,
                     "enabled_by_default": False,
+                    "entity_category": "diagnostic",
                 }
             )
 

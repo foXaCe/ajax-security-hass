@@ -45,6 +45,7 @@ from .models import (
     AjaxAccount,
     AjaxDevice,
     AjaxGroup,
+    AjaxNotification,
     AjaxRoom,
     AjaxSpace,
     AjaxVideoEdge,
@@ -381,7 +382,7 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
                         if updated:
                             self.async_set_updated_data(self.account)
 
-                    except Exception as err:
+                    except (AjaxRestApiError, AjaxRestAuthError) as err:
                         _LOGGER.debug(
                             "Error polling door sensors for space %s: %s",
                             space_id,
@@ -541,7 +542,7 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
                     if not device_found:
                         break
 
-                except Exception as err:
+                except (AjaxRestApiError, AjaxRestAuthError) as err:
                     _LOGGER.error("Error in fast polling for door sensor %s: %s", device_id, err)
 
                 await asyncio.sleep(poll_interval)
@@ -982,7 +983,7 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
                     existing_space = self.account.spaces[space_id]
                     space_name = existing_space.name
                     real_space_id = existing_space.real_space_id
-                    rooms_map = getattr(existing_space, "_rooms_map", {})
+                    rooms_map = existing_space.rooms_map
 
                 # Try to get name: prefer space name, fallback to hub details
                 hub_name = (
@@ -1017,7 +1018,7 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
                     security_state = SecurityState.NIGHT_MODE
                 else:
                     security_state = self._parse_security_state(hub_state)
-            except Exception as err:
+            except (AjaxRestApiError, AjaxRestAuthError) as err:
                 _LOGGER.warning("Failed to get hub details for %s: %s", hub_id, err)
                 hub_name = f"Hub {hub_id}"
                 security_state = SecurityState.NONE
@@ -1060,7 +1061,7 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
             # Only update rooms, users on full refresh (they rarely change)
             if full_refresh or is_new_space:
                 # Store rooms mapping in space for device room name lookup
-                space._rooms_map = rooms_map  # type: ignore
+                space.rooms_map = rooms_map
 
                 # Populate space.rooms with AjaxRoom objects
                 for room_data in rooms_data:
@@ -1077,9 +1078,9 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
                 # Fetch users for this hub
                 try:
                     users_data = await self.api.async_get_users(hub_id)
-                    space._users = users_data  # type: ignore
-                except Exception:
-                    space._users = []  # type: ignore
+                    space.users = users_data
+                except (AjaxRestApiError, AjaxRestAuthError):
+                    space.users = []
 
             # Always fetch groups on every poll (group state changes frequently)
             groups_enabled = hub_details.get("groupsEnabled", False)
@@ -1135,7 +1136,7 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
                         len(space.groups),
                         ", ".join(group_states) if group_states else "none",
                     )
-                except Exception as err:
+                except (AjaxRestApiError, AjaxRestAuthError) as err:
                     _LOGGER.warning("Failed to get groups for hub %s: %s", hub_id, err)
 
             # Check if SQS/SSE recently updated this hub's state
@@ -1222,7 +1223,7 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
 
             # Get room_id and room_name
             room_id = device_data.get("roomId", device_data.get("room_id"))
-            rooms_map = getattr(space, "_rooms_map", {})
+            rooms_map = space.rooms_map
             room_name = rooms_map.get(room_id) if room_id else None
 
             # Create or update device
@@ -1515,6 +1516,23 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
             if "indication" in device_data:
                 device.attributes["indication"] = device_data.get("indication")
 
+            # WaterStop specific attributes (smart water valve)
+            waterstop_attrs = [
+                "valveState",
+                "motorState",
+                "tempProtectState",
+                "extPower",
+                "preventionEnable",
+                "preventionDaysPeriod",
+                "preventionExecuteHours",
+                "preventionExecuteMinutes",
+                "buttonCfg",
+                "indicationMode",
+            ]
+            for attr in waterstop_attrs:
+                if attr in device_data:
+                    device.attributes[attr] = device_data.get(attr)
+
             # Socket/Relay/WallSwitch: Parse switchState to is_on (direct from enriched data)
             if "switchState" in device_data:
                 switch_state = device_data["switchState"]
@@ -1797,8 +1815,7 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
             space.notifications.clear()
 
             for notif_data in notifications_data:
-                # Parse notification data
-                from .models import AjaxNotification
+                # Parse notification data - AjaxNotification already imported at module level
 
                 # Determine notification type based on event_type
                 event_type = notif_data.get("event_type", "")
@@ -1813,7 +1830,7 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
                     message=f"{notif_data.get('device_name', 'Device')}: {event_type.replace('_', ' ')}"
                     if event_type
                     else "",
-                    timestamp=notif_data.get("timestamp") or datetime.now(),
+                    timestamp=notif_data.get("timestamp") or datetime.now(UTC),
                     device_id=notif_data.get("device_id"),
                     device_name=notif_data.get("device_name"),
                     read=notif_data.get("read", False),
@@ -1825,7 +1842,7 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
             # Update unread count
             space.unread_notifications = sum(1 for n in space.notifications if not n.read)
 
-        except Exception as err:
+        except (AjaxRestApiError, AjaxRestAuthError, KeyError, ValueError) as err:
             _LOGGER.error("Error updating notifications for space %s: %s", space_id, err)
 
     async def _async_update_video_edges(self, space_id: str) -> None:
@@ -1954,8 +1971,7 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
 
     def _parse_notification_type(self, event_type: str | None) -> NotificationType:
         """Parse notification type from event type string."""
-        from .models import NotificationType
-
+        # NotificationType already imported at module level
         if not event_type:
             return NotificationType.INFO
 

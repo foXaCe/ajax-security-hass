@@ -233,7 +233,8 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
             security_state: Current security state (used to filter sensors in night mode)
         """
         # Check if fast polling is enabled (can be disabled to reduce API calls)
-        if not self._door_sensor_fast_poll_enabled:
+        # Also disable fast polling in proxy mode to reduce load on shared proxy
+        if not self._door_sensor_fast_poll_enabled or self._sse_url:
             should_poll = False
 
         # Store security state for the polling loop
@@ -1458,6 +1459,30 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
                 device.attributes["imageResolution"] = device_data.get("imageResolution")
             if "photosPerAlarm" in device_data:
                 device.attributes["photosPerAlarm"] = device_data.get("photosPerAlarm")
+
+            # LifeQuality specific attributes (CO2, temperature, humidity sensors)
+            if "actualCO2" in device_data:
+                device.attributes["actualCO2"] = device_data.get("actualCO2")
+            if "actualTemperature" in device_data:
+                device.attributes["actualTemperature"] = device_data.get("actualTemperature")
+            if "actualHumidity" in device_data:
+                device.attributes["actualHumidity"] = device_data.get("actualHumidity")
+            if "minComfortCO2" in device_data:
+                device.attributes["minComfortCO2"] = device_data.get("minComfortCO2")
+            if "maxComfortCO2" in device_data:
+                device.attributes["maxComfortCO2"] = device_data.get("maxComfortCO2")
+            if "minComfortTemperature" in device_data:
+                device.attributes["minComfortTemperature"] = device_data.get("minComfortTemperature")
+            if "maxComfortTemperature" in device_data:
+                device.attributes["maxComfortTemperature"] = device_data.get("maxComfortTemperature")
+            if "minComfortHumidity" in device_data:
+                device.attributes["minComfortHumidity"] = device_data.get("minComfortHumidity")
+            if "maxComfortHumidity" in device_data:
+                device.attributes["maxComfortHumidity"] = device_data.get("maxComfortHumidity")
+            if "calibrationState" in device_data:
+                device.attributes["calibrationState"] = device_data.get("calibrationState")
+            if "indication" in device_data:
+                device.attributes["indication"] = device_data.get("indication")
 
             # Socket/Relay/WallSwitch: Parse switchState to is_on (direct from enriched data)
             if "switchState" in device_data:

@@ -269,7 +269,7 @@ class AjaxOnvifClient:
             if response and hasattr(response, "NotificationMessage"):
                 messages = response.NotificationMessage
                 if messages:
-                    _LOGGER.info("ONVIF: Received %d message(s) from %s", len(messages), self.video_edge.name)
+                    _LOGGER.debug("ONVIF: Received %d message(s) from %s", len(messages), self.video_edge.name)
                     for msg in messages:
                         await self._process_message(msg)
 

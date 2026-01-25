@@ -16,6 +16,7 @@ from homeassistant.components.update import (
     UpdateEntityFeature,
 )
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
@@ -91,6 +92,8 @@ async def async_setup_entry(
 
 class AjaxVideoEdgeFirmwareUpdate(CoordinatorEntity[AjaxDataCoordinator], UpdateEntity):
     """Firmware update entity for Ajax Video Edge devices."""
+
+    __slots__ = ("_video_edge_id", "_space_id")
 
     _attr_has_entity_name = True
     _attr_translation_key = "video_edge_firmware"
@@ -172,7 +175,7 @@ class AjaxVideoEdgeFirmwareUpdate(CoordinatorEntity[AjaxDataCoordinator], Update
         return video_edge.firmware_version
 
     @property
-    def in_progress(self) -> bool | int:
+    def in_progress(self) -> bool | None:
         """Return True if an update is in progress."""
         video_edge = self._video_edge
         if not video_edge:
@@ -182,14 +185,7 @@ class AjaxVideoEdgeFirmwareUpdate(CoordinatorEntity[AjaxDataCoordinator], Update
         update_status = firmware_info.get("updateStatus") or {}
         state = update_status.get("state", "IDLE")
 
-        if state in ("DOWNLOADING", "INSTALLING"):
-            # Return progress percentage if available
-            progress = update_status.get("progress", 0)
-            if progress > 0:
-                return progress
-            return True
-
-        return False
+        return state in ("DOWNLOADING", "INSTALLING")
 
     @property
     def release_summary(self) -> str | None:
@@ -226,6 +222,8 @@ class AjaxVideoEdgeFirmwareUpdate(CoordinatorEntity[AjaxDataCoordinator], Update
 class AjaxHubFirmwareUpdate(CoordinatorEntity[AjaxDataCoordinator], UpdateEntity):
     """Firmware update entity for Ajax Hub."""
 
+    __slots__ = ("_space_id",)
+
     _attr_has_entity_name = True
     _attr_translation_key = "hub_firmware"
     _attr_device_class = UpdateDeviceClass.FIRMWARE
@@ -259,14 +257,14 @@ class AjaxHubFirmwareUpdate(CoordinatorEntity[AjaxDataCoordinator], UpdateEntity
             hw_version = space.hub_details["hardwareVersions"].get("pcb")
 
         # Device info - link to existing hub device
-        self._attr_device_info = {
-            "identifiers": {(DOMAIN, space.hub_id)},
-            "name": space.name,
-            "manufacturer": MANUFACTURER,
-            "model": model_display,
-            "sw_version": firmware_version,
-            "hw_version": hw_version,
-        }
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, space.hub_id)} if space.hub_id else {(DOMAIN, self._space_id)},
+            name=space.name,
+            manufacturer=MANUFACTURER,
+            model=model_display,
+            sw_version=firmware_version,
+            hw_version=hw_version,
+        )
 
     @property
     def _space(self) -> AjaxSpace | None:

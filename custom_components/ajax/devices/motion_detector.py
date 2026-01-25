@@ -111,8 +111,8 @@ class MotionDetectorHandler(AjaxDeviceHandler):
                     "key": "sensitivity",
                     "translation_key": "sensitivity",
                     "value_fn": lambda: {0: "low", 1: "normal", 2: "high"}.get(
-                        self.device.attributes.get("sensitivity"),
-                        self.device.attributes.get("sensitivity"),
+                        int(self.device.attributes.get("sensitivity", 0)),
+                        str(self.device.attributes.get("sensitivity")),
                     ),
                     "enabled_by_default": True,
                 }

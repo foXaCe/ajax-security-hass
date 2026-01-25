@@ -16,7 +16,7 @@ import asyncio
 import contextlib
 import json
 import logging
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from typing import Any
 
 import aiohttp
@@ -36,7 +36,7 @@ class AjaxSSEClient:
         self,
         sse_url: str,
         session_token: str,
-        callback: Callable[[dict[str, Any]], None],
+        callback: Callable[[dict[str, Any]], Awaitable[None] | None],
         hass_loop: asyncio.AbstractEventLoop | None = None,
     ):
         """Initialize the SSE client.
@@ -133,14 +133,14 @@ class AjaxSSEClient:
             self._reconnect_delay = self.RECONNECT_DELAY  # Reset on successful connect
 
             # Read SSE stream
-            event_type = None
-            event_data = []
+            event_type: str | None = None
+            event_data: list[str] = []
 
-            async for line in response.content:
+            async for line_bytes in response.content:
                 if not self._running:
                     break
 
-                line = line.decode("utf-8").rstrip("\n\r")
+                line = line_bytes.decode("utf-8").rstrip("\n\r")
 
                 if not line:
                     # Empty line = end of event

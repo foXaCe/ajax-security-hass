@@ -21,6 +21,7 @@ from homeassistant.components.sensor import (
 )
 from homeassistant.const import PERCENTAGE
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -247,7 +248,7 @@ def _format_time_ago(timestamp: datetime) -> str:
 # ==============================================================================
 
 
-@dataclass
+@dataclass(frozen=True)
 class AjaxSpaceSensorDescription(SensorEntityDescription):
     """Description for Ajax space-level sensors."""
 
@@ -327,7 +328,7 @@ SPACE_SENSORS: tuple[AjaxSpaceSensorDescription, ...] = (
         value_fn=lambda space: format_signal_level(space.hub_details.get("wifi", {}).get("signalLevel"))
         if space.hub_details and space.hub_details.get("wifi", {}).get("enabled")
         else None,
-        should_create=lambda space: space.hub_details and space.hub_details.get("wifi", {}).get("enabled", False),
+        should_create=lambda space: bool(space.hub_details and space.hub_details.get("wifi", {}).get("enabled", False)),
     ),
     AjaxSpaceSensorDescription(
         key="hub_gsm",
@@ -336,7 +337,7 @@ SPACE_SENSORS: tuple[AjaxSpaceSensorDescription, ...] = (
         value_fn=lambda space: format_signal_level(space.hub_details.get("gsm", {}).get("signalLevel"))
         if space.hub_details
         else None,
-        should_create=lambda space: space.hub_details and space.hub_details.get("gsm") is not None,
+        should_create=lambda space: bool(space.hub_details and space.hub_details.get("gsm") is not None),
     ),
     AjaxSpaceSensorDescription(
         key="hub_led_brightness",
@@ -374,10 +375,10 @@ SPACE_SENSORS: tuple[AjaxSpaceSensorDescription, ...] = (
             "GRADE_1": "Grade 1",
             "GRADE_2": "Grade 2",
             "GRADE_3": "Grade 3",
-        }.get(space.hub_details.get("gradeMode"), space.hub_details.get("gradeMode"))
+        }.get(str(space.hub_details.get("gradeMode", "")), space.hub_details.get("gradeMode"))
         if space.hub_details
         else None,
-        should_create=lambda space: space.hub_details and space.hub_details.get("gradeMode"),
+        should_create=lambda space: bool(space.hub_details and space.hub_details.get("gradeMode")),
     ),
     # Active Channels (WiFi, Ethernet, GSM) - disabled by default (changes too often)
     # IMPORTANT: sorted() prevents state changes from random API order
@@ -389,7 +390,7 @@ SPACE_SENSORS: tuple[AjaxSpaceSensorDescription, ...] = (
         value_fn=lambda space: ", ".join(sorted(space.hub_details.get("activeChannels", [])))
         if space.hub_details and space.hub_details.get("activeChannels")
         else None,
-        should_create=lambda space: space.hub_details and space.hub_details.get("activeChannels"),
+        should_create=lambda space: bool(space.hub_details and space.hub_details.get("activeChannels")),
     ),
     # Ping Period
     AjaxSpaceSensorDescription(
@@ -398,7 +399,7 @@ SPACE_SENSORS: tuple[AjaxSpaceSensorDescription, ...] = (
         native_unit_of_measurement="s",
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda space: space.hub_details.get("pingPeriodSeconds") if space.hub_details else None,
-        should_create=lambda space: space.hub_details and space.hub_details.get("pingPeriodSeconds"),
+        should_create=lambda space: bool(space.hub_details and space.hub_details.get("pingPeriodSeconds")),
     ),
     # Offline Alarm Delay
     AjaxSpaceSensorDescription(
@@ -407,7 +408,7 @@ SPACE_SENSORS: tuple[AjaxSpaceSensorDescription, ...] = (
         native_unit_of_measurement="s",
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda space: space.hub_details.get("offlineAlarmSeconds") if space.hub_details else None,
-        should_create=lambda space: space.hub_details and space.hub_details.get("offlineAlarmSeconds"),
+        should_create=lambda space: bool(space.hub_details and space.hub_details.get("offlineAlarmSeconds")),
     ),
     # Noise Level (radio interference)
     AjaxSpaceSensorDescription(
@@ -419,7 +420,7 @@ SPACE_SENSORS: tuple[AjaxSpaceSensorDescription, ...] = (
         else "normal"
         if space.hub_details and space.hub_details.get("noiseLevel")
         else None,
-        should_create=lambda space: space.hub_details and space.hub_details.get("noiseLevel"),
+        should_create=lambda space: bool(space.hub_details and space.hub_details.get("noiseLevel")),
     ),
     # Limits (sensors, rooms, etc.)
     AjaxSpaceSensorDescription(
@@ -429,7 +430,7 @@ SPACE_SENSORS: tuple[AjaxSpaceSensorDescription, ...] = (
         value_fn=lambda space: f"{len(space.devices)}/{space.hub_details.get('limits', {}).get('sensors', 0)}"
         if space.hub_details and space.hub_details.get("limits")
         else None,
-        should_create=lambda space: space.hub_details and space.hub_details.get("limits"),
+        should_create=lambda space: bool(space.hub_details and space.hub_details.get("limits")),
     ),
 )
 
@@ -498,7 +499,7 @@ async def async_setup_entry(
         for device_id, device in space.devices.items():
             handler_class = DEVICE_HANDLERS.get(device.type)
             if handler_class:
-                handler = handler_class(device)
+                handler = handler_class(device)  # type: ignore[abstract]
                 # Get device-specific sensors + common sensors (room, etc.)
                 sensors = handler.get_sensors() + handler.get_common_sensors()
 
@@ -534,7 +535,7 @@ async def async_setup_entry(
         # Create sensors for video edges (surveillance cameras)
         all_video_edges = space.video_edges
         for ve_id, video_edge in all_video_edges.items():
-            handler = VideoEdgeHandler(video_edge, all_video_edges)
+            handler = VideoEdgeHandler(video_edge, all_video_edges)  # type: ignore[assignment]
             sensors = handler.get_sensors()
 
             for sensor_desc in sensors:
@@ -598,6 +599,8 @@ async def async_setup_entry(
 class AjaxSpaceSensor(CoordinatorEntity[AjaxDataCoordinator], SensorEntity):
     """Representation of an Ajax space-level sensor (statistics about the space/hub)."""
 
+    __slots__ = ("_space_id", "_entry")
+
     entity_description: AjaxSpaceSensorDescription
 
     def __init__(
@@ -643,26 +646,27 @@ class AjaxSpaceSensor(CoordinatorEntity[AjaxDataCoordinator], SensorEntity):
         self.async_write_ha_state()
 
     @property
-    def device_info(self) -> dict[str, Any]:
+    def device_info(self) -> DeviceInfo | None:
         """Return device information."""
         space = self.coordinator.get_space(self._space_id)
         if not space:
-            return {}
+            return None
 
         hub_display_name = "Ajax Hub" if space.name == "Hub" else space.name
-        device_info = {
-            "identifiers": {(DOMAIN, self._space_id)},
-            "name": hub_display_name,
-            "manufacturer": MANUFACTURER,
-            "model": format_hub_type(space.hub_details.get("hubSubtype")) if space.hub_details else "Security Hub",
-        }
+        sw_version: str | None = None
 
         if space.hub_details and space.hub_details.get("firmware"):
             firmware = space.hub_details["firmware"]
             if firmware.get("version"):
-                device_info["sw_version"] = firmware["version"]
+                sw_version = firmware["version"]
 
-        return device_info
+        return DeviceInfo(
+            identifiers={(DOMAIN, self._space_id)},
+            name=hub_display_name,
+            manufacturer=MANUFACTURER,
+            model=format_hub_type(space.hub_details.get("hubSubtype")) if space.hub_details else "Security Hub",
+            sw_version=sw_version,
+        )
 
 
 # ==============================================================================
@@ -744,25 +748,22 @@ class AjaxDeviceSensor(CoordinatorEntity[AjaxDataCoordinator], SensorEntity):
         return device.attributes.get("online", True)
 
     @property
-    def device_info(self) -> dict[str, Any]:
+    def device_info(self) -> DeviceInfo | None:
         """Return device information."""
         device = self._get_device()
         if not device:
-            return {}
+            return None
 
-        info = {
-            "identifiers": {(DOMAIN, self._device_id)},
-            "name": device.name,
-            "manufacturer": MANUFACTURER,
-            "model": device.raw_type,
-            "via_device": (DOMAIN, self._space_id),
-            "sw_version": device.firmware_version,
-            "hw_version": device.hardware_version,
-        }
-        # Auto-assign device to HA Area based on Ajax room
-        if device.room_name:
-            info["suggested_area"] = device.room_name
-        return info
+        return DeviceInfo(
+            identifiers={(DOMAIN, self._device_id)},
+            name=device.name,
+            manufacturer=MANUFACTURER,
+            model=device.raw_type,
+            via_device=(DOMAIN, self._space_id),
+            sw_version=device.firmware_version,
+            hw_version=device.hardware_version,
+            suggested_area=device.room_name,
+        )
 
     def _get_device(self) -> AjaxDevice | None:
         """Get the device from coordinator data."""
@@ -784,6 +785,8 @@ class AjaxDeviceSensor(CoordinatorEntity[AjaxDataCoordinator], SensorEntity):
 
 class AjaxVideoEdgeSensor(CoordinatorEntity[AjaxDataCoordinator], SensorEntity):
     """Representation of an Ajax Video Edge sensor."""
+
+    __slots__ = ("_space_id", "_video_edge_id", "_sensor_key", "_sensor_desc")
 
     _attr_has_entity_name = True
 
@@ -875,11 +878,11 @@ class AjaxVideoEdgeSensor(CoordinatorEntity[AjaxDataCoordinator], SensorEntity):
         return None
 
     @property
-    def device_info(self) -> dict[str, Any]:
+    def device_info(self) -> DeviceInfo | None:
         """Return device information."""
         video_edge = self._get_video_edge()
         if not video_edge:
-            return {}
+            return None
 
         # Use human-readable model name
         model_name = VIDEO_EDGE_MODEL_NAMES.get(video_edge.video_edge_type, video_edge.video_edge_type.value)
@@ -893,17 +896,15 @@ class AjaxVideoEdgeSensor(CoordinatorEntity[AjaxDataCoordinator], SensorEntity):
         if nvr_id:
             via_device_id = nvr_id
 
-        info = {
-            "identifiers": {(DOMAIN, self._video_edge_id)},
-            "name": video_edge.name,
-            "manufacturer": MANUFACTURER,
-            "model": model_name,
-            "via_device": (DOMAIN, via_device_id),
-            "sw_version": video_edge.firmware_version,
-        }
-        if video_edge.room_name:
-            info["suggested_area"] = video_edge.room_name
-        return info
+        return DeviceInfo(
+            identifiers={(DOMAIN, self._video_edge_id)},
+            name=video_edge.name,
+            manufacturer=MANUFACTURER,
+            model=model_name,
+            via_device=(DOMAIN, via_device_id),
+            sw_version=video_edge.firmware_version,
+            suggested_area=video_edge.room_name,
+        )
 
     def _get_video_edge(self) -> AjaxVideoEdge | None:
         """Get the video edge from coordinator data."""
@@ -1064,6 +1065,8 @@ class AjaxHubSensor(CoordinatorEntity[AjaxDataCoordinator], SensorEntity):
     not from a device in space.devices.
     """
 
+    __slots__ = ("_space_id", "_sensor_key", "_sensor_desc")
+
     _attr_has_entity_name = True
 
     def __init__(
@@ -1135,16 +1138,16 @@ class AjaxHubSensor(CoordinatorEntity[AjaxDataCoordinator], SensorEntity):
         return space is not None and space.hub_details is not None
 
     @property
-    def device_info(self) -> dict[str, Any]:
+    def device_info(self) -> DeviceInfo | None:
         """Return device information linking to the hub/space device."""
         space = self.coordinator.get_space(self._space_id)
         if not space:
-            return {}
+            return None
 
         # Link to the space device (hub)
-        return {
-            "identifiers": {(DOMAIN, self._space_id)},
-        }
+        return DeviceInfo(
+            identifiers={(DOMAIN, self._space_id)},
+        )
 
     @callback
     def _handle_coordinator_update(self) -> None:

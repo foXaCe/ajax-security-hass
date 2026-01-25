@@ -159,10 +159,10 @@ class SSEManager:
                 source_name = event.get("sourceObjectName") or event.get("sourceName", "")
 
             # Source ID: try device.id, sourceObjectId, deviceId
-            source_id = (
+            source_id: str = str(
                 device.get("id")
                 if isinstance(device, dict) and device.get("id")
-                else event.get("sourceObjectId") or event.get("deviceId", "")
+                else event.get("sourceObjectId") or event.get("deviceId") or ""
             )
 
             # Source type: try device.type, source.type, sourceObjectType, sourceType
@@ -215,6 +215,9 @@ class SSEManager:
 
             # Get space by hub_id
             space = None
+            if self.coordinator.account is None:
+                _LOGGER.warning("SSE: No account data available")
+                return
             for s in self.coordinator.account.spaces.values():
                 if s.hub_id == hub_id:
                     space = s
@@ -261,7 +264,8 @@ class SSEManager:
                 )
 
             # Notify HA of update
-            self.coordinator.async_set_updated_data(self.coordinator.account)
+            if self.coordinator.account is not None:
+                self.coordinator.async_set_updated_data(self.coordinator.account)
 
         except Exception as err:
             _LOGGER.error("SSE event processing error: %s", err, exc_info=True)
@@ -771,7 +775,8 @@ class SSEManager:
             )
 
             # Notify HA of update
-            self.coordinator.async_set_updated_data(self.coordinator.account)
+            if self.coordinator.account is not None:
+                self.coordinator.async_set_updated_data(self.coordinator.account)
 
         except Exception as err:
             _LOGGER.debug("Error resetting video detection: %s", err)

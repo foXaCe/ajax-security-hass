@@ -12,6 +12,7 @@ from typing import Any
 from homeassistant.components.device_tracker import SourceType
 from homeassistant.components.device_tracker.config_entry import TrackerEntity
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
@@ -29,6 +30,9 @@ async def async_setup_entry(
 ) -> None:
     """Set up Ajax device trackers from a config entry."""
     coordinator = entry.runtime_data
+
+    if coordinator.account is None:
+        return
 
     entities: list[AjaxHubTracker] = []
 
@@ -52,6 +56,8 @@ async def async_setup_entry(
 
 class AjaxHubTracker(CoordinatorEntity[AjaxDataCoordinator], TrackerEntity):
     """Device tracker for Ajax Hub location."""
+
+    __slots__ = ("_space_id",)
 
     _attr_has_entity_name = True
 
@@ -130,17 +136,17 @@ class AjaxHubTracker(CoordinatorEntity[AjaxDataCoordinator], TrackerEntity):
         }
 
     @property
-    def device_info(self) -> dict[str, Any]:
+    def device_info(self) -> DeviceInfo | None:
         """Return device information."""
         space = self.coordinator.get_space(self._space_id)
         if not space:
-            return {}
+            return None
 
-        return {
-            "identifiers": {(DOMAIN, self._space_id)},
-            "name": "Ajax Hub" if space.name == "Hub" else space.name,
-            "manufacturer": MANUFACTURER,
-        }
+        return DeviceInfo(
+            identifiers={(DOMAIN, self._space_id)},
+            name="Ajax Hub" if space.name == "Hub" else space.name,
+            manufacturer=MANUFACTURER,
+        )
 
     @callback
     def _handle_coordinator_update(self) -> None:

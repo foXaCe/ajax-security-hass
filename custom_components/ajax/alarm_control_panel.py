@@ -12,6 +12,7 @@ from homeassistant.components.alarm_control_panel import (
 )
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
@@ -31,7 +32,7 @@ async def async_setup_entry(
     """Set up Ajax alarm control panels from a config entry."""
     coordinator = entry.runtime_data
 
-    entities = []
+    entities: list[AlarmControlPanelEntity] = []
 
     if coordinator.account:
         for space_id, space in coordinator.account.spaces.items():
@@ -64,6 +65,8 @@ class AjaxAlarmControlPanel(CoordinatorEntity[AjaxDataCoordinator], AlarmControl
     from "unavailable" back to its normal state.
     """
 
+    __slots__ = ("_entry", "_space_id", "_device_info_updated")
+
     _attr_has_entity_name = True
     _attr_name = None  # Use device name as entity name (main entity)
     _attr_supported_features = AlarmControlPanelEntityFeature.ARM_AWAY | AlarmControlPanelEntityFeature.ARM_NIGHT
@@ -78,11 +81,11 @@ class AjaxAlarmControlPanel(CoordinatorEntity[AjaxDataCoordinator], AlarmControl
         self._attr_unique_id = f"{entry.entry_id}_alarm_{space_id}"
 
     @property
-    def device_info(self) -> dict[str, Any]:
+    def device_info(self) -> DeviceInfo | None:
         """Return device information."""
         space = self.coordinator.get_space(self._space_id)
         if not space:
-            return {}
+            return None
 
         # Get hub subtype and color for model name
         hub_subtype = space.hub_details.get("hubSubtype", "Security Hub") if space.hub_details else "Security Hub"
@@ -95,27 +98,30 @@ class AjaxAlarmControlPanel(CoordinatorEntity[AjaxDataCoordinator], AlarmControl
 
         model_name = f"{hub_subtype_formatted} ({color_name})" if color_name else hub_subtype_formatted
 
-        device_info = {
-            "identifiers": {(DOMAIN, self._space_id)},
-            "name": space.name,
-            "manufacturer": MANUFACTURER,
-            "model": model_name,
-        }
+        sw_version: str | None = None
+        hw_version: str | None = None
 
         # Add firmware version if available
         if space.hub_details and space.hub_details.get("firmware"):
             firmware = space.hub_details["firmware"]
             if firmware.get("version"):
-                device_info["sw_version"] = firmware["version"]
+                sw_version = firmware["version"]
 
         # Add hardware version - just PCB version for simplicity
         if space.hub_details and space.hub_details.get("hardwareVersions"):
             hw_versions = space.hub_details["hardwareVersions"]
             pcb_version = hw_versions.get("pcb")
             if pcb_version:
-                device_info["hw_version"] = f"PCB rev.{pcb_version}"
+                hw_version = f"PCB rev.{pcb_version}"
 
-        return device_info
+        return DeviceInfo(
+            identifiers={(DOMAIN, self._space_id)},
+            name=space.name,
+            manufacturer=MANUFACTURER,
+            model=model_name,
+            sw_version=sw_version,
+            hw_version=hw_version,
+        )
 
     @property
     def alarm_state(self) -> AlarmControlPanelState | None:
@@ -290,7 +296,7 @@ class AjaxAlarmControlPanel(CoordinatorEntity[AjaxDataCoordinator], AlarmControl
         if not space:
             return {}
 
-        attributes = {
+        attributes: dict[str, Any] = {
             "space_id": space.id,
             "space_name": space.name,
             "hub_id": space.hub_id,
@@ -335,6 +341,8 @@ class AjaxGroupAlarmControlPanel(CoordinatorEntity[AjaxDataCoordinator], AlarmCo
     allowing users to arm/disarm individual groups independently.
     """
 
+    __slots__ = ("_entry", "_space_id", "_group_id")
+
     _attr_has_entity_name = True
     _attr_supported_features = AlarmControlPanelEntityFeature.ARM_AWAY
     _attr_code_arm_required = False
@@ -359,11 +367,11 @@ class AjaxGroupAlarmControlPanel(CoordinatorEntity[AjaxDataCoordinator], AlarmCo
         self._attr_name = group.name if group else "Group"
 
     @property
-    def device_info(self) -> dict[str, Any]:
+    def device_info(self) -> DeviceInfo:
         """Return device information - link to the hub device."""
-        return {
-            "identifiers": {(DOMAIN, self._space_id)},
-        }
+        return DeviceInfo(
+            identifiers={(DOMAIN, self._space_id)},
+        )
 
     @property
     def alarm_state(self) -> AlarmControlPanelState | None:

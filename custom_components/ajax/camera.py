@@ -14,6 +14,7 @@ from urllib.parse import quote
 from homeassistant.components.camera import Camera, CameraEntityFeature
 from homeassistant.components.ffmpeg import get_ffmpeg_manager
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
@@ -122,6 +123,19 @@ async def async_setup_entry(
 class AjaxVideoEdgeCamera(CoordinatorEntity[AjaxDataCoordinator], Camera):
     """Camera entity for Ajax Video Edge devices."""
 
+    __slots__ = (
+        "_entry",
+        "_video_edge_id",
+        "_space_id",
+        "_stream_type",
+        "_channel_index",
+        "_channel_id",
+        "_model_name",
+        "_color",
+        "_snapshot_cache",
+        "_snapshot_cache_time",
+    )
+
     _attr_has_entity_name = True
     _attr_supported_features = CameraEntityFeature.STREAM
     _attr_use_stream_for_stills = True  # Use RTSP stream for snapshot images
@@ -195,11 +209,11 @@ class AjaxVideoEdgeCamera(CoordinatorEntity[AjaxDataCoordinator], Camera):
         return video_edge.connection_state == "ONLINE"
 
     @property
-    def device_info(self) -> dict:
+    def device_info(self) -> DeviceInfo | None:
         """Return device information."""
         video_edge = self._video_edge
         if not video_edge:
-            return {}
+            return None
 
         model_display = f"{self._model_name} ({self._color})" if self._color else self._model_name
 
@@ -210,14 +224,14 @@ class AjaxVideoEdgeCamera(CoordinatorEntity[AjaxDataCoordinator], Camera):
         if nvr_id:
             via_device_id = nvr_id
 
-        return {
-            "identifiers": {(DOMAIN, video_edge.id)},
-            "name": video_edge.name,
-            "manufacturer": MANUFACTURER,
-            "model": model_display,
-            "via_device": (DOMAIN, via_device_id),
-            "sw_version": video_edge.firmware_version,
-        }
+        return DeviceInfo(
+            identifiers={(DOMAIN, video_edge.id)},
+            name=video_edge.name,
+            manufacturer=MANUFACTURER,
+            model=model_display,
+            via_device=(DOMAIN, via_device_id),
+            sw_version=video_edge.firmware_version,
+        )
 
     def _get_recording_nvr_id(self) -> str | None:
         """Get the ID of the NVR that records this camera (if any).

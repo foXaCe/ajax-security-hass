@@ -19,7 +19,7 @@ import contextlib
 import logging
 import time
 from datetime import UTC, datetime, timedelta
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed
@@ -55,38 +55,46 @@ from .models import (
     VideoEdgeType,
 )
 
-# Optional SQS support
-try:
-    from .sqs_client import AjaxSQSClient
+# Type imports for optional modules (for type checking only)
+if TYPE_CHECKING:
+    from .onvif_client import OnvifDetectionEvent
+    from .onvif_manager import AjaxOnvifManager
     from .sqs_manager import SQSManager
+    from .sse_manager import SSEManager
+
+# Optional SQS support
+SQS_AVAILABLE = False
+_SQSManager: type | None = None
+_AjaxSQSClient: type | None = None
+try:
+    from .sqs_client import AjaxSQSClient as _AjaxSQSClient
+    from .sqs_manager import SQSManager as _SQSManager
 
     SQS_AVAILABLE = True
 except ImportError:
-    SQS_AVAILABLE = False
-    SQSManager = None
-    AjaxSQSClient = None
+    pass
 
 # Optional SSE support (for proxy mode)
+SSE_AVAILABLE = False
+_SSEManager: type | None = None
+_AjaxSSEClient: type | None = None
 try:
-    from .sse_client import AjaxSSEClient
-    from .sse_manager import SSEManager
+    from .sse_client import AjaxSSEClient as _AjaxSSEClient
+    from .sse_manager import SSEManager as _SSEManager
 
     SSE_AVAILABLE = True
 except ImportError:
-    SSE_AVAILABLE = False
-    SSEManager = None
-    AjaxSSEClient = None
+    pass
 
 # Optional ONVIF support (for local AI detections)
+ONVIF_AVAILABLE = False
+_AjaxOnvifManager: type | None = None
 try:
-    from .onvif_client import OnvifDetectionEvent
-    from .onvif_manager import AjaxOnvifManager
+    from .onvif_manager import AjaxOnvifManager as _AjaxOnvifManager
 
     ONVIF_AVAILABLE = True
 except ImportError:
-    ONVIF_AVAILABLE = False
-    AjaxOnvifManager = None
-    OnvifDetectionEvent = None
+    pass
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -295,6 +303,9 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
                     if not contact_sensors:
                         continue
 
+                    if not space.hub_id:
+                        continue
+
                     try:
                         # Get all devices with enriched data (includes reedClosed)
                         devices_data = await self.api.async_get_devices(space.hub_id, enrich=True)
@@ -340,7 +351,7 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
                                         # Try attributes as fallback
                                         api_attrs = device_data.get("attributes", {})
                                         normalized_attrs = self._normalize_device_attributes(api_attrs, device.type)
-                                        new_door_state = normalized_attrs.get("door_opened", old_door_state)
+                                        new_door_state = bool(normalized_attrs.get("door_opened", old_door_state))
 
                                     if old_door_state != new_door_state:
                                         device.attributes["door_opened"] = new_door_state
@@ -410,6 +421,9 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
             if self.account is None:
                 await self._async_init_account()
 
+            # After init, account must exist
+            assert self.account is not None, "Account should be initialized"
+
             # Only do full data load on first run or manual reload
             if not self._initial_load_done:
                 # Full update - use hubs endpoint directly to get hubId
@@ -467,12 +481,12 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
                 await self._async_update_spaces_from_hubs(full_refresh=need_metadata_refresh)
 
                 for space_id in self.account.spaces:
-                    space = self.account.spaces.get(space_id)
-                    if space:
-                        self._reset_expired_motion_detections(space)
+                    space_obj: AjaxSpace | None = self.account.spaces.get(space_id)
+                    if space_obj:
+                        self._reset_expired_motion_detections(space_obj)
                         await self._async_update_devices(space_id)
                         # Refresh video edges to get AI detection states
-                        if space.video_edges:
+                        if space_obj.video_edges:
                             await self._async_update_video_edges(space_id)
 
             return self.account
@@ -495,8 +509,10 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
                     break
 
                 try:
+                    if self.account is None:
+                        break
                     space = self.account.spaces.get(space_id)
-                    if not space:
+                    if not space or not space.hub_id:
                         break
                     devices_data = await self.api.async_get_devices(space.hub_id)
 
@@ -516,6 +532,7 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
                                 door_opened = device.attributes.get("door_opened", False)
 
                                 if not door_opened:
+                                    assert self.account is not None
                                     self.async_set_updated_data(self.account)
                                     if device_id in self._fast_poll_tasks:
                                         del self._fast_poll_tasks[device_id]
@@ -578,7 +595,9 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
             _LOGGER.info("Initializing AWS SQS for real-time events...")
 
             # Create SQS client with HA's event loop for thread-safe callbacks
-            sqs_client = AjaxSQSClient(
+            assert _AjaxSQSClient is not None  # Validated by SQS_AVAILABLE check above
+            assert _SQSManager is not None
+            sqs_client = _AjaxSQSClient(
                 aws_access_key_id=self._aws_access_key_id,
                 aws_secret_access_key=self._aws_secret_access_key,
                 queue_name=self._queue_name,
@@ -586,7 +605,7 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
             )
 
             # Create SQS manager
-            self.sqs_manager = SQSManager(
+            self.sqs_manager = _SQSManager(
                 coordinator=self,
                 sqs_client=sqs_client,
             )
@@ -649,15 +668,17 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
             _LOGGER.info("Initializing SSE for real-time events...")
 
             # Create SSE client
-            sse_client = AjaxSSEClient(
+            assert _AjaxSSEClient is not None  # Validated by SSE_AVAILABLE check above
+            assert _SSEManager is not None
+            sse_client = _AjaxSSEClient(
                 sse_url=self._sse_url,
-                session_token=self.api.session_token,
+                session_token=self.api.session_token or "",
                 callback=lambda event: None,  # Will be set by manager
                 hass_loop=self.hass.loop,
             )
 
             # Create SSE manager
-            self.sse_manager = SSEManager(
+            self.sse_manager = _SSEManager(
                 coordinator=self,
                 sse_client=sse_client,
             )
@@ -724,6 +745,10 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
             return
 
         # Collect all video edges with IP addresses
+        if self.account is None:
+            self._onvif_initialized = True
+            return
+
         video_edges = []
         for space in self.account.spaces.values():
             for video_edge in space.video_edges.values():
@@ -739,7 +764,8 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
             _LOGGER.info("Initializing ONVIF for local AI detections...")
 
             # Create ONVIF manager with event callback
-            self.onvif_manager = AjaxOnvifManager(
+            assert _AjaxOnvifManager is not None  # Validated by ONVIF_AVAILABLE check above
+            self.onvif_manager = _AjaxOnvifManager(
                 username=username,
                 password=password,
                 event_callback=self._handle_onvif_event,
@@ -880,6 +906,9 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
             full_refresh: If True, fetch all metadata (rooms, users, groups).
                          If False, only fetch hub state (light polling).
         """
+        if self.account is None:
+            return
+
         hubs_data = await self.api.async_get_hubs()
 
         for hub_data in hubs_data:
@@ -897,7 +926,7 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
             try:
                 space_binding = await self.api.async_get_space_by_hub(hub_id)
                 if space_binding and space_binding.get("name"):
-                    hub_name = space_binding.get("name")
+                    hub_name = str(space_binding.get("name"))
                     self.all_discovered_spaces[hub_id] = hub_name
             except Exception:  # noqa: S110
                 pass  # Keep the fallback name
@@ -1143,8 +1172,10 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
 
     async def _async_update_devices(self, space_id: str) -> None:
         """Update devices for a specific space."""
+        if self.account is None:
+            return
         space = self.account.spaces.get(space_id)
-        if not space:
+        if not space or not space.hub_id:
             return
 
         # Get all devices with full details in one API call (enrich=True)
@@ -1750,6 +1781,8 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
 
     async def _async_update_notifications(self, space_id: str, limit: int = 50) -> None:
         """Update notifications for a specific space."""
+        if self.account is None:
+            return
         space = self.account.spaces.get(space_id)
         if not space:
             return
@@ -1758,7 +1791,7 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
             # TODO: Fetch notifications from API when endpoint is available
             # For now, notifications come from SQS real-time events
             # notifications_data = await self.api.async_find_notifications(space_id, limit)
-            notifications_data = []
+            notifications_data: list[dict[str, Any]] = []
 
             # Clear existing notifications and add new ones
             space.notifications.clear()
@@ -1797,6 +1830,8 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
 
     async def _async_update_video_edges(self, space_id: str) -> None:
         """Update video edge devices (surveillance cameras) for a specific space."""
+        if self.account is None:
+            return
         space = self.account.spaces.get(space_id)
         if not space:
             return
@@ -1975,7 +2010,7 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
             event_name = "ajax_security_state_changed"
 
         # Prepare event data
-        event_data = {
+        event_data: dict[str, Any] = {
             "space_id": space.id,
             "space_name": space.name,
             "old_state": old_state.value,
@@ -2459,7 +2494,7 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
         _LOGGER.warning("PANIC BUTTON pressed for space %s", space_id)
 
         try:
-            await self.api.async_press_panic_button(space_id)
+            await self.api.async_press_panic_button(space_id)  # type: ignore[attr-defined]
             # No state update needed, panic is instantaneous
 
         except AjaxRestApiError as err:

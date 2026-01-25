@@ -893,10 +893,9 @@ class AjaxRestApi:
         url = f"{self._get_base_url()}/user/{self.user_id}/hubs/{hub_id}/cameras/{camera_id}/snapshot"
         session = await self._get_session()
 
-        headers = {
-            **self._base_headers,
-            "X-Session-Token": self.session_token,
-        }
+        headers: dict[str, str] = {k: v for k, v in self._base_headers.items() if v is not None}
+        if self.session_token:
+            headers["X-Session-Token"] = self.session_token
 
         async with session.get(url, headers=headers) as response:
             response.raise_for_status()
@@ -1019,7 +1018,7 @@ class AjaxRestApi:
         Returns:
             Updated light state
         """
-        payload = {"state": "on" if state else "off"}
+        payload: dict[str, str | int] = {"state": "on" if state else "off"}
         if brightness is not None:
             payload["brightness"] = brightness
         return await self._request("POST", f"devices/{device_id}/control", payload)

@@ -10,6 +10,7 @@ from typing import Any
 
 from homeassistant.components.valve import ValveEntity, ValveEntityFeature
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
@@ -34,6 +35,9 @@ async def async_setup_entry(
 ) -> None:
     """Set up Ajax valves from a config entry."""
     coordinator = entry.runtime_data
+
+    if coordinator.account is None:
+        return
 
     entities: list[ValveEntity] = []
 
@@ -69,6 +73,8 @@ async def async_setup_entry(
 
 class AjaxValve(CoordinatorEntity[AjaxDataCoordinator], ValveEntity):
     """Representation of an Ajax valve (WaterStop)."""
+
+    __slots__ = ("_space_id", "_device_id", "_valve_key", "_valve_desc")
 
     _attr_has_entity_name = True
     _attr_supported_features = ValveEntityFeature.OPEN | ValveEntityFeature.CLOSE
@@ -151,6 +157,10 @@ class AjaxValve(CoordinatorEntity[AjaxDataCoordinator], ValveEntity):
             _LOGGER.error("Space or device not found for valve %s", self._valve_key)
             return
 
+        if not space.hub_id:
+            _LOGGER.error("Hub ID not found for space %s", self._space_id)
+            return
+
         # Optimistic update
         old_value = device.attributes.get("valveState")
         device.attributes["valveState"] = "OPEN" if open_valve else "CLOSED"
@@ -199,24 +209,21 @@ class AjaxValve(CoordinatorEntity[AjaxDataCoordinator], ValveEntity):
         return attrs
 
     @property
-    def device_info(self) -> dict[str, Any]:
+    def device_info(self) -> DeviceInfo | None:
         """Return device information."""
         device = self._get_device()
         if not device:
-            return {}
+            return None
 
-        info = {
-            "identifiers": {(DOMAIN, self._device_id)},
-            "name": device.name,
-            "manufacturer": MANUFACTURER,
-            "model": "WaterStop",
-            "via_device": (DOMAIN, self._space_id),
-            "sw_version": device.attributes.get("firmwareVersion"),
-        }
-        # Auto-assign device to HA Area based on Ajax room
-        if device.room_name:
-            info["suggested_area"] = device.room_name
-        return info
+        return DeviceInfo(
+            identifiers={(DOMAIN, self._device_id)},
+            name=device.name,
+            manufacturer=MANUFACTURER,
+            model="WaterStop",
+            via_device=(DOMAIN, self._space_id),
+            sw_version=device.attributes.get("firmwareVersion"),
+            suggested_area=device.room_name,
+        )
 
     def _get_device(self) -> AjaxDevice | None:
         """Get the device from coordinator data."""

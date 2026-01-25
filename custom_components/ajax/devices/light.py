@@ -150,12 +150,14 @@ class LightHandler(AjaxDeviceHandler):
         else:
             brightness_percent = 100
 
-        await self.device.coordinator.api.async_set_light_state(
-            self.device.device_id, state=True, brightness=brightness_percent
+        await self.device.coordinator.api.async_set_light_state(  # type: ignore[attr-defined]
+            self.device.id,
+            state=True,
+            brightness=brightness_percent,  # type: ignore[attr-defined]
         )
-        await self.device.coordinator.async_request_refresh()
+        await self.device.coordinator.async_request_refresh()  # type: ignore[attr-defined]
 
     async def _async_turn_off(self) -> None:
         """Turn the light off."""
-        await self.device.coordinator.api.async_set_light_state(self.device.device_id, state=False)
-        await self.device.coordinator.async_request_refresh()
+        await self.device.coordinator.api.async_set_light_state(self.device.id, state=False)  # type: ignore[attr-defined]
+        await self.device.coordinator.async_request_refresh()  # type: ignore[attr-defined]

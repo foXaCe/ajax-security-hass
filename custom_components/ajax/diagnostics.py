@@ -113,8 +113,8 @@ async def get_ajax_raw_data(
                     )
 
         type_counts: dict[str, int] = {}
-        for device in all_devices:
-            dtype = device.get("deviceType", "unknown")
+        for device_data in all_devices:
+            dtype = device_data.get("deviceType", "unknown")
             type_counts[dtype] = type_counts.get(dtype, 0) + 1
         type_list = dict(sorted(type_counts.items()))
 

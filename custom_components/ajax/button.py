@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import logging
-from typing import Any
 
 from homeassistant.components.button import ButtonDeviceClass, ButtonEntity
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
@@ -42,6 +42,8 @@ async def async_setup_entry(
 class AjaxPanicButton(CoordinatorEntity[AjaxDataCoordinator], ButtonEntity):
     """Representation of an Ajax panic button."""
 
+    __slots__ = ("_entry", "_space_id")
+
     _attr_device_class = ButtonDeviceClass.IDENTIFY
 
     def __init__(self, coordinator: AjaxDataCoordinator, entry: AjaxConfigEntry, space_id: str) -> None:
@@ -65,16 +67,15 @@ class AjaxPanicButton(CoordinatorEntity[AjaxDataCoordinator], ButtonEntity):
             raise
 
     @property
-    def device_info(self) -> dict[str, Any]:
+    def device_info(self) -> DeviceInfo | None:
         """Return device information."""
         space = self.coordinator.get_space(self._space_id)
         if not space:
-            return {}
+            return None
 
-        return {
-            "identifiers": {(DOMAIN, self._space_id)},
-            "name": space.name,
-            "manufacturer": MANUFACTURER,
-            "model": "Security Hub",
-            "sw_version": None,  # TODO: Add hub firmware version when available
-        }
+        return DeviceInfo(
+            identifiers={(DOMAIN, self._space_id)},
+            name=space.name,
+            manufacturer=MANUFACTURER,
+            model="Security Hub",
+        )

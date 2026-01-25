@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import voluptuous as vol
 from homeassistant.components.persistent_notification import async_create
@@ -93,8 +93,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: AjaxConfigEntry) -> bool
     password_hash = entry.data[CONF_PASSWORD]  # Already hashed in config_flow
 
     # Variables for different modes
-    api_key = None
-    proxy_url = None
+    api_key: str | None = None
+    proxy_url: str | None = None
     proxy_mode = None
     sse_url = None
     aws_access_key_id = None
@@ -117,8 +117,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: AjaxConfigEntry) -> bool
 
     # Create REST API instance with HA session for connection reuse
     # password_is_hashed=True because we store only SHA256 hash, never plain password
+    # Note: api_key can be None for proxy mode (fetched during login)
     api = AjaxRestApi(
-        api_key=api_key,
+        api_key=api_key or "",  # type: ignore[arg-type]
         email=email,
         password=password_hash,
         password_is_hashed=True,  # Password is already SHA256 hash
@@ -490,17 +491,18 @@ async def _async_setup_services(hass: HomeAssistant) -> None:
         coordinator = entry.runtime_data
 
         # Find NVRs and their cameras
-        nvr_data = []
+        nvr_data: list[dict[str, Any]] = []
 
         for _space_id, space in coordinator.data.spaces.items():
             for ve_id, video_edge in space.video_edges.items():
                 if video_edge.video_edge_type.value == "NVR":
                     # Found an NVR
-                    nvr_info = {
+                    recordings_list: list[dict[str, Any]] = []
+                    nvr_info: dict[str, Any] = {
                         "nvr_id": ve_id,
                         "nvr_name": video_edge.name,
                         "channels": video_edge.channels or [],
-                        "recordings": [],
+                        "recordings": recordings_list,
                     }
 
                     # Get recordings for the last 24 hours
@@ -596,6 +598,10 @@ async def _async_setup_areas(hass: HomeAssistant, coordinator: AjaxDataCoordinat
     # Collect all rooms from all spaces
     rooms_created = 0
     devices_assigned = 0
+
+    if coordinator.account is None:
+        _LOGGER.warning("Cannot sync rooms: coordinator.account is None")
+        return
 
     for _space_id, space in coordinator.account.spaces.items():
         # Get rooms map from space

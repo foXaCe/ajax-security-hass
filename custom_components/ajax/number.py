@@ -8,12 +8,12 @@ This module creates number entities for Ajax device settings like:
 from __future__ import annotations
 
 import logging
-from typing import Any
 
 from homeassistant.components.number import NumberEntity, NumberMode
 from homeassistant.const import UnitOfElectricCurrent
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
+from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -45,6 +45,9 @@ async def async_setup_entry(
 ) -> None:
     """Set up Ajax number entities from a config entry."""
     coordinator = entry.runtime_data
+
+    if coordinator.account is None:
+        return
 
     entities: list[NumberEntity] = []
 
@@ -87,6 +90,8 @@ async def async_setup_entry(
 class AjaxDoorPlusBaseNumber(CoordinatorEntity[AjaxDataCoordinator], NumberEntity):
     """Base class for DoorProtect Plus number entities."""
 
+    __slots__ = ("_space_id", "_device_id")
+
     _attr_has_entity_name = True
     _attr_mode = NumberMode.SLIDER
 
@@ -105,8 +110,8 @@ class AjaxDoorPlusBaseNumber(CoordinatorEntity[AjaxDataCoordinator], NumberEntit
         return device.online if device else False
 
     @property
-    def device_info(self) -> dict[str, Any]:
-        return {"identifiers": {(DOMAIN, self._device_id)}}
+    def device_info(self) -> DeviceInfo:
+        return DeviceInfo(identifiers={(DOMAIN, self._device_id)})
 
     @callback
     def _handle_coordinator_update(self) -> None:
@@ -149,6 +154,9 @@ class AjaxTiltDegreesNumber(AjaxDoorPlusBaseNumber):
                 translation_key="system_armed",
             )
 
+        if not space.hub_id:
+            raise HomeAssistantError("hub_not_found")
+
         try:
             await self.coordinator.api.async_update_device(
                 space.hub_id, self._device_id, {"accelerometerTiltDegrees": int(value)}
@@ -165,13 +173,15 @@ class AjaxTiltDegreesNumber(AjaxDoorPlusBaseNumber):
                 translation_key="failed_to_change",
                 translation_placeholders={
                     "entity": "accelerometer tilt degrees",
-                    "error": err,
+                    "error": str(err),
                 },
             ) from err
 
 
 class AjaxCurrentThresholdNumber(CoordinatorEntity[AjaxDataCoordinator], NumberEntity):
     """Number entity for socket current threshold (protection limit)."""
+
+    __slots__ = ("_space_id", "_device_id")
 
     _attr_has_entity_name = True
     _attr_mode = NumberMode.SLIDER
@@ -198,8 +208,8 @@ class AjaxCurrentThresholdNumber(CoordinatorEntity[AjaxDataCoordinator], NumberE
         return device.online if device else False
 
     @property
-    def device_info(self) -> dict[str, Any]:
-        return {"identifiers": {(DOMAIN, self._device_id)}}
+    def device_info(self) -> DeviceInfo:
+        return DeviceInfo(identifiers={(DOMAIN, self._device_id)})
 
     @property
     def native_value(self) -> float | None:
@@ -220,6 +230,9 @@ class AjaxCurrentThresholdNumber(CoordinatorEntity[AjaxDataCoordinator], NumberE
                 translation_domain=DOMAIN,
                 translation_key="space_not_found",
             )
+
+        if not space.hub_id:
+            raise HomeAssistantError("hub_not_found")
 
         try:
             await self.coordinator.api.async_update_device(
@@ -244,6 +257,8 @@ class AjaxCurrentThresholdNumber(CoordinatorEntity[AjaxDataCoordinator], NumberE
 
 class AjaxLedBrightnessV2Number(CoordinatorEntity[AjaxDataCoordinator], NumberEntity):
     """Number entity for SocketOutlet LED brightness (1-8 scale)."""
+
+    __slots__ = ("_space_id", "_device_id")
 
     _attr_has_entity_name = True
     _attr_mode = NumberMode.SLIDER
@@ -272,8 +287,8 @@ class AjaxLedBrightnessV2Number(CoordinatorEntity[AjaxDataCoordinator], NumberEn
         return device.attributes.get("indicationMode") != "DISABLED"
 
     @property
-    def device_info(self) -> dict[str, Any]:
-        return {"identifiers": {(DOMAIN, self._device_id)}}
+    def device_info(self) -> DeviceInfo:
+        return DeviceInfo(identifiers={(DOMAIN, self._device_id)})
 
     @property
     def native_value(self) -> float | None:
@@ -294,6 +309,9 @@ class AjaxLedBrightnessV2Number(CoordinatorEntity[AjaxDataCoordinator], NumberEn
                 translation_domain=DOMAIN,
                 translation_key="space_not_found",
             )
+
+        if not space.hub_id:
+            raise HomeAssistantError("hub_not_found")
 
         try:
             await self.coordinator.api.async_update_device(

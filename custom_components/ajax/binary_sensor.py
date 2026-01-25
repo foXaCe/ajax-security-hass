@@ -16,6 +16,7 @@ from homeassistant.components.binary_sensor import (
 )
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
@@ -91,7 +92,10 @@ async def async_setup_entry(
     """Set up Ajax binary sensor platform."""
     coordinator = entry.runtime_data
 
-    entities = []
+    if coordinator.account is None:
+        return
+
+    entities: list[BinarySensorEntity] = []
     seen_unique_ids: set[str] = set()
 
     # Create binary sensors for all devices using handlers
@@ -99,7 +103,7 @@ async def async_setup_entry(
         for device_id, device in space.devices.items():
             handler_class = DEVICE_HANDLERS.get(device.type)
             if handler_class:
-                handler = handler_class(device)
+                handler = handler_class(device)  # type: ignore[abstract]
                 binary_sensors = handler.get_binary_sensors()
 
                 for sensor_desc in binary_sensors:
@@ -135,7 +139,7 @@ async def async_setup_entry(
         # Pass all video edges so we can find NVR links for each camera
         all_video_edges = space.video_edges
         for ve_id, video_edge in all_video_edges.items():
-            handler = VideoEdgeHandler(video_edge, all_video_edges)
+            handler = VideoEdgeHandler(video_edge, all_video_edges)  # type: ignore[assignment]
             binary_sensors = handler.get_binary_sensors()
 
             for sensor_desc in binary_sensors:
@@ -317,11 +321,11 @@ class AjaxBinarySensor(CoordinatorEntity[AjaxDataCoordinator], BinarySensorEntit
         )
 
     @property
-    def device_info(self) -> dict[str, Any]:
+    def device_info(self) -> DeviceInfo | None:
         """Return device information."""
         device = self._get_device()
         if not device:
-            return {}
+            return None
 
         # Get model name - use raw_type from API (e.g., "DoorProtect Plus")
         model_name = device.raw_type or device.type.value.replace("_", " ").title()
@@ -330,19 +334,16 @@ class AjaxBinarySensor(CoordinatorEntity[AjaxDataCoordinator], BinarySensorEntit
             color = str(device.device_color).title()
             model_name = f"{model_name} ({color})"
 
-        info = {
-            "identifiers": {(DOMAIN, self._device_id)},
-            "name": device.name,
-            "manufacturer": MANUFACTURER,
-            "model": model_name,
-            "via_device": (DOMAIN, self._space_id),
-            "sw_version": device.firmware_version,
-            "hw_version": device.hardware_version,
-        }
-        # Auto-assign device to HA Area based on Ajax room
-        if device.room_name:
-            info["suggested_area"] = device.room_name
-        return info
+        return DeviceInfo(
+            identifiers={(DOMAIN, self._device_id)},
+            name=device.name,
+            manufacturer=MANUFACTURER,
+            model=model_name,
+            via_device=(DOMAIN, self._space_id),
+            sw_version=device.firmware_version,
+            hw_version=device.hardware_version,
+            suggested_area=device.room_name,
+        )
 
     def _get_device(self) -> AjaxDevice | None:
         """Get the device from coordinator data."""
@@ -354,6 +355,8 @@ class AjaxBinarySensor(CoordinatorEntity[AjaxDataCoordinator], BinarySensorEntit
 
 class AjaxVideoEdgeBinarySensor(CoordinatorEntity[AjaxDataCoordinator], BinarySensorEntity):
     """Representation of an Ajax Video Edge binary sensor."""
+
+    __slots__ = ("_space_id", "_video_edge_id", "_sensor_key", "_sensor_desc")
 
     _attr_has_entity_name = True
 
@@ -421,11 +424,11 @@ class AjaxVideoEdgeBinarySensor(CoordinatorEntity[AjaxDataCoordinator], BinarySe
         return attrs if attrs else None
 
     @property
-    def device_info(self) -> dict[str, Any]:
+    def device_info(self) -> DeviceInfo | None:
         """Return device information."""
         video_edge = self._get_video_edge()
         if not video_edge:
-            return {}
+            return None
 
         # Use human-readable model name
         model_name = VIDEO_EDGE_MODEL_NAMES.get(video_edge.video_edge_type, video_edge.video_edge_type.value)
@@ -439,17 +442,15 @@ class AjaxVideoEdgeBinarySensor(CoordinatorEntity[AjaxDataCoordinator], BinarySe
         if nvr_id:
             via_device_id = nvr_id
 
-        info = {
-            "identifiers": {(DOMAIN, self._video_edge_id)},
-            "name": video_edge.name,
-            "manufacturer": MANUFACTURER,
-            "model": model_name,
-            "via_device": (DOMAIN, via_device_id),
-            "sw_version": video_edge.firmware_version,
-        }
-        if video_edge.room_name:
-            info["suggested_area"] = video_edge.room_name
-        return info
+        return DeviceInfo(
+            identifiers={(DOMAIN, self._video_edge_id)},
+            name=video_edge.name,
+            manufacturer=MANUFACTURER,
+            model=model_name,
+            via_device=(DOMAIN, via_device_id),
+            sw_version=video_edge.firmware_version,
+            suggested_area=video_edge.room_name,
+        )
 
     def _get_video_edge(self) -> AjaxVideoEdge | None:
         """Get the video edge from coordinator data."""
@@ -510,10 +511,12 @@ class AjaxHubBinarySensor(CoordinatorEntity[AjaxDataCoordinator], BinarySensorEn
     not from a device in space.devices.
     """
 
+    __slots__ = ("_space_id", "_sensor_key", "_sensor_config")
+
     _attr_has_entity_name = True
 
     # Hub binary sensor definitions
-    HUB_BINARY_SENSORS = {
+    HUB_BINARY_SENSORS: dict[str, dict[str, Any]] = {
         "tamper": {
             "device_class": BinarySensorDeviceClass.TAMPER,
             "value_key": "tampered",
@@ -535,7 +538,7 @@ class AjaxHubBinarySensor(CoordinatorEntity[AjaxDataCoordinator], BinarySensorEn
         super().__init__(coordinator)
         self._space_id = space_id
         self._sensor_key = sensor_key
-        self._sensor_config = self.HUB_BINARY_SENSORS.get(sensor_key, {})
+        self._sensor_config: dict[str, Any] = self.HUB_BINARY_SENSORS.get(sensor_key, {})
 
         # Get space for hub_id
         space = coordinator.get_space(space_id)
@@ -579,13 +582,13 @@ class AjaxHubBinarySensor(CoordinatorEntity[AjaxDataCoordinator], BinarySensorEn
         return space is not None and space.hub_details is not None
 
     @property
-    def device_info(self) -> dict[str, Any]:
+    def device_info(self) -> DeviceInfo | None:
         """Return device information linking to the hub/space device."""
         space = self.coordinator.get_space(self._space_id)
         if not space:
-            return {}
+            return None
 
         # Link to the space device (hub)
-        return {
-            "identifiers": {(DOMAIN, self._space_id)},
-        }
+        return DeviceInfo(
+            identifiers={(DOMAIN, self._space_id)},
+        )

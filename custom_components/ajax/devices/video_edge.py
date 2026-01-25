@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from ..models import VideoEdgeType
 
@@ -672,7 +672,7 @@ class VideoEdgeHandler:
         Returns a list of dicts with NVR info: {id, name}.
         Used to add linked_nvr attribute to detection sensors.
         """
-        linked_nvrs = []
+        linked_nvrs: list[dict[str, Any]] = []
 
         # Only search for NVR links if this is a camera (not an NVR itself)
         if self.video_edge.video_edge_type.value == "NVR":

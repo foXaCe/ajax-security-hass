@@ -69,6 +69,16 @@
         "description": "Ваша сесія закінчилася. Будь ласка, введіть пароль для {email} ще раз.",
         "title": "Повторна автентифікація"
       },
+      "reconfigure": {
+        "data": {
+          "api_key": "API Key",
+          "email": "Email",
+          "password": "Password",
+          "proxy_url": "Proxy URL"
+        },
+        "description": "Update your Ajax credentials.",
+        "title": "Reconfigure Ajax"
+      },
       "select_spaces": {
         "data": {
           "enabled_spaces": "Увімкнені простори"
@@ -143,6 +153,13 @@
       "beep_on_delay": {
         "name": "Звук при затримці входу/виходу"
       },
+      "co2_problem": {
+        "name": "CO₂ level",
+        "state": {
+          "off": "Normal",
+          "on": "High CO₂"
+        }
+      },
       "connection": {
         "name": "Підключення хаба",
         "state": {
@@ -159,11 +176,28 @@
       "external_power": {
         "name": "Зовнішнє живлення"
       },
+      "externally_powered": {
+        "name": "External power"
+      },
       "glass_break": {
         "name": "Датчик розбиття скла"
       },
       "gsm_antenna": {
         "name": "GSM антена"
+      },
+      "high_temperature": {
+        "name": "High temperature",
+        "state": {
+          "off": "Normal",
+          "on": "Temperature threshold exceeded"
+        }
+      },
+      "humidity_problem": {
+        "name": "Humidity",
+        "state": {
+          "off": "Normal",
+          "on": "Out of range"
+        }
       },
       "jeweller_radio": {
         "name": "Jeweller радіо"
@@ -182,8 +216,22 @@
           }
         }
       },
+      "rapid_temperature_rise": {
+        "name": "Rapid temperature rise",
+        "state": {
+          "off": "Normal",
+          "on": "Rapid temperature increase detected"
+        }
+      },
       "shock": {
         "name": "Удар"
+      },
+      "steam": {
+        "name": "Steam detected",
+        "state": {
+          "off": "Clear",
+          "on": "Steam detected"
+        }
       },
       "system_problems": {
         "name": "Системні проблеми",
@@ -203,20 +251,64 @@
           }
         }
       },
+      "temperature_problem": {
+        "name": "Temperature",
+        "state": {
+          "off": "Normal",
+          "on": "Out of range"
+        }
+      },
       "tilt": {
         "name": "Нахил"
       },
+      "video_edge_lid_closed": {
+        "name": "Lid",
+        "state": {
+          "off": "Closed",
+          "on": "Open"
+        }
+      },
+      "video_edge_onvif_enabled": {
+        "name": "ONVIF integration",
+        "state": {
+          "off": "Disabled",
+          "on": "Enabled"
+        }
+      },
       "video_human": {
-        "name": "Виявлено людину"
+        "name": "Виявлено людину",
+        "state": {
+          "off": "None",
+          "on": "Human detected"
+        }
       },
       "video_motion": {
-        "name": "Виявлено рух"
+        "name": "Виявлено рух",
+        "state": {
+          "off": "None",
+          "on": "Motion detected"
+        }
       },
       "video_pet": {
-        "name": "Виявлено тварину"
+        "name": "Виявлено тварину",
+        "state": {
+          "off": "None",
+          "on": "Pet detected"
+        }
       },
       "video_vehicle": {
-        "name": "Виявлено транспорт"
+        "name": "Виявлено транспорт",
+        "state": {
+          "off": "None",
+          "on": "Vehicle detected"
+        }
+      },
+      "waterstop_temp_protect": {
+        "name": "Frost protection",
+        "state": {
+          "off": "Inactive",
+          "on": "Active"
+        }
       },
       "wings_radio": {
         "name": "Wings радіо"
@@ -233,17 +325,66 @@
       }
     },
     "number": {
+      "current_threshold": {
+        "name": "Current limit"
+      },
+      "led_brightness_level": {
+        "name": "LED brightness"
+      },
       "tilt_degrees": {
         "name": "Поріг нахилу"
       }
     },
     "select": {
+      "alarm_duration_select": {
+        "name": "Alarm duration",
+        "state": {
+          "1": "1 minute",
+          "10": "10 minutes",
+          "15": "15 minutes",
+          "2": "2 minutes",
+          "3": "3 minutes",
+          "5": "5 minutes"
+        }
+      },
+      "beep_volume": {
+        "name": "Beep volume",
+        "state": {
+          "loud": "Loud",
+          "quiet": "Quiet",
+          "very_loud": "Very loud"
+        }
+      },
+      "indication_mode": {
+        "name": "Backlight mode",
+        "state": {
+          "always": "Always on",
+          "if_on": "When active",
+          "off": "Off"
+        }
+      },
+      "led_brightness": {
+        "name": "LED brightness",
+        "state": {
+          "max": "High",
+          "min": "Low"
+        }
+      },
       "shock_sensitivity": {
         "name": "Чутливість до ударів",
         "state": {
           "high": "Висока",
           "low": "Низька",
           "normal": "Нормальна"
+        }
+      },
+      "siren_volume": {
+        "name": "Siren volume",
+        "state": {
+          "disabled": "Disabled",
+          "loud": "Loud",
+          "quiet": "Quiet",
+          "very_loud": "Very loud"
         }
       }
     },
@@ -288,6 +429,22 @@
           "very_loud": "Дуже гучно"
         }
       },
+      "button_brightness": {
+        "name": "Button LED brightness",
+        "state": {
+          "high": "High",
+          "low": "Low",
+          "off": "Off"
+        }
+      },
+      "button_mode": {
+        "name": "Button mode",
+        "state": {
+          "interconnect_delay": "Interconnect delay",
+          "panic_button": "Panic button",
+          "smart_button": "Smart button"
+        }
+      },
       "bypassed_devices": {
         "name": "Обхідні пристрої"
       },
@@ -309,6 +466,14 @@
       },
       "devices_with_malfunctions": {
         "name": "Пристрої з несправностями"
+      },
+      "false_press_filter": {
+        "name": "False press filter",
+        "state": {
+          "disabled": "Disabled",
+          "double_click": "Double click",
+          "long_push": "Long push"
+        }
       },
       "firmware_version": {
         "name": "Версія прошивки"
@@ -635,6 +800,9 @@
           }
         }
       },
+      "nvr_cameras": {
+        "name": "Cameras"
+      },
       "online_devices": {
         "name": "Онлайн пристрої"
       },
@@ -692,11 +860,105 @@
       "unread_notifications": {
         "name": "Непрочитані сповіщення"
       },
+      "video_edge_archive_depth": {
+        "name": "Archive duration"
+      },
+      "video_edge_connection": {
+        "name": "Connection",
+        "state": {
+          "offline": "Offline",
+          "online": "Online",
+          "unknown": "Unknown"
+        }
+      },
+      "video_edge_cpu_usage": {
+        "name": "CPU usage"
+      },
+      "video_edge_led_brightness": {
+        "name": "LED brightness"
+      },
+      "video_edge_max_preview_duration": {
+        "name": "Max preview duration"
+      },
+      "video_edge_ram_usage": {
+        "name": "RAM usage"
+      },
+      "video_edge_record_mode": {
+        "name": "Local recording",
+        "state": {
+          "disabled": "Disabled",
+          "on_detection": "On detection",
+          "permanent": "Permanent",
+          "unknown": "Unknown"
+        }
+      },
+      "video_edge_record_policy": {
+        "name": "NVR recording",
+        "state": {
+          "always": "Always",
+          "unknown": "Unknown",
+          "when_requested": "When requested"
+        }
+      },
+      "video_edge_storage_status": {
+        "name": "Storage status",
+        "state": {
+          "formatting": "Formatting",
+          "idle": "Idle",
+          "need_format": "Format required",
+          "none": "None",
+          "ready": "Ready"
+        }
+      },
+      "video_edge_storage_temperature": {
+        "name": "Storage temperature"
+      },
+      "video_edge_storage_total": {
+        "name": "Total storage"
+      },
+      "video_edge_uptime": {
+        "name": "Uptime"
+      },
+      "video_edge_wifi_signal": {
+        "name": "Camera WiFi signal"
+      },
+      "waterstop_external_power": {
+        "name": "Power source",
+        "state": {
+          "battery": "Battery",
+          "supply": "External power",
+          "unknown": "Unknown"
+        }
+      },
+      "waterstop_motor_state": {
+        "name": "Motor state",
+        "state": {
+          "off": "Stopped",
+          "on": "Running"
+        }
+      },
+      "waterstop_prevention_period": {
+        "name": "Prevention period"
+      },
+      "waterstop_prevention_status": {
+        "name": "Prevention",
+        "state": {
+          "disabled": "Disabled",
+          "enabled": "Enabled"
+        }
+      },
       "wifi_signal_level": {
         "name": "Сигнал Wi-Fi"
       }
     },
     "switch": {
+      "alert_if_moved": {
+        "name": "Alert if moved",
+        "state": {
+          "off": "Disabled",
+          "on": "Enabled"
+        }
+      },
       "alerts_by_sirens": {
         "name": "Тривоги через сирени",
         "state": {
@@ -753,6 +1015,20 @@
           "on": "Увімкнено"
         }
       },
+      "co_alarm_enabled": {
+        "name": "CO alarm",
+        "state": {
+          "off": "Disabled",
+          "on": "Enabled"
+        }
+      },
+      "current_protection": {
+        "name": "Current protection",
+        "state": {
+          "off": "Disabled",
+          "on": "Enabled"
+        }
+      },
       "external_contact_enabled": {
         "name": "Зовнішній контакт",
         "state": {
@@ -765,6 +1041,13 @@
         "state": {
           "off": "Вимкнено",
           "on": "Увімкнено"
+        }
+      },
+      "indication_enabled": {
+        "name": "LED indication",
+        "state": {
+          "off": "Disabled",
+          "on": "Enabled"
         }
       },
       "indicator_light": {
@@ -866,12 +1149,46 @@
           }
         }
       },
+      "temp_alarm_enabled": {
+        "name": "High temperature alarm",
+        "state": {
+          "off": "Disabled",
+          "on": "Enabled"
+        }
+      },
+      "temp_diff_alarm_enabled": {
+        "name": "Rapid temperature rise alarm",
+        "state": {
+          "off": "Disabled",
+          "on": "Enabled"
+        }
+      },
       "tilt_sensor": {
         "name": "Датчик нахилу",
         "state": {
           "off": "Вимкнено",
           "on": "Увімкнено"
         }
+      },
+      "voltage_protection": {
+        "name": "Voltage protection",
+        "state": {
+          "off": "Disabled",
+          "on": "Enabled"
+        }
+      }
+    },
+    "update": {
+      "hub_firmware": {
+        "name": "Firmware"
+      },
+      "video_edge_firmware": {
+        "name": "Firmware"
+      }
+    },
+    "valve": {
+      "waterstop_valve": {
+        "name": "Water valve"
       }
     }
   },
@@ -896,6 +1213,20 @@
     },
     "system_armed": {
       "message": "Система під охороною. Будь ласка, зніміть."
+    }
+  },
+  "issues": {
+    "critical_firmware_update": {
+      "description": "A **critical security update** is available for **{device_name}**.\n\n- Current version: {current_version}\n- New version: {new_version}\n\nPlease update immediately via the Ajax app.",
+      "title": "Critical firmware update for {device_name}"
+    },
+    "device_offline": {
+      "description": "The device **{device_name}** is currently offline and not responding. Please check the device and its connection.",
+      "title": "{device_name} is offline"
+    },
+    "firmware_update": {
+      "description": "A firmware update is available for **{device_name}**.\n\n- Current version: {current_version}\n- New version: {new_version}\n\nPlease update via the Ajax app.",
+      "title": "Firmware update available for {device_name}"
     }
   },
   "options": {
@@ -928,7 +1259,8 @@
           "enabled_spaces": "Увімкнені простори",
           "notifications": "Сповіщення",
           "polling_settings": "Налаштування опитування",
-          "proxy_settings": "Налаштування проксі"
+          "proxy_settings": "Налаштування проксі",
+          "rtsp_credentials": "RTSP/ONVIF Credentials"
         },
         "title": "Параметри Ajax"
       },
@@ -960,6 +1292,18 @@
         },
         "description": "Змініть URL-адресу вашого проксі-сервера Ajax.",
         "title": "Налаштування проксі"
+      },
+      "rtsp_credentials": {
+        "data": {
+          "rtsp_password": "ONVIF Password",
+          "rtsp_username": "ONVIF Username"
+        },
+        "data_description": {
+          "rtsp_password": "Password associated with the ONVIF user",
+          "rtsp_username": "Username created in Ajax app for ONVIF"
+        },
+        "description": "Configure ONVIF/RTSP credentials to access Video Edge camera streams.\n\n**Current configuration:**\n- Username: {current_username}\n- Password: {current_password}\n\n⚠️ These credentials must be created in the Ajax app (Camera → Settings → ONVIF).",
+        "title": "RTSP/ONVIF Credentials"
       }
     }
   },
@@ -987,6 +1331,10 @@
     "force_arm_night": {
       "description": "Примусова активація нічного режиму, ігноруючи відкриті датчики та проблеми.",
       "name": "Примусовий нічний режим"
+    },
+    "get_nvr_recordings": {
+      "description": "Get NVR recordings data from the API (last 24 hours). Saves the response to ajax_nvr_recordings.json for diagnostic purposes.",
+      "name": "Get NVR recordings"
     },
     "get_raw_devices": {
       "description": "Отримати необроблені JSON-дані API для всіх пристроїв. Зберігає повну відповідь API у ajax_raw_devices.json.",

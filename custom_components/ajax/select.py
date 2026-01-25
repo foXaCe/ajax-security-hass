@@ -8,11 +8,11 @@ This module creates select entities for Ajax device settings like:
 from __future__ import annotations
 
 import logging
-from typing import Any
 
 from homeassistant.components.select import SelectEntity
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
+from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -67,6 +67,9 @@ async def async_setup_entry(
 ) -> None:
     """Set up Ajax select entities from a config entry."""
     coordinator = entry.runtime_data
+
+    if coordinator.account is None:
+        return
 
     entities: list[SelectEntity] = []
 
@@ -140,8 +143,8 @@ class AjaxDoorPlusBaseSelect(CoordinatorEntity[AjaxDataCoordinator], SelectEntit
         return device.online if device else False
 
     @property
-    def device_info(self) -> dict[str, Any]:
-        return {"identifiers": {(DOMAIN, self._device_id)}}
+    def device_info(self) -> DeviceInfo:
+        return DeviceInfo(identifiers={(DOMAIN, self._device_id)})
 
     @callback
     def _handle_coordinator_update(self) -> None:
@@ -181,6 +184,9 @@ class AjaxShockSensitivitySelect(AjaxDoorPlusBaseSelect):
                 translation_key="system_armed",
             )
 
+        if not space.hub_id:
+            raise HomeAssistantError("hub_not_found")
+
         try:
             await self.coordinator.api.async_update_device(
                 space.hub_id, self._device_id, {"shockSensorSensitivity": value}
@@ -198,13 +204,15 @@ class AjaxShockSensitivitySelect(AjaxDoorPlusBaseSelect):
                 translation_key="failed_to_change",
                 translation_placeholders={
                     "entity": "shock sensitivity level",
-                    "error": err,
+                    "error": str(err),
                 },
             ) from err
 
 
 class AjaxLedBrightnessSelect(CoordinatorEntity[AjaxDataCoordinator], SelectEntity):
     """Select entity for Socket LED brightness."""
+
+    __slots__ = ("_space_id", "_device_id")
 
     _attr_has_entity_name = True
     _attr_entity_category = EntityCategory.CONFIG
@@ -230,8 +238,8 @@ class AjaxLedBrightnessSelect(CoordinatorEntity[AjaxDataCoordinator], SelectEnti
         return device.attributes.get("indicationEnabled", False)
 
     @property
-    def device_info(self) -> dict[str, Any]:
-        return {"identifiers": {(DOMAIN, self._device_id)}}
+    def device_info(self) -> DeviceInfo:
+        return DeviceInfo(identifiers={(DOMAIN, self._device_id)})
 
     @property
     def current_option(self) -> str | None:
@@ -247,6 +255,9 @@ class AjaxLedBrightnessSelect(CoordinatorEntity[AjaxDataCoordinator], SelectEnti
         space = self.coordinator.get_space(self._space_id)
         if not space:
             raise HomeAssistantError("space_not_found")
+
+        if not space.hub_id:
+            raise HomeAssistantError("hub_not_found")
 
         # Convert lowercase HA option to uppercase for API
         api_value = option.upper()
@@ -267,7 +278,7 @@ class AjaxLedBrightnessSelect(CoordinatorEntity[AjaxDataCoordinator], SelectEnti
                 translation_key="failed_to_change",
                 translation_placeholders={
                     "entity": "LED brightness",
-                    "error": err,
+                    "error": str(err),
                 },
             ) from err
 
@@ -278,6 +289,8 @@ class AjaxLedBrightnessSelect(CoordinatorEntity[AjaxDataCoordinator], SelectEnti
 
 class AjaxIndicationModeSelect(CoordinatorEntity[AjaxDataCoordinator], SelectEntity):
     """Select entity for SocketOutlet indication mode (LED backlight mode)."""
+
+    __slots__ = ("_space_id", "_device_id")
 
     _attr_has_entity_name = True
     _attr_entity_category = EntityCategory.CONFIG
@@ -300,8 +313,8 @@ class AjaxIndicationModeSelect(CoordinatorEntity[AjaxDataCoordinator], SelectEnt
         return device.online if device else False
 
     @property
-    def device_info(self) -> dict[str, Any]:
-        return {"identifiers": {(DOMAIN, self._device_id)}}
+    def device_info(self) -> DeviceInfo:
+        return DeviceInfo(identifiers={(DOMAIN, self._device_id)})
 
     @property
     def current_option(self) -> str | None:
@@ -316,6 +329,9 @@ class AjaxIndicationModeSelect(CoordinatorEntity[AjaxDataCoordinator], SelectEnt
         space = self.coordinator.get_space(self._space_id)
         if not space:
             raise HomeAssistantError("space_not_found")
+
+        if not space.hub_id:
+            raise HomeAssistantError("hub_not_found")
 
         api_value = INDICATION_MODE_VALUES.get(option, "ENABLED")
 
@@ -344,6 +360,8 @@ class AjaxIndicationModeSelect(CoordinatorEntity[AjaxDataCoordinator], SelectEnt
 
 class AjaxHandlerSelect(CoordinatorEntity[AjaxDataCoordinator], SelectEntity):
     """Generic select entity created from device handler definitions."""
+
+    __slots__ = ("_space_id", "_device_id", "_select_desc")
 
     _attr_has_entity_name = True
     _attr_entity_category = EntityCategory.CONFIG
@@ -374,8 +392,8 @@ class AjaxHandlerSelect(CoordinatorEntity[AjaxDataCoordinator], SelectEntity):
         return device.online if device else False
 
     @property
-    def device_info(self) -> dict[str, Any]:
-        return {"identifiers": {(DOMAIN, self._device_id)}}
+    def device_info(self) -> DeviceInfo:
+        return DeviceInfo(identifiers={(DOMAIN, self._device_id)})
 
     @property
     def current_option(self) -> str | None:
@@ -389,6 +407,9 @@ class AjaxHandlerSelect(CoordinatorEntity[AjaxDataCoordinator], SelectEntity):
         space = self.coordinator.get_space(self._space_id)
         if not space:
             raise HomeAssistantError("space_not_found")
+
+        if not space.hub_id:
+            raise HomeAssistantError("hub_not_found")
 
         api_key = self._select_desc.get("api_key")
         if not api_key:

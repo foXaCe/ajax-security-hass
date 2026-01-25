@@ -12,6 +12,7 @@ from typing import Any
 from homeassistant.components.switch import SwitchEntity
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import ServiceValidationError
+from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -70,6 +71,9 @@ async def async_setup_entry(
     """Set up Ajax switches from a config entry."""
     coordinator = entry.runtime_data
 
+    if coordinator.account is None:
+        return
+
     entities: list[SwitchEntity] = []
 
     # Create switches for each device using handlers
@@ -77,7 +81,7 @@ async def async_setup_entry(
         for device_id, device in space.devices.items():
             handler_class = DEVICE_HANDLERS.get(device.type)
             if handler_class:
-                handler = handler_class(device)
+                handler = handler_class(device)  # type: ignore[abstract]
                 switches = handler.get_switches()
 
                 for switch_desc in switches:
@@ -192,6 +196,10 @@ class AjaxSwitch(CoordinatorEntity[AjaxDataCoordinator], SwitchEntity):
             _LOGGER.error("Space or device not found for switch %s", self._switch_key)
             return
 
+        if not space.hub_id:
+            _LOGGER.error("Hub ID not found for space %s", self._space_id)
+            return
+
         # Handle Socket/Relay/WallSwitch using /command endpoint
         # BUT only if this is NOT a configuration switch (no api_key means it's the main on/off switch)
         if device.type in (DeviceType.SOCKET, DeviceType.RELAY, DeviceType.WALLSWITCH) and not self._switch_desc.get(
@@ -220,7 +228,7 @@ class AjaxSwitch(CoordinatorEntity[AjaxDataCoordinator], SwitchEntity):
             try:
                 # Use raw_type from API (exact device type like LIGHT_SWITCH_ONE_GANG)
                 # instead of generic mapping (WALL_SWITCH, SOCKET, RELAY)
-                device_type_str = device.raw_type
+                device_type_str = device.raw_type or device.type.value
                 _LOGGER.debug(
                     "Using device raw_type for command: %s (device: %s)",
                     device_type_str,
@@ -411,25 +419,22 @@ class AjaxSwitch(CoordinatorEntity[AjaxDataCoordinator], SwitchEntity):
         }
 
     @property
-    def device_info(self) -> dict[str, Any]:
+    def device_info(self) -> DeviceInfo | None:
         """Return device information."""
         device = self._get_device()
         if not device:
-            return {}
+            return None
 
-        info = {
-            "identifiers": {(DOMAIN, self._device_id)},
-            "name": device.name,
-            "manufacturer": MANUFACTURER,
-            "model": device.raw_type,
-            "via_device": (DOMAIN, self._space_id),
-            "sw_version": device.firmware_version,
-            "hw_version": device.hardware_version,
-        }
-        # Auto-assign device to HA Area based on Ajax room
-        if device.room_name:
-            info["suggested_area"] = device.room_name
-        return info
+        return DeviceInfo(
+            identifiers={(DOMAIN, self._device_id)},
+            name=device.name,
+            manufacturer=MANUFACTURER,
+            model=device.raw_type,
+            via_device=(DOMAIN, self._space_id),
+            sw_version=device.firmware_version,
+            hw_version=device.hardware_version,
+            suggested_area=device.room_name,
+        )
 
     def _get_device(self) -> AjaxDevice | None:
         """Get the device from coordinator data."""

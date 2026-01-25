@@ -343,6 +343,9 @@ class AjaxConfigFlow(ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             code = user_input.get("code", "").strip()
 
+            if self._api is None or self._request_id is None:
+                return self.async_abort(reason="api_not_initialized")
+
             try:
                 # Verify 2FA code
                 await self._api.async_verify_2fa(self._request_id, code)
@@ -462,7 +465,7 @@ class AjaxConfigFlow(ConfigFlow, domain=DOMAIN):
                     default=default_spaces,
                 ): SelectSelector(
                     SelectSelectorConfig(
-                        options=space_options,
+                        options=space_options,  # type: ignore[typeddict-item]
                         mode=SelectSelectorMode.LIST,
                         multiple=True,
                     )
@@ -740,7 +743,7 @@ class AjaxOptionsFlow(OptionsFlow):
                         default=current_enabled,
                     ): SelectSelector(
                         SelectSelectorConfig(
-                            options=space_options,
+                            options=space_options,  # type: ignore[typeddict-item]
                             mode=SelectSelectorMode.LIST,
                             multiple=True,
                         )
@@ -820,7 +823,7 @@ class AjaxOptionsFlow(OptionsFlow):
                 )
             ] = SelectSelector(
                 SelectSelectorConfig(
-                    options=space_options,
+                    options=space_options,  # type: ignore[typeddict-item]
                     mode=SelectSelectorMode.DROPDOWN,
                     multiple=True,
                 )

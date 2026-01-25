@@ -338,13 +338,16 @@ class SQSManager:
                 await self._create_alarm_notification(space, event_record)
 
             # Always update UI to show new event in history
-            self.coordinator.async_set_updated_data(self.coordinator.account)
+            if self.coordinator.account is not None:
+                self.coordinator.async_set_updated_data(self.coordinator.account)
 
         except Exception as err:
             _LOGGER.error("Error handling SQS event: %s", err)
 
     def _find_space(self, hub_id: str):
         """Find space by hub ID."""
+        if self.coordinator.account is None:
+            return None
         for space in self.coordinator.account.spaces.values():
             if space.hub_id == hub_id or space.id == hub_id:
                 return space
@@ -378,7 +381,8 @@ class SQSManager:
             category = parsed["category"]
         else:
             # Fall back to event tag mapping
-            for events_dict in [
+            # Using Any for mixed dict types (some have str, others have tuple[str, bool])
+            event_dicts: list[dict[str, Any]] = [
                 DOOR_EVENTS,
                 MOTION_EVENTS,
                 SMOKE_EVENTS,
@@ -388,7 +392,8 @@ class SQSManager:
                 TAMPER_EVENTS,
                 DEVICE_STATUS_EVENTS,
                 SECURITY_EVENT_ACTIONS,
-            ]:
+            ]
+            for events_dict in event_dicts:
                 if event_tag in events_dict:
                     value = events_dict[event_tag]
                     if isinstance(value, tuple):

@@ -1651,8 +1651,41 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
             # These are at root level of device_data, not inside "attributes"
             if "channelStatuses" in device_data:
                 channel_statuses = device_data.get("channelStatuses", [])
+                device.attributes["channelStatuses"] = channel_statuses  # Raw list for light.py
                 device.attributes["channel_1_on"] = "CHANNEL_1_ON" in channel_statuses
                 device.attributes["channel_2_on"] = "CHANNEL_2_ON" in channel_statuses
+
+            # LightSwitchDimmer: Parse brightness attributes (at root level)
+            if "actualBrightnessCh1" in device_data:
+                device.attributes["actualBrightnessCh1"] = device_data.get("actualBrightnessCh1")
+            if "minBrightnessLimitCh1" in device_data:
+                device.attributes["minBrightnessLimitCh1"] = device_data.get("minBrightnessLimitCh1")
+            if "maxBrightnessLimitCh1" in device_data:
+                device.attributes["maxBrightnessLimitCh1"] = device_data.get("maxBrightnessLimitCh1")
+            if "armActionBrightnessCh1" in device_data:
+                device.attributes["armActionBrightnessCh1"] = device_data.get("armActionBrightnessCh1")
+            if "disarmActionBrightnessCh1" in device_data:
+                device.attributes["disarmActionBrightnessCh1"] = device_data.get("disarmActionBrightnessCh1")
+            if "brightnessChangeSpeed" in device_data:
+                device.attributes["brightnessChangeSpeed"] = device_data.get("brightnessChangeSpeed")
+
+            # LightSwitch settings and protection statuses
+            if "settingsSwitch" in device_data:
+                device.attributes["settingsSwitch"] = device_data.get("settingsSwitch", [])
+            if "protectStatuses" in device_data:
+                device.attributes["protectStatuses"] = device_data.get("protectStatuses", [])
+            if "touchSensitivity" in device_data:
+                device.attributes["touchSensitivity"] = device_data.get("touchSensitivity")
+            if "touchMode" in device_data:
+                device.attributes["touchMode"] = device_data.get("touchMode")
+            if "dimmerSettings" in device_data:
+                device.attributes["dimmerSettings"] = device_data.get("dimmerSettings", {})
+            if "dataChannelSignalQuality" in device_data:
+                device.attributes["dataChannelSignalQuality"] = device_data.get("dataChannelSignalQuality")
+            if "dataChannelOk" in device_data:
+                device.attributes["dataChannelOk"] = device_data.get("dataChannelOk")
+            if "panelColor" in device_data:
+                device.attributes["panelColor"] = device_data.get("panelColor")
 
             if "buttonOne" in device_data or "buttonTwo" in device_data:
                 button_one = device_data.get("buttonOne", {})
@@ -2450,6 +2483,8 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
             "lightswitchtwogang": DeviceType.WALLSWITCH,
             "lightswitchtwochanneltwoway": DeviceType.WALLSWITCH,
             "light_switch_two_channel_two_way": DeviceType.WALLSWITCH,
+            "lightswitchdimmer": DeviceType.WALLSWITCH,
+            "light_switch_dimmer": DeviceType.WALLSWITCH,
             "thermostat": DeviceType.THERMOSTAT,
             "life_quality": DeviceType.LIFE_QUALITY,
             "lifequality": DeviceType.LIFE_QUALITY,

@@ -167,6 +167,20 @@
           "on": "Connecté"
         }
       },
+      "current_limit": {
+        "name": "Protection courant",
+        "state": {
+          "off": "Normal",
+          "on": "Limite de courant atteinte"
+        }
+      },
+      "data_channel_ok": {
+        "name": "Canal de données",
+        "state": {
+          "off": "Problème",
+          "on": "OK"
+        }
+      },
       "doorbell_ring": {
         "name": "Sonnette"
       },
@@ -201,6 +215,13 @@
       },
       "jeweller_radio": {
         "name": "Radio Jeweller"
+      },
+      "mcp_fire_alarm": {
+        "name": "Alarme incendie",
+        "state": {
+          "off": "Normal",
+          "on": "Alarme déclenchée"
+        }
       },
       "problem": {
         "name": "Problème détecté",
@@ -249,6 +270,13 @@
           "total_malfunctions": {
             "name": "Total dysfonctionnements"
           }
+        }
+      },
+      "temperature_limit": {
+        "name": "Protection température",
+        "state": {
+          "off": "Normal",
+          "on": "Limite de température atteinte"
         }
       },
       "temperature_problem": {
@@ -324,15 +352,38 @@
         "name": "Position"
       }
     },
+    "light": {
+      "dimmer_light": {
+        "name": "Variateur"
+      }
+    },
     "number": {
+      "arm_brightness": {
+        "name": "Luminosité si armé"
+      },
+      "brightness_change_speed": {
+        "name": "Vitesse de variation"
+      },
       "current_threshold": {
         "name": "Limite de courant"
+      },
+      "disarm_brightness": {
+        "name": "Luminosité si désarmé"
       },
       "led_brightness_level": {
         "name": "Luminosité LED"
       },
+      "max_brightness": {
+        "name": "Luminosité maximum"
+      },
+      "min_brightness": {
+        "name": "Luminosité minimum"
+      },
       "tilt_degrees": {
         "name": "Seuil d'inclinaison"
+      },
+      "touch_sensitivity": {
+        "name": "Sensibilité tactile"
       }
     },
     "select": {
@@ -355,6 +406,14 @@
           "very_loud": "Très fort"
         }
       },
+      "dimmer_curve": {
+        "name": "Courbe du variateur",
+        "state": {
+          "curve_type_auto": "Auto",
+          "curve_type_linear": "Linéaire",
+          "curve_type_logarithmic": "Logarithmique"
+        }
+      },
       "indication_mode": {
         "name": "Mode rétroéclairage",
         "state": {
@@ -368,6 +427,14 @@
         "state": {
           "max": "Élevé",
           "min": "Faible"
+        }
+      },
+      "light_source": {
+        "name": "Type de source lumineuse",
+        "state": {
+          "light_source_auto": "Auto",
+          "light_source_leading_edge": "Front montant",
+          "light_source_trailing_edge": "Front descendant"
         }
       },
       "shock_sensitivity": {
@@ -385,6 +452,14 @@
           "loud": "Fort",
           "quiet": "Faible",
           "very_loud": "Très fort"
+        }
+      },
+      "touch_mode": {
+        "name": "Mode tactile",
+        "state": {
+          "touch_mode_blocked": "Bloqué",
+          "touch_mode_toggle": "Bouton uniquement",
+          "touch_mode_toggle_and_slider": "Bouton et curseur"
         }
       }
     },
@@ -1001,6 +1076,13 @@
           "on": "Activé"
         }
       },
+      "child_lock": {
+        "name": "Verrouillage enfant",
+        "state": {
+          "off": "Désactivé",
+          "on": "Activé"
+        }
+      },
       "chimes": {
         "name": "Carillons",
         "state": {
@@ -1029,6 +1111,20 @@
           "on": "Activé"
         }
       },
+      "current_threshold": {
+        "name": "Protection seuil de courant",
+        "state": {
+          "off": "Désactivée",
+          "on": "Activée"
+        }
+      },
+      "dimmer_calibration": {
+        "name": "Calibration variateur",
+        "state": {
+          "off": "Désactivée",
+          "on": "Activée"
+        }
+      },
       "external_contact_enabled": {
         "name": "Contact externe",
         "state": {
@@ -1055,6 +1151,13 @@
         "state": {
           "off": "Désactivée",
           "on": "Activée"
+        }
+      },
+      "led_indicator": {
+        "name": "Indicateur LED",
+        "state": {
+          "off": "Désactivé",
+          "on": "Activé"
         }
       },
       "night_mode": {
@@ -1147,6 +1250,13 @@
           "output_mode": {
             "name": "Mode de sortie"
           }
+        }
+      },
+      "state_memory": {
+        "name": "Mémoire d'état",
+        "state": {
+          "off": "Désactivée",
+          "on": "Activée"
         }
       },
       "temp_alarm_enabled": {

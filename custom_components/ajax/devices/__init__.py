@@ -12,6 +12,7 @@ Structure:
 - flood_detector.py: LeaksProtect
 - manual_call_point.py: ManualCallPoint (fire alarm button)
 - socket.py: Socket, Relay, WallSwitch
+- dimmer.py: LightSwitchDimmer (dimmable wall switch)
 - hub.py: Hub/Hub 2/Hub Plus with alarm control panel
 - keypad.py: KeyPad, KeyPad Plus
 - button.py: Button, DoubleButton, SpaceControl
@@ -22,6 +23,7 @@ Structure:
 
 from .base import AjaxDeviceHandler
 from .button import ButtonHandler
+from .dimmer import DimmerHandler
 from .door_contact import DoorContactHandler, WireInputHandler
 from .doorbell import DoorbellHandler
 from .flood_detector import FloodDetectorHandler
@@ -42,6 +44,7 @@ from .waterstop import WaterStopHandler
 __all__ = [
     "AjaxDeviceHandler",
     "ButtonHandler",
+    "DimmerHandler",
     "DoorbellHandler",
     "DoorContactHandler",
     "FloodDetectorHandler",

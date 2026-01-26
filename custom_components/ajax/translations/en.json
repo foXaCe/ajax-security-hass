@@ -167,6 +167,20 @@
           "on": "Connected"
         }
       },
+      "current_limit": {
+        "name": "Current protection",
+        "state": {
+          "off": "Normal",
+          "on": "Current limit reached"
+        }
+      },
+      "data_channel_ok": {
+        "name": "Data channel",
+        "state": {
+          "off": "Problem",
+          "on": "OK"
+        }
+      },
       "doorbell_ring": {
         "name": "Doorbell"
       },
@@ -201,6 +215,13 @@
       },
       "jeweller_radio": {
         "name": "Jeweller radio"
+      },
+      "mcp_fire_alarm": {
+        "name": "Fire alarm",
+        "state": {
+          "off": "Normal",
+          "on": "Alarm triggered"
+        }
       },
       "problem": {
         "name": "Problem detected",
@@ -249,6 +270,13 @@
           "total_malfunctions": {
             "name": "Total malfunctions"
           }
+        }
+      },
+      "temperature_limit": {
+        "name": "Temperature protection",
+        "state": {
+          "off": "Normal",
+          "on": "Temperature limit reached"
         }
       },
       "temperature_problem": {
@@ -324,15 +352,38 @@
         "name": "Position"
       }
     },
+    "light": {
+      "dimmer_light": {
+        "name": "Dimmer"
+      }
+    },
     "number": {
+      "arm_brightness": {
+        "name": "Brightness when armed"
+      },
+      "brightness_change_speed": {
+        "name": "Brightness change speed"
+      },
       "current_threshold": {
         "name": "Current limit"
+      },
+      "disarm_brightness": {
+        "name": "Brightness when disarmed"
       },
       "led_brightness_level": {
         "name": "LED brightness"
       },
+      "max_brightness": {
+        "name": "Maximum brightness"
+      },
+      "min_brightness": {
+        "name": "Minimum brightness"
+      },
       "tilt_degrees": {
         "name": "Tilt threshold"
+      },
+      "touch_sensitivity": {
+        "name": "Touch sensitivity"
       }
     },
     "select": {
@@ -355,6 +406,14 @@
           "very_loud": "Very loud"
         }
       },
+      "dimmer_curve": {
+        "name": "Dimmer curve",
+        "state": {
+          "curve_type_auto": "Auto",
+          "curve_type_linear": "Linear",
+          "curve_type_logarithmic": "Logarithmic"
+        }
+      },
       "indication_mode": {
         "name": "Backlight mode",
         "state": {
@@ -368,6 +427,14 @@
         "state": {
           "max": "High",
           "min": "Low"
+        }
+      },
+      "light_source": {
+        "name": "Light source type",
+        "state": {
+          "light_source_auto": "Auto",
+          "light_source_leading_edge": "Leading edge",
+          "light_source_trailing_edge": "Trailing edge"
         }
       },
       "shock_sensitivity": {
@@ -385,6 +452,14 @@
           "loud": "Loud",
           "quiet": "Quiet",
           "very_loud": "Very loud"
+        }
+      },
+      "touch_mode": {
+        "name": "Touch mode",
+        "state": {
+          "touch_mode_blocked": "Blocked",
+          "touch_mode_toggle": "Toggle only",
+          "touch_mode_toggle_and_slider": "Toggle and slider"
         }
       }
     },
@@ -1001,6 +1076,13 @@
           "on": "Enabled"
         }
       },
+      "child_lock": {
+        "name": "Child lock",
+        "state": {
+          "off": "Disabled",
+          "on": "Enabled"
+        }
+      },
       "chimes": {
         "name": "Chimes",
         "state": {
@@ -1029,6 +1111,20 @@
           "on": "Enabled"
         }
       },
+      "current_threshold": {
+        "name": "Current threshold protection",
+        "state": {
+          "off": "Disabled",
+          "on": "Enabled"
+        }
+      },
+      "dimmer_calibration": {
+        "name": "Dimmer calibration",
+        "state": {
+          "off": "Disabled",
+          "on": "Enabled"
+        }
+      },
       "external_contact_enabled": {
         "name": "External contact",
         "state": {
@@ -1052,6 +1148,13 @@
       },
       "indicator_light": {
         "name": "Indicator light",
+        "state": {
+          "off": "Disabled",
+          "on": "Enabled"
+        }
+      },
+      "led_indicator": {
+        "name": "LED indicator",
         "state": {
           "off": "Disabled",
           "on": "Enabled"
@@ -1147,6 +1250,13 @@
           "output_mode": {
             "name": "Output mode"
           }
+        }
+      },
+      "state_memory": {
+        "name": "State memory",
+        "state": {
+          "off": "Disabled",
+          "on": "Enabled"
         }
       },
       "temp_alarm_enabled": {

@@ -11,7 +11,7 @@ from typing import Any
 
 from homeassistant.components.switch import SwitchEntity
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.exceptions import ServiceValidationError
+from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -40,7 +40,7 @@ from .models import AjaxDevice, DeviceType, SecurityState
 
 _LOGGER = logging.getLogger(__name__)
 
-# Mapping of device types to handlers
+# Mapping of device types to handlers (excluding dimmer - handled separately)
 DEVICE_HANDLERS = {
     DeviceType.MOTION_DETECTOR: MotionDetectorHandler,
     DeviceType.COMBI_PROTECT: MotionDetectorHandler,
@@ -64,6 +64,49 @@ DEVICE_HANDLERS = {
     DeviceType.LIFE_QUALITY: LifeQualityHandler,
 }
 
+# LightSwitchDimmer switch definitions (settingsSwitch-based)
+DIMMER_SETTINGS_SWITCHES = [
+    {
+        "key": "led_indicator",
+        "translation_key": "led_indicator",
+        "settings_key": "LED_INDICATOR_ENABLED",
+    },
+    {
+        "key": "child_lock",
+        "translation_key": "child_lock",
+        "settings_key": "CHILD_LOCK_ENABLED",
+    },
+    {
+        "key": "state_memory",
+        "translation_key": "state_memory",
+        "settings_key": "STATE_MEMORY_ENABLED",
+    },
+    {
+        "key": "current_threshold",
+        "translation_key": "current_threshold",
+        "settings_key": "CURRENT_THRESHOLD_ENABLED",
+    },
+]
+
+
+def is_dimmer_device(device: AjaxDevice) -> bool:
+    """Check if device is a LightSwitchDimmer."""
+    raw_type = (device.raw_type or "").lower().replace("_", "").replace(" ", "")
+    return "lightswitchdimmer" in raw_type or raw_type == "dimmer"
+
+
+def get_device_handler(device: AjaxDevice):
+    """Get the appropriate handler for a device.
+
+    Dimmer devices are handled separately, not via handlers.
+    """
+    # Dimmer devices are handled separately
+    if is_dimmer_device(device):
+        return None
+
+    # Standard mapping
+    return DEVICE_HANDLERS.get(device.type)
+
 
 async def async_setup_entry(
     hass: HomeAssistant,
@@ -78,10 +121,55 @@ async def async_setup_entry(
 
     entities: list[SwitchEntity] = []
 
-    # Create switches for each device using handlers
+    # Create switches for each device
     for space_id, space in coordinator.account.spaces.items():
         for device_id, device in space.devices.items():
-            handler_class = DEVICE_HANDLERS.get(device.type)
+            # Handle LightSwitchDimmer separately with static definitions
+            if is_dimmer_device(device):
+                # Settings-based switches (settingsSwitch list)
+                if "settingsSwitch" in device.attributes:
+                    for switch_def in DIMMER_SETTINGS_SWITCHES:
+                        entities.append(
+                            AjaxDimmerSettingsSwitch(
+                                coordinator=coordinator,
+                                space_id=space_id,
+                                device_id=device_id,
+                                switch_def=switch_def,
+                            )
+                        )
+                        _LOGGER.debug(
+                            "Created dimmer switch '%s' for device: %s",
+                            switch_def["key"],
+                            device.name,
+                        )
+
+                # Night mode switch (boolean attribute)
+                if "nightModeArm" in device.attributes:
+                    entities.append(
+                        AjaxDimmerBoolSwitch(
+                            coordinator=coordinator,
+                            space_id=space_id,
+                            device_id=device_id,
+                            switch_key="night_mode",
+                            attr_key="nightModeArm",
+                            api_key="nightModeArm",
+                        )
+                    )
+
+                # Dimmer calibration switch (nested in dimmerSettings)
+                dimmer_settings = device.attributes.get("dimmerSettings", {})
+                if dimmer_settings and "calibration" in dimmer_settings:
+                    entities.append(
+                        AjaxDimmerCalibrationSwitch(
+                            coordinator=coordinator,
+                            space_id=space_id,
+                            device_id=device_id,
+                        )
+                    )
+                continue
+
+            # Standard handler-based switches for other devices
+            handler_class = get_device_handler(device)
             if handler_class:
                 handler = handler_class(device)  # type: ignore[abstract]
                 switches = handler.get_switches()
@@ -100,7 +188,7 @@ async def async_setup_entry(
                         "Created switch '%s' for device: %s (type: %s)",
                         switch_desc["key"],
                         device.name,
-                        device.type.value,
+                        device.type.value if device.type else "unknown",
                     )
 
     if entities:
@@ -272,6 +360,12 @@ class AjaxSwitch(CoordinatorEntity[AjaxDataCoordinator], SwitchEntity):
             await self._set_trigger_value(space, device, trigger_key, value)
             return
 
+        # Handle settings-type switches (settingsSwitch list for LightSwitch)
+        settings_key = self._switch_desc.get("settings_key")
+        if settings_key:
+            await self._set_settings_value(space, device, settings_key, value)
+            return
+
         # Handle standard boolean or value-based switches
         if value:
             api_value = self._switch_desc.get("api_value_on", True)
@@ -370,6 +464,32 @@ class AjaxSwitch(CoordinatorEntity[AjaxDataCoordinator], SwitchEntity):
             _LOGGER.error("Failed to set sirenTriggers: %s", err)
             await self.coordinator.async_request_refresh()
 
+    async def _set_settings_value(self, space, device, settings_key: str, enabled: bool) -> None:
+        """Set a settings value in the settingsSwitch list (for LightSwitch devices)."""
+        current_settings = list(device.attributes.get("settingsSwitch", []))
+
+        if enabled and settings_key not in current_settings:
+            current_settings.append(settings_key)
+        elif not enabled and settings_key in current_settings:
+            current_settings.remove(settings_key)
+
+        # Optimistic update
+        device.attributes["settingsSwitch"] = current_settings
+        self.async_write_ha_state()
+
+        try:
+            await self.coordinator.api.async_update_device(
+                space.hub_id, self._device_id, {"settingsSwitch": current_settings}
+            )
+            _LOGGER.info(
+                "Set settingsSwitch=%s for device %s",
+                current_settings,
+                self._device_id,
+            )
+        except Exception as err:
+            _LOGGER.error("Failed to set settingsSwitch: %s", err)
+            await self.coordinator.async_request_refresh()
+
     async def _set_channel_value(self, space, device, channel: int, value: bool) -> None:
         """Set a channel value for multi-gang LightSwitch devices."""
         # channel is 0-based (0, 1), but attribute keys are 1-based (channel_1_on, channel_2_on)
@@ -449,3 +569,272 @@ class AjaxSwitch(CoordinatorEntity[AjaxDataCoordinator], SwitchEntity):
     def _handle_coordinator_update(self) -> None:
         """Handle updated data from the coordinator."""
         self.async_write_ha_state()
+
+
+class AjaxDimmerSettingsSwitch(CoordinatorEntity[AjaxDataCoordinator], SwitchEntity):
+    """Switch entity for LightSwitchDimmer settings (settingsSwitch list)."""
+
+    _attr_has_entity_name = True
+    _attr_entity_category = EntityCategory.CONFIG
+
+    def __init__(
+        self,
+        coordinator: AjaxDataCoordinator,
+        space_id: str,
+        device_id: str,
+        switch_def: dict,
+    ) -> None:
+        """Initialize the dimmer settings switch."""
+        super().__init__(coordinator)
+        self._space_id = space_id
+        self._device_id = device_id
+        self._switch_def = switch_def
+
+        self._attr_unique_id = f"{device_id}_{switch_def['key']}"
+        self._attr_translation_key = switch_def["translation_key"]
+
+    def _get_device(self) -> AjaxDevice | None:
+        """Get current device from coordinator."""
+        space = self.coordinator.get_space(self._space_id)
+        return space.devices.get(self._device_id) if space else None
+
+    @property
+    def available(self) -> bool:
+        """Return if entity is available."""
+        device = self._get_device()
+        return self.coordinator.last_update_success and device is not None and device.online
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        """Return device info."""
+        return DeviceInfo(identifiers={(DOMAIN, self._device_id)})
+
+    @property
+    def is_on(self) -> bool:
+        """Return true if the switch is on."""
+        device = self._get_device()
+        if not device:
+            return False
+        settings_list = device.attributes.get("settingsSwitch", [])
+        return self._switch_def["settings_key"] in settings_list
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        """Handle updated data from coordinator."""
+        self.async_write_ha_state()
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        """Turn the switch on."""
+        await self._set_value(True)
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        """Turn the switch off."""
+        await self._set_value(False)
+
+    async def _set_value(self, value: bool) -> None:
+        """Set the switch value."""
+        space = self.coordinator.get_space(self._space_id)
+        device = self._get_device()
+        if not space or not device:
+            raise HomeAssistantError("Device not found")
+
+        if not space.hub_id:
+            raise HomeAssistantError("Hub not found")
+
+        settings_key = self._switch_def["settings_key"]
+        current_settings = list(device.attributes.get("settingsSwitch", []))
+
+        if value and settings_key not in current_settings:
+            current_settings.append(settings_key)
+        elif not value and settings_key in current_settings:
+            current_settings.remove(settings_key)
+
+        # Optimistic update
+        device.attributes["settingsSwitch"] = current_settings
+        self.async_write_ha_state()
+
+        try:
+            await self.coordinator.api.async_update_device(
+                space.hub_id, self._device_id, {"settingsSwitch": current_settings}
+            )
+            _LOGGER.info(
+                "Set settingsSwitch=%s for device %s",
+                current_settings,
+                self._device_id,
+            )
+        except Exception as err:
+            _LOGGER.error("Failed to set settingsSwitch: %s", err)
+            await self.coordinator.async_request_refresh()
+
+
+class AjaxDimmerBoolSwitch(CoordinatorEntity[AjaxDataCoordinator], SwitchEntity):
+    """Switch entity for LightSwitchDimmer boolean attributes."""
+
+    _attr_has_entity_name = True
+    _attr_entity_category = EntityCategory.CONFIG
+
+    def __init__(
+        self,
+        coordinator: AjaxDataCoordinator,
+        space_id: str,
+        device_id: str,
+        switch_key: str,
+        attr_key: str,
+        api_key: str,
+    ) -> None:
+        """Initialize the dimmer boolean switch."""
+        super().__init__(coordinator)
+        self._space_id = space_id
+        self._device_id = device_id
+        self._attr_key = attr_key
+        self._api_key = api_key
+
+        self._attr_unique_id = f"{device_id}_{switch_key}"
+        self._attr_translation_key = switch_key
+
+    def _get_device(self) -> AjaxDevice | None:
+        """Get current device from coordinator."""
+        space = self.coordinator.get_space(self._space_id)
+        return space.devices.get(self._device_id) if space else None
+
+    @property
+    def available(self) -> bool:
+        """Return if entity is available."""
+        device = self._get_device()
+        return self.coordinator.last_update_success and device is not None and device.online
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        """Return device info."""
+        return DeviceInfo(identifiers={(DOMAIN, self._device_id)})
+
+    @property
+    def is_on(self) -> bool:
+        """Return true if the switch is on."""
+        device = self._get_device()
+        if not device:
+            return False
+        return device.attributes.get(self._attr_key, False)
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        """Handle updated data from coordinator."""
+        self.async_write_ha_state()
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        """Turn the switch on."""
+        await self._set_value(True)
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        """Turn the switch off."""
+        await self._set_value(False)
+
+    async def _set_value(self, value: bool) -> None:
+        """Set the switch value."""
+        space = self.coordinator.get_space(self._space_id)
+        device = self._get_device()
+        if not space or not device:
+            raise HomeAssistantError("Device not found")
+
+        if not space.hub_id:
+            raise HomeAssistantError("Hub not found")
+
+        # Optimistic update
+        device.attributes[self._attr_key] = value
+        self.async_write_ha_state()
+
+        try:
+            await self.coordinator.api.async_update_device(space.hub_id, self._device_id, {self._api_key: value})
+            _LOGGER.info(
+                "Set %s=%s for device %s",
+                self._api_key,
+                value,
+                self._device_id,
+            )
+        except Exception as err:
+            _LOGGER.error("Failed to set %s: %s", self._api_key, err)
+            await self.coordinator.async_request_refresh()
+
+
+class AjaxDimmerCalibrationSwitch(CoordinatorEntity[AjaxDataCoordinator], SwitchEntity):
+    """Switch entity for LightSwitchDimmer calibration (nested in dimmerSettings)."""
+
+    _attr_has_entity_name = True
+    _attr_entity_category = EntityCategory.CONFIG
+
+    def __init__(
+        self,
+        coordinator: AjaxDataCoordinator,
+        space_id: str,
+        device_id: str,
+    ) -> None:
+        """Initialize the dimmer calibration switch."""
+        super().__init__(coordinator)
+        self._space_id = space_id
+        self._device_id = device_id
+
+        self._attr_unique_id = f"{device_id}_dimmer_calibration"
+        self._attr_translation_key = "dimmer_calibration"
+
+    def _get_device(self) -> AjaxDevice | None:
+        """Get current device from coordinator."""
+        space = self.coordinator.get_space(self._space_id)
+        return space.devices.get(self._device_id) if space else None
+
+    @property
+    def available(self) -> bool:
+        """Return if entity is available."""
+        device = self._get_device()
+        return self.coordinator.last_update_success and device is not None and device.online
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        """Return device info."""
+        return DeviceInfo(identifiers={(DOMAIN, self._device_id)})
+
+    @property
+    def is_on(self) -> bool:
+        """Return true if calibration is enabled."""
+        device = self._get_device()
+        if not device:
+            return False
+        dimmer_settings = device.attributes.get("dimmerSettings", {})
+        return dimmer_settings.get("calibration") == "ENABLED"
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        """Handle updated data from coordinator."""
+        self.async_write_ha_state()
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        """Turn on calibration."""
+        await self._set_value(True)
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        """Turn off calibration."""
+        await self._set_value(False)
+
+    async def _set_value(self, value: bool) -> None:
+        """Set the calibration value."""
+        space = self.coordinator.get_space(self._space_id)
+        device = self._get_device()
+        if not space or not device:
+            raise HomeAssistantError("Device not found")
+
+        if not space.hub_id:
+            raise HomeAssistantError("Hub not found")
+
+        api_value = "ENABLED" if value else "DISABLED"
+        payload = {"dimmerSettings": {"calibration": api_value}}
+
+        try:
+            await self.coordinator.api.async_update_device_nested(space.hub_id, self._device_id, payload)
+            _LOGGER.info(
+                "Set dimmerSettings.calibration=%s for device %s",
+                api_value,
+                self._device_id,
+            )
+            await self.coordinator.async_request_refresh()
+        except Exception as err:
+            _LOGGER.error("Failed to set dimmer calibration: %s", err)
+            await self.coordinator.async_request_refresh()

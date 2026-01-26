@@ -1101,6 +1101,38 @@ class AjaxRestApi:
             payload["brightness"] = brightness
         return await self._request("POST", f"devices/{device_id}/control", payload)
 
+    async def async_set_dimmer_brightness(
+        self,
+        hub_id: str,
+        device_id: str,
+        brightness: int,
+    ) -> None:
+        """Set dimmer brightness level.
+
+        Args:
+            hub_id: Hub ID
+            device_id: Dimmer device ID
+            brightness: Brightness level (0-100). 0 = off.
+        """
+        if not self.user_id:
+            raise AjaxRestApiError("No user_id available. Call async_login() first.")
+
+        # Use command endpoint with BRIGHTNESS command
+        await self._request_no_response(
+            "POST",
+            f"user/{self.user_id}/hubs/{hub_id}/devices/{device_id}/command",
+            {
+                "command": "BRIGHTNESS",
+                "deviceType": "LightSwitchDimmer",
+                "additionalParam": {
+                    "additionalParamType": "BRIGHTNESS_STATUS",
+                    "brightnessInPercentage": brightness,
+                    "channels": ["CHANNEL_1"],
+                    "brightnessType": "BRIGHTNESS_TYPE_ABSOLUTE",
+                },
+            },
+        )
+
     # Automation methods
     async def async_get_automations(self, hub_id: str) -> list[dict[str, Any]]:
         """Get hub automations/scenarios.

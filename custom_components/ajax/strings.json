@@ -321,11 +321,37 @@
       },
       "wings_radio": {
         "name": "Wings radio"
+      },
+      "current_limit": {
+        "name": "Current protection",
+        "state": {
+          "off": "Normal",
+          "on": "Current limit reached"
+        }
+      },
+      "temperature_limit": {
+        "name": "Temperature protection",
+        "state": {
+          "off": "Normal",
+          "on": "Temperature limit reached"
+        }
+      },
+      "data_channel_ok": {
+        "name": "Data channel",
+        "state": {
+          "off": "Problem",
+          "on": "OK"
+        }
       }
     },
     "button": {
       "panic": {
         "name": "Panic Button"
+      }
+    },
+    "light": {
+      "dimmer_light": {
+        "name": "Dimmer"
       }
     },
     "device_tracker": {
@@ -342,6 +368,30 @@
       },
       "led_brightness_level": {
         "name": "LED brightness"
+      },
+      "touch_sensitivity": {
+        "name": "Touch sensitivity"
+      },
+      "brightness_change_speed": {
+        "name": "Brightness change speed"
+      },
+      "min_brightness": {
+        "name": "Minimum brightness"
+      },
+      "max_brightness": {
+        "name": "Maximum brightness"
+      },
+      "arm_brightness": {
+        "name": "Brightness when armed"
+      },
+      "disarm_brightness": {
+        "name": "Brightness when disarmed"
+      },
+      "current_brightness": {
+        "name": "Current brightness"
+      },
+      "data_channel_quality": {
+        "name": "Data channel quality"
       }
     },
     "select": {
@@ -394,6 +444,30 @@
           "5": "5 minutes",
           "10": "10 minutes",
           "15": "15 minutes"
+        }
+      },
+      "touch_mode": {
+        "name": "Touch mode",
+        "state": {
+          "touch_mode_toggle_and_slider": "Toggle and slider",
+          "touch_mode_toggle": "Toggle only",
+          "touch_mode_blocked": "Blocked"
+        }
+      },
+      "dimmer_curve": {
+        "name": "Dimmer curve",
+        "state": {
+          "curve_type_auto": "Auto",
+          "curve_type_linear": "Linear",
+          "curve_type_logarithmic": "Logarithmic"
+        }
+      },
+      "light_source": {
+        "name": "Light source type",
+        "state": {
+          "light_source_auto": "Auto",
+          "light_source_leading_edge": "Leading edge",
+          "light_source_trailing_edge": "Trailing edge"
         }
       }
     },
@@ -1203,6 +1277,41 @@
       },
       "tilt_sensor": {
         "name": "Tilt sensor",
+        "state": {
+          "off": "Disabled",
+          "on": "Enabled"
+        }
+      },
+      "led_indicator": {
+        "name": "LED indicator",
+        "state": {
+          "off": "Disabled",
+          "on": "Enabled"
+        }
+      },
+      "child_lock": {
+        "name": "Child lock",
+        "state": {
+          "off": "Disabled",
+          "on": "Enabled"
+        }
+      },
+      "state_memory": {
+        "name": "State memory",
+        "state": {
+          "off": "Disabled",
+          "on": "Enabled"
+        }
+      },
+      "current_threshold": {
+        "name": "Current threshold protection",
+        "state": {
+          "off": "Disabled",
+          "on": "Enabled"
+        }
+      },
+      "dimmer_calibration": {
+        "name": "Dimmer calibration",
         "state": {
           "off": "Disabled",
           "on": "Enabled"

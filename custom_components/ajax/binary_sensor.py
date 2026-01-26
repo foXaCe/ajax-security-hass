@@ -25,6 +25,7 @@ from .const import DOMAIN, MANUFACTURER
 from .coordinator import AjaxDataCoordinator
 from .devices import (
     ButtonHandler,
+    DimmerHandler,
     DoorbellHandler,
     DoorContactHandler,
     FloodDetectorHandler,
@@ -85,6 +86,24 @@ DEVICE_HANDLERS = {
     DeviceType.LIFE_QUALITY: LifeQualityHandler,
 }
 
+# Raw device types that should use DimmerHandler instead of SocketHandler
+DIMMER_RAW_TYPES = {"lightswitchdimmer", "light_switch_dimmer"}
+
+
+def get_device_handler(device: AjaxDevice):
+    """Get the appropriate handler for a device.
+
+    Checks raw_type for special cases like LightSwitchDimmer before
+    falling back to the standard DeviceType mapping.
+    """
+    # Check for dimmer first (raw_type based)
+    raw_type = (device.raw_type or "").lower().replace("_", "")
+    if raw_type in DIMMER_RAW_TYPES or "dimmer" in raw_type:
+        return DimmerHandler
+
+    # Standard mapping
+    return DEVICE_HANDLERS.get(device.type)
+
 
 async def async_setup_entry(
     hass: HomeAssistant,
@@ -103,7 +122,7 @@ async def async_setup_entry(
     # Create binary sensors for all devices using handlers
     for space_id, space in coordinator.account.spaces.items():
         for device_id, device in space.devices.items():
-            handler_class = DEVICE_HANDLERS.get(device.type)
+            handler_class = get_device_handler(device)
             if handler_class:
                 handler = handler_class(device)  # type: ignore[abstract]
                 binary_sensors = handler.get_binary_sensors()

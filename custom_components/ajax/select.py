@@ -1,8 +1,9 @@
 """Ajax select platform for Home Assistant.
 
 This module creates select entities for Ajax device settings like:
-- shockSensorSensitivity: Shock sensor sensitivity (Désactivé, Faible, Normal, Élevé)
+- shockSensorSensitivity: Shock sensor sensitivity (Low, Normal, High)
 - indicationBrightness: Socket LED brightness (Min, Max)
+- LightSwitchDimmer settings (touch mode, dimmer curve, light source)
 """
 
 from __future__ import annotations
@@ -21,7 +22,7 @@ from . import AjaxConfigEntry
 from .const import DOMAIN
 from .coordinator import AjaxDataCoordinator
 from .devices.siren import SirenHandler
-from .models import DeviceType, SecurityState
+from .models import AjaxDevice, DeviceType, SecurityState
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -38,26 +39,85 @@ DEVICES_WITH_DOOR_PLUS_SELECTS = [
 ]
 
 # Shock sensitivity options mapping (value -> translation key)
-# Ajax API values: 0=low, 4=normal, 7=high (confirmed via testing)
 SHOCK_SENSITIVITY_OPTIONS = {
     0: "low",
     4: "normal",
     7: "high",
 }
-
-# Reverse mapping (key -> value)
 SHOCK_SENSITIVITY_VALUES = {v: k for k, v in SHOCK_SENSITIVITY_OPTIONS.items()}
 
 # LED brightness options for Socket (lowercase for HA translation keys)
 LED_BRIGHTNESS_OPTIONS = ["min", "max"]
 
-# Indication mode options for SocketOutlet (ENABLED=Always, DISABLED=Off, IF_ON=If activated)
+# Indication mode options for SocketOutlet
 INDICATION_MODE_OPTIONS = {
     "ENABLED": "always",
     "DISABLED": "off",
     "IF_ON": "if_on",
 }
 INDICATION_MODE_VALUES = {v: k for k, v in INDICATION_MODE_OPTIONS.items()}
+
+# LightSwitchDimmer select definitions
+DIMMER_SELECT_DEFINITIONS = [
+    {
+        "key": "touch_mode",
+        "translation_key": "touch_mode",
+        "attr_key": "touchMode",
+        "options": ["touch_mode_toggle_and_slider", "touch_mode_toggle", "touch_mode_blocked"],
+        "api_key": "touchMode",
+        "api_options": {
+            "touch_mode_toggle_and_slider": "TOUCH_MODE_TOGGLE_AND_SLIDER",
+            "touch_mode_toggle": "TOUCH_MODE_TOGGLE",
+            "touch_mode_blocked": "TOUCH_MODE_BLOCKED",
+        },
+    },
+    {
+        "key": "dimmer_curve",
+        "translation_key": "dimmer_curve",
+        "attr_key": "dimmerSettings.curveType",
+        "options": ["curve_type_auto", "curve_type_linear", "curve_type_logarithmic"],
+        "api_nested_key": "dimmerSettings",
+        "api_key": "curveType",
+        "api_options": {
+            "curve_type_auto": "CURVE_TYPE_AUTO",
+            "curve_type_linear": "CURVE_TYPE_LINEAR",
+            "curve_type_logarithmic": "CURVE_TYPE_LOGARITHMIC",
+        },
+    },
+    {
+        "key": "light_source",
+        "translation_key": "light_source",
+        "attr_key": "dimmerSettings.lightSource",
+        "options": ["light_source_auto", "light_source_leading_edge", "light_source_trailing_edge"],
+        "api_nested_key": "dimmerSettings",
+        "api_key": "lightSource",
+        "api_options": {
+            "light_source_auto": "LIGHT_SOURCE_AUTO",
+            "light_source_leading_edge": "LIGHT_SOURCE_LEADING_EDGE",
+            "light_source_trailing_edge": "LIGHT_SOURCE_TRAILING_EDGE",
+        },
+    },
+]
+
+
+def is_dimmer_device(device: AjaxDevice) -> bool:
+    """Check if device is a LightSwitchDimmer."""
+    raw_type = (device.raw_type or "").lower().replace("_", "").replace(" ", "")
+    return "lightswitchdimmer" in raw_type or raw_type == "dimmer"
+
+
+def _get_dimmer_attr(device: AjaxDevice, attr_key: str):
+    """Get nested attribute value from device."""
+    if "." in attr_key:
+        parts = attr_key.split(".")
+        value = device.attributes
+        for part in parts:
+            if isinstance(value, dict):
+                value = value.get(part)
+            else:
+                return None
+        return value
+    return device.attributes.get(attr_key)
 
 
 async def async_setup_entry(
@@ -77,29 +137,29 @@ async def async_setup_entry(
         for device_id, device in space.devices.items():
             device_type = device.raw_type or ""
 
+            # DoorProtect Plus shock sensitivity
             if device_type in DEVICES_WITH_DOOR_PLUS_SELECTS:
-                # Shock sensor sensitivity
                 entities.append(AjaxShockSensitivitySelect(coordinator, space_id, device_id))
-                _LOGGER.debug(
-                    "Created select entities for device: %s",
-                    device.name,
-                )
 
-            # Socket LED brightness (old Socket model with MIN/MAX)
+            # Socket LED brightness (old model with MIN/MAX)
             if device.type == DeviceType.SOCKET and device.attributes.get("indicationBrightness") in ["MIN", "MAX"]:
                 entities.append(AjaxLedBrightnessSelect(coordinator, space_id, device_id))
-                _LOGGER.debug(
-                    "Created LED brightness select for device: %s",
-                    device.name,
-                )
 
-            # SocketOutlet indication mode (ENABLED/DISABLED/IF_ON)
+            # SocketOutlet indication mode
             if device.type == DeviceType.SOCKET and "indicationMode" in device.attributes:
                 entities.append(AjaxIndicationModeSelect(coordinator, space_id, device_id))
-                _LOGGER.debug(
-                    "Created indication mode select for device: %s",
-                    device.name,
-                )
+
+            # LightSwitchDimmer select entities
+            if is_dimmer_device(device):
+                for select_def in DIMMER_SELECT_DEFINITIONS:
+                    # Only create entity if the attribute exists
+                    if _get_dimmer_attr(device, select_def["attr_key"]) is not None:
+                        entities.append(AjaxDimmerSelect(coordinator, space_id, device_id, select_def))
+                        _LOGGER.debug(
+                            "Created dimmer select '%s' for device: %s",
+                            select_def["key"],
+                            device.name,
+                        )
 
             # Handler-based selects (sirens, etc.)
             handler_class = SELECT_DEVICE_HANDLERS.get(device.type)
@@ -109,16 +169,10 @@ async def async_setup_entry(
                     selects = handler.get_selects()
                     for select_desc in selects:
                         entities.append(AjaxHandlerSelect(coordinator, space_id, device_id, select_desc))
-                        _LOGGER.debug(
-                            "Created select '%s' for device: %s (type: %s)",
-                            select_desc.get("key"),
-                            device.name,
-                            device.type.value if device.type else "unknown",
-                        )
 
     if entities:
         async_add_entities(entities)
-        _LOGGER.info("Added %d Ajax select entit(ies)", len(entities))
+        _LOGGER.info("Added %d Ajax select entities", len(entities))
 
 
 class AjaxDoorPlusBaseSelect(CoordinatorEntity[AjaxDataCoordinator], SelectEntity):
@@ -358,8 +412,112 @@ class AjaxIndicationModeSelect(CoordinatorEntity[AjaxDataCoordinator], SelectEnt
         self.async_write_ha_state()
 
 
+class AjaxDimmerSelect(CoordinatorEntity[AjaxDataCoordinator], SelectEntity):
+    """Select entity for LightSwitchDimmer settings."""
+
+    _attr_has_entity_name = True
+    _attr_entity_category = EntityCategory.CONFIG
+
+    def __init__(
+        self,
+        coordinator: AjaxDataCoordinator,
+        space_id: str,
+        device_id: str,
+        select_def: dict,
+    ) -> None:
+        """Initialize the dimmer select entity."""
+        super().__init__(coordinator)
+        self._space_id = space_id
+        self._device_id = device_id
+        self._select_def = select_def
+
+        self._attr_unique_id = f"{device_id}_{select_def['key']}"
+        self._attr_translation_key = select_def["translation_key"]
+        self._attr_options = select_def["options"]
+
+    def _get_device(self) -> AjaxDevice | None:
+        """Get current device from coordinator."""
+        space = self.coordinator.get_space(self._space_id)
+        return space.devices.get(self._device_id) if space else None
+
+    @property
+    def available(self) -> bool:
+        """Return if entity is available."""
+        device = self._get_device()
+        return self.coordinator.last_update_success and device is not None and device.online
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        """Return device info."""
+        return DeviceInfo(identifiers={(DOMAIN, self._device_id)})
+
+    @property
+    def current_option(self) -> str | None:
+        """Return current option from device attributes."""
+        device = self._get_device()
+        if not device:
+            return None
+        value = _get_dimmer_attr(device, self._select_def["attr_key"])
+        if value is None:
+            return None
+        # Convert API value to HA option
+        value_lower = str(value).lower()
+        for option in self._select_def["options"]:
+            if option == value_lower:
+                return option
+        return None
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        """Handle updated data from coordinator."""
+        self.async_write_ha_state()
+
+    async def async_select_option(self, option: str) -> None:
+        """Set the select option."""
+        space = self.coordinator.get_space(self._space_id)
+        if not space:
+            raise HomeAssistantError("space_not_found")
+
+        if not space.hub_id:
+            raise HomeAssistantError("hub_not_found")
+
+        # Get API value from option
+        api_options = self._select_def.get("api_options", {})
+        api_value = api_options.get(option, option)
+        api_key = self._select_def["api_key"]
+        api_nested_key = self._select_def.get("api_nested_key")
+
+        # Build payload
+        if api_nested_key:
+            payload = {api_nested_key: {api_key: api_value}}
+        else:
+            payload = {api_key: api_value}
+
+        try:
+            if api_nested_key:
+                await self.coordinator.api.async_update_device_nested(space.hub_id, self._device_id, payload)
+            else:
+                await self.coordinator.api.async_update_device(space.hub_id, self._device_id, payload)
+            _LOGGER.info(
+                "Set %s=%s for device %s",
+                api_key,
+                api_value,
+                self._device_id,
+            )
+            await self.coordinator.async_request_refresh()
+        except Exception as err:
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="failed_to_change",
+                translation_placeholders={
+                    "entity": self._select_def["key"],
+                    "error": str(err),
+                },
+            ) from err
+
+
 class AjaxHandlerSelect(CoordinatorEntity[AjaxDataCoordinator], SelectEntity):
-    """Generic select entity created from device handler definitions."""
+    """Generic select entity created from device handler definitions (for sirens, etc.)."""
 
     __slots__ = ("_space_id", "_device_id", "_select_desc")
 
@@ -416,11 +574,27 @@ class AjaxHandlerSelect(CoordinatorEntity[AjaxDataCoordinator], SelectEntity):
             raise HomeAssistantError("No API key configured for this select")
 
         # Transform the option value if needed
-        api_transform = self._select_desc.get("api_transform")
-        api_value = api_transform(option) if api_transform else option
+        api_options = self._select_desc.get("api_options")
+        if api_options:
+            # Use api_options mapping (HA value -> API value)
+            api_value = api_options.get(option, option)
+        else:
+            api_transform = self._select_desc.get("api_transform")
+            api_value = api_transform(option) if api_transform else option
+
+        # Build payload (handle nested keys like dimmerSettings.curveType)
+        api_nested_key = self._select_desc.get("api_nested_key")
+        if api_nested_key:
+            payload = {api_nested_key: {api_key: api_value}}
+        else:
+            payload = {api_key: api_value}
 
         try:
-            await self.coordinator.api.async_update_device(space.hub_id, self._device_id, {api_key: api_value})
+            # Use nested update for settings inside nested structures (e.g., dimmerSettings)
+            if api_nested_key:
+                await self.coordinator.api.async_update_device_nested(space.hub_id, self._device_id, payload)
+            else:
+                await self.coordinator.api.async_update_device(space.hub_id, self._device_id, payload)
             _LOGGER.info(
                 "Set %s=%s for device %s",
                 api_key,

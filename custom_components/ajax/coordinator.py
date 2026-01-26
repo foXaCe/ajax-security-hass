@@ -23,6 +23,7 @@ from typing import TYPE_CHECKING, Any
 
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.debounce import Debouncer
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
@@ -1753,6 +1754,36 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
         # Log summary of devices loaded
         if new_devices_count > 0:
             _LOGGER.info("Discovered %d new device(s) in space %s", new_devices_count, space_id)
+
+        # Clean up devices that no longer exist in Ajax
+        # Compare existing devices with those received from API
+        existing_device_ids = set(space.devices.keys())
+        removed_device_ids = existing_device_ids - processed_ids
+
+        if removed_device_ids:
+            device_registry = dr.async_get(self.hass)
+            for device_id in removed_device_ids:
+                device = space.devices.get(device_id)
+                device_name = device.name if device else device_id
+
+                # Remove from HA device registry
+                ha_device = device_registry.async_get_device(identifiers={(DOMAIN, device_id)})
+                if ha_device:
+                    device_registry.async_remove_device(ha_device.id)
+                    _LOGGER.info(
+                        "Removed device '%s' (ID: %s) from Home Assistant - no longer exists in Ajax",
+                        device_name,
+                        device_id,
+                    )
+
+                # Remove from internal tracking
+                del space.devices[device_id]
+
+            _LOGGER.info(
+                "Cleaned up %d removed device(s) from space %s",
+                len(removed_device_ids),
+                space_id,
+            )
 
     def _normalize_device_attributes(self, api_attributes: dict[str, Any], device_type: DeviceType) -> dict[str, Any]:
         """Normalize Ajax API attributes to internal format.

@@ -723,6 +723,10 @@ class AjaxDeviceSensor(CoordinatorEntity[AjaxDataCoordinator], SensorEntity):
         if "device_class" in sensor_desc:
             self._attr_device_class = sensor_desc["device_class"]
 
+        # Set options for enum sensors (required for translations)
+        if "options" in sensor_desc:
+            self._attr_options = sensor_desc["options"]
+
         # Set translation key only if explicitly provided
         # If device_class is set and no translation_key, HA will use automatic naming
         if "translation_key" in sensor_desc:

@@ -10,6 +10,7 @@ Structure:
 - door_contact.py: DoorProtect, DoorProtect Plus
 - smoke_detector.py: FireProtect, FireProtect Plus, FireProtect 2
 - flood_detector.py: LeaksProtect
+- manual_call_point.py: ManualCallPoint (fire alarm button)
 - socket.py: Socket, Relay, WallSwitch
 - hub.py: Hub/Hub 2/Hub Plus with alarm control panel
 - keypad.py: KeyPad, KeyPad Plus
@@ -28,6 +29,7 @@ from .glass_break import GlassBreakHandler
 from .hub import HubHandler
 from .life_quality import LifeQualityHandler
 from .light import LightHandler
+from .manual_call_point import ManualCallPointHandler
 from .motion_detector import MotionDetectorHandler
 from .repeater import RepeaterHandler
 from .siren import SirenHandler
@@ -47,6 +49,7 @@ __all__ = [
     "HubHandler",
     "LifeQualityHandler",
     "LightHandler",
+    "ManualCallPointHandler",
     "MotionDetectorHandler",
     "RepeaterHandler",
     "SirenHandler",

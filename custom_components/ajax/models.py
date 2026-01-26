@@ -39,6 +39,7 @@ class DeviceType(Enum):
     COMBI_PROTECT = "combi_protect"  # Combined motion + glass break detector
     SMOKE_DETECTOR = "smoke_detector"
     FLOOD_DETECTOR = "flood_detector"
+    MANUAL_CALL_POINT = "manual_call_point"  # Manual fire alarm button (MCP)
     TEMPERATURE_SENSOR = "temperature_sensor"
 
     # Security Devices

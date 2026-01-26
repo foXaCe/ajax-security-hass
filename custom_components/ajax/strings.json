@@ -52,12 +52,14 @@
         "data": {
           "email": "Email Address",
           "password": "Password",
-          "proxy_url": "Proxy URL"
+          "proxy_url": "Proxy URL",
+          "verify_ssl": "Verify SSL Certificate"
         },
         "data_description": {
           "email": "Your Ajax account email address",
           "password": "Your Ajax account password",
-          "proxy_url": "Ajax proxy server URL"
+          "proxy_url": "Ajax proxy server URL",
+          "verify_ssl": "Disable if using self-signed certificate (HTTPS)"
         },
         "description": "Connect via an Ajax proxy server.\n\n⚠️ **User account only** (not PRO/Enterprise accounts).\n\nEvents will be received in real-time via SSE.",
         "title": "Proxy Connection"
@@ -183,6 +185,13 @@
       },
       "doorbell_ring": {
         "name": "Doorbell"
+      },
+      "mcp_fire_alarm": {
+        "name": "Fire alarm",
+        "state": {
+          "off": "Normal",
+          "on": "Alarm triggered"
+        }
       },
       "external_contact": {
         "name": "Door (external contact)"
@@ -436,7 +445,16 @@
         "name": "Device color",
         "state": {
           "black": "Black",
-          "white": "White"
+          "white": "White",
+          "red": "Red",
+          "blue": "Blue"
+        }
+      },
+      "mcp_switch_state": {
+        "name": "Button state",
+        "state": {
+          "button_unpressed": "Normal",
+          "button_pressed": "Pressed"
         }
       },
       "device_label": {
@@ -1271,12 +1289,14 @@
       },
       "proxy_settings": {
         "data": {
-          "proxy_url": "Proxy URL"
+          "proxy_url": "Proxy URL",
+          "verify_ssl": "Verify SSL Certificate"
         },
         "data_description": {
-          "proxy_url": "Example: https://my-proxy.example.com"
+          "proxy_url": "Example: https://my-proxy.example.com",
+          "verify_ssl": "Disable for self-signed certificates"
         },
-        "description": "Change your Ajax proxy server URL.",
+        "description": "Change your Ajax proxy server URL and SSL settings.",
         "title": "Proxy Settings"
       },
       "rtsp_credentials": {

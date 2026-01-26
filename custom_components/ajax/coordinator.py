@@ -715,6 +715,7 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
                 callback=lambda event: None,  # Will be set by manager
                 hass_loop=self.hass.loop,
                 user_id=self.api.user_id,
+                verify_ssl=self.api.verify_ssl,
             )
 
             # Create SSE manager
@@ -1793,6 +1794,21 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
             else:
                 normalized["is_on"] = True
 
+        # Manual Call Point (MCP): Parse button state and attributes
+        if device_type == DeviceType.MANUAL_CALL_POINT:
+            # switchState for MCP is a string: "BUTTON_UNPRESSED" or "BUTTON_PRESSED"
+            if "switchState" in api_attributes:
+                normalized["switchState"] = api_attributes["switchState"]
+            # customEvent indicates the alarm type (e.g., "FIRE_ALARM")
+            if "customEvent" in api_attributes:
+                normalized["customEvent"] = api_attributes["customEvent"]
+            # Device color (RED, BLUE, etc.)
+            if "color" in api_attributes:
+                normalized["color"] = api_attributes["color"]
+            # Self-monitoring config
+            if "selfMonitoringConfig" in api_attributes:
+                normalized["selfMonitoringConfig"] = api_attributes["selfMonitoringConfig"]
+
         # Note: LightSwitch multi-gang (channelStatuses, buttonOne, buttonTwo)
         # is parsed directly from device_data in _update_devices since these
         # fields are at root level, not inside "attributes"
@@ -2304,6 +2320,12 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
             "fireprotect2base": DeviceType.SMOKE_DETECTOR,
             "smoke": DeviceType.SMOKE_DETECTOR,
             "fire": DeviceType.SMOKE_DETECTOR,
+            # Manual Call Point (fire alarm button)
+            "switchbasemcpfire": DeviceType.MANUAL_CALL_POINT,
+            "switch_base_mcp_fire": DeviceType.MANUAL_CALL_POINT,
+            "manualcallpoint": DeviceType.MANUAL_CALL_POINT,
+            "manual_call_point": DeviceType.MANUAL_CALL_POINT,
+            "mcp": DeviceType.MANUAL_CALL_POINT,
             # Flood detectors
             "leak_protect": DeviceType.FLOOD_DETECTOR,
             "leakprotect": DeviceType.FLOOD_DETECTOR,

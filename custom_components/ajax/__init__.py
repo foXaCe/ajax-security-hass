@@ -38,6 +38,7 @@ from .const import (
     CONF_PASSWORD,
     CONF_PROXY_URL,
     CONF_QUEUE_NAME,
+    CONF_VERIFY_SSL,
     DOMAIN,
     AjaxConfigEntry,
 )
@@ -115,9 +116,20 @@ async def async_setup_entry(hass: HomeAssistant, entry: AjaxConfigEntry) -> bool
         proxy_mode = AUTH_MODE_PROXY_SECURE
         _LOGGER.info("Using proxy secure authentication mode")
 
+    # Get verify_ssl option (default True for backwards compatibility)
+    verify_ssl = entry.data.get(CONF_VERIFY_SSL, True)
+
     # Create REST API instance with HA session for connection reuse
     # password_is_hashed=True because we store only SHA256 hash, never plain password
     # Note: api_key can be None for proxy mode (fetched during login)
+    # Note: For proxy mode with HTTPS, we can't use HA session when verify_ssl=False
+    #       because async_get_clientsession() doesn't support disabling SSL verification
+    if verify_ssl:
+        session = async_get_clientsession(hass)
+    else:
+        session = None  # API will create its own session with SSL disabled
+        _LOGGER.warning("SSL verification disabled - using dedicated session")
+
     api = AjaxRestApi(
         api_key=api_key or "",  # type: ignore[arg-type]
         email=email,
@@ -125,7 +137,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: AjaxConfigEntry) -> bool
         password_is_hashed=True,  # Password is already SHA256 hash
         proxy_url=proxy_url,
         proxy_mode=proxy_mode,
-        session=async_get_clientsession(hass),
+        session=session,
+        verify_ssl=verify_ssl,
     )
 
     try:

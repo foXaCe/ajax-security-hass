@@ -44,6 +44,7 @@ from .const import (
     CONF_QUEUE_NAME,
     CONF_RTSP_PASSWORD,
     CONF_RTSP_USERNAME,
+    CONF_VERIFY_SSL,
     DOMAIN,
     NOTIFICATION_FILTER_ALARMS_ONLY,
     NOTIFICATION_FILTER_ALL,
@@ -283,6 +284,7 @@ class AjaxConfigFlow(ConfigFlow, domain=DOMAIN):
                     CONF_PROXY_URL: proxy_url,
                     CONF_EMAIL: user_input[CONF_EMAIL],
                     CONF_PASSWORD: password_hash,
+                    CONF_VERIFY_SSL: user_input.get(CONF_VERIFY_SSL, True),
                 }
 
                 # If multiple spaces, let user select which to enable
@@ -327,6 +329,7 @@ class AjaxConfigFlow(ConfigFlow, domain=DOMAIN):
                 vol.Required(CONF_PROXY_URL): str,
                 vol.Required(CONF_EMAIL): str,
                 vol.Required(CONF_PASSWORD): str,
+                vol.Optional(CONF_VERIFY_SSL, default=True): bool,
             }
         )
 
@@ -870,19 +873,24 @@ class AjaxOptionsFlow(OptionsFlow):
                 if not new_proxy_url.startswith(("http://", "https://")):
                     errors["base"] = "invalid_proxy_url"
                 else:
-                    # Update config entry data with new proxy URL
+                    # Update config entry data with new proxy URL and verify_ssl
                     new_data = {**self.config_entry.data}
                     new_data[CONF_PROXY_URL] = new_proxy_url.rstrip("/")
+                    new_data[CONF_VERIFY_SSL] = user_input.get(CONF_VERIFY_SSL, True)
 
                     self.hass.config_entries.async_update_entry(
                         self.config_entry,
                         data=new_data,
                     )
 
+                    # Reload to apply SSL changes
+                    await self.hass.config_entries.async_reload(self.config_entry.entry_id)
+
                     return self.async_create_entry(title="", data=self.config_entry.options)
 
-        # Get current proxy URL
+        # Get current proxy URL and verify_ssl
         current_proxy_url = self.config_entry.data.get(CONF_PROXY_URL, "")
+        current_verify_ssl = self.config_entry.data.get(CONF_VERIFY_SSL, True)
 
         data_schema = vol.Schema(
             {
@@ -890,6 +898,10 @@ class AjaxOptionsFlow(OptionsFlow):
                     CONF_PROXY_URL,
                     default=current_proxy_url,
                 ): str,
+                vol.Optional(
+                    CONF_VERIFY_SSL,
+                    default=current_verify_ssl,
+                ): bool,
             }
         )
 

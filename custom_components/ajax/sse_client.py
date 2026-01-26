@@ -41,6 +41,7 @@ class AjaxSSEClient:
         callback: Callable[[dict[str, Any]], Awaitable[None] | None],
         hass_loop: asyncio.AbstractEventLoop | None = None,
         user_id: str | None = None,
+        verify_ssl: bool = True,
     ):
         """Initialize the SSE client.
 
@@ -50,10 +51,12 @@ class AjaxSSEClient:
             callback: Function to call when an event is received
             hass_loop: Home Assistant event loop for thread-safe callbacks
             user_id: User ID for proxy rate limiting (X-User-Id header)
+            verify_ssl: Verify SSL certificates (set False for self-signed certs)
         """
         self.sse_url = sse_url
         self.session_token = session_token
         self.user_id = user_id
+        self.verify_ssl = verify_ssl
         self._callback = callback
         self._hass_loop = hass_loop
         self._running = False
@@ -112,7 +115,13 @@ class AjaxSSEClient:
     async def _connect_and_receive(self) -> None:
         """Connect to SSE endpoint and receive events."""
         if not self._session or self._session.closed:
-            self._session = aiohttp.ClientSession()
+            # Create session with SSL verification setting
+            if self.verify_ssl:
+                connector = None
+            else:
+                connector = aiohttp.TCPConnector(ssl=False)
+                _LOGGER.warning("SSE: SSL certificate verification disabled")
+            self._session = aiohttp.ClientSession(connector=connector)
 
         headers = {
             "X-Session-Token": self.session_token,

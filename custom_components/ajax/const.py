@@ -56,6 +56,7 @@ CONF_QUEUE_NAME = "queue_name"
 # Authentication mode
 CONF_AUTH_MODE = "auth_mode"
 CONF_PROXY_URL = "proxy_url"
+CONF_VERIFY_SSL = "verify_ssl"  # Verify SSL certificates (disable for self-signed)
 
 # Auth mode options
 AUTH_MODE_DIRECT = "direct"  # Direct API + SQS (current)

@@ -89,6 +89,7 @@ class AjaxRestApi:
         proxy_url: str | None = None,
         proxy_mode: str | None = None,
         session: aiohttp.ClientSession | None = None,
+        verify_ssl: bool = True,
     ):
         """Initialize the API client.
 
@@ -100,11 +101,13 @@ class AjaxRestApi:
             proxy_url: URL of proxy server (for proxy modes)
             proxy_mode: Authentication mode (direct, proxy_secure)
             session: Optional aiohttp session (use async_get_clientsession(hass) for HA)
+            verify_ssl: Verify SSL certificates (set False for self-signed certs)
         """
         self.api_key = api_key
         self.email = email
         self.proxy_url = proxy_url.rstrip("/") if proxy_url else None
         self.proxy_mode = proxy_mode or AUTH_MODE_DIRECT
+        self.verify_ssl = verify_ssl  # Verify SSL certificates
         self.sse_url: str | None = None  # SSE endpoint URL (set by proxy on login)
 
         # Hash password if not already hashed
@@ -170,7 +173,14 @@ class AjaxRestApi:
     async def _get_session(self) -> aiohttp.ClientSession:
         """Get or create aiohttp session."""
         if self.session is None or self.session.closed:
-            self.session = aiohttp.ClientSession()
+            # Create session with SSL verification setting
+            if self.verify_ssl:
+                connector = None  # Use default SSL verification
+            else:
+                # Disable SSL verification for self-signed certificates
+                connector = aiohttp.TCPConnector(ssl=False)
+                _LOGGER.warning("SSL certificate verification disabled - use only with trusted self-signed certs")
+            self.session = aiohttp.ClientSession(connector=connector)
             self._owns_session = True
         return self.session
 

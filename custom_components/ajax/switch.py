@@ -27,6 +27,7 @@ from .devices import (
     FloodDetectorHandler,
     GlassBreakHandler,
     LifeQualityHandler,
+    LightSwitchHandler,
     ManualCallPointHandler,
     MotionDetectorHandler,
     RepeaterHandler,
@@ -93,6 +94,13 @@ def is_dimmer_device(device: AjaxDevice) -> bool:
     """Check if device is a LightSwitchDimmer."""
     raw_type = (device.raw_type or "").lower().replace("_", "").replace(" ", "")
     return "lightswitchdimmer" in raw_type or raw_type == "dimmer"
+
+
+def is_lightswitch_device(device: AjaxDevice) -> bool:
+    """Check if device is a LightSwitch (non-dimmer)."""
+    raw_type = (device.raw_type or "").lower().replace("_", "").replace(" ", "")
+    # Match LightSwitchTwoWay, LightSwitchTwoGang, LightSwitchTwoChannelTwoWay, etc.
+    return "lightswitch" in raw_type and "dimmer" not in raw_type
 
 
 def get_device_handler(device: AjaxDevice):
@@ -189,6 +197,26 @@ async def async_setup_entry(
                         switch_desc["key"],
                         device.name,
                         device.type.value if device.type else "unknown",
+                    )
+
+            # Add LightSwitch settings switches (non-dimmer) - LED, child lock, etc.
+            if is_lightswitch_device(device):
+                lightswitch_handler = LightSwitchHandler(device)
+                settings_switches = lightswitch_handler.get_switches()
+                for switch_desc in settings_switches:
+                    entities.append(
+                        AjaxSwitch(
+                            coordinator=coordinator,
+                            space_id=space_id,
+                            device_id=device_id,
+                            switch_key=switch_desc["key"],
+                            switch_desc=switch_desc,
+                        )
+                    )
+                    _LOGGER.debug(
+                        "Created LightSwitch settings switch '%s' for device: %s",
+                        switch_desc["key"],
+                        device.name,
                     )
 
     if entities:
@@ -492,13 +520,29 @@ class AjaxSwitch(CoordinatorEntity[AjaxDataCoordinator], SwitchEntity):
 
     async def _set_channel_value(self, space, device, channel: int, value: bool) -> None:
         """Set a channel value for multi-gang LightSwitch devices."""
+        import time
+
         # channel is 0-based (0, 1), but attribute keys are 1-based (channel_1_on, channel_2_on)
         attr_key = f"channel_{channel + 1}_on"
         old_value = device.attributes.get(attr_key)
 
-        # Optimistic update
+        # Optimistic update - also update channelStatuses to keep in sync
         device.attributes[attr_key] = value
+        channel_str_on = f"CHANNEL_{channel + 1}_ON"
+        current_statuses = list(device.attributes.get("channelStatuses", []))
+        if value and channel_str_on not in current_statuses:
+            current_statuses.append(channel_str_on)
+        elif not value and channel_str_on in current_statuses:
+            current_statuses.remove(channel_str_on)
+        device.attributes["channelStatuses"] = current_statuses
+
+        # Mark device as having pending optimistic update (prevent polling overwrite)
+        # Use 15 seconds to give enough time for the device to report state
+        device.attributes["_optimistic_until"] = time.time() + 15.0
+
         self.async_write_ha_state()
+        # Notify other channel switches of state change
+        self.coordinator.async_update_listeners()
 
         try:
             device_type_str = device.raw_type
@@ -525,8 +569,15 @@ class AjaxSwitch(CoordinatorEntity[AjaxDataCoordinator], SwitchEntity):
             )
             # Revert optimistic update on error
             device.attributes[attr_key] = old_value
+            # Revert channelStatuses
+            if value and channel_str_on in current_statuses:
+                current_statuses.remove(channel_str_on)
+            elif not value and channel_str_on not in current_statuses:
+                current_statuses.append(channel_str_on)
+            device.attributes["channelStatuses"] = current_statuses
+            device.attributes.pop("_optimistic_until", None)
             self.async_write_ha_state()
-            await self.coordinator.async_request_refresh()
+            self.coordinator.async_update_listeners()
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:

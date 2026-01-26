@@ -1651,9 +1651,22 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
             # These are at root level of device_data, not inside "attributes"
             if "channelStatuses" in device_data:
                 channel_statuses = device_data.get("channelStatuses", [])
-                device.attributes["channelStatuses"] = channel_statuses  # Raw list for light.py
-                device.attributes["channel_1_on"] = "CHANNEL_1_ON" in channel_statuses
-                device.attributes["channel_2_on"] = "CHANNEL_2_ON" in channel_statuses
+                _LOGGER.debug(
+                    "LightSwitch %s channelStatuses from API: %s",
+                    device.name,
+                    channel_statuses,
+                )
+                # Check if device has pending optimistic update (don't overwrite for 15 seconds)
+                optimistic_until = device.attributes.get("_optimistic_until", 0)
+                if time.time() < optimistic_until:
+                    _LOGGER.debug(
+                        "Skipping channelStatuses update for %s (optimistic update pending)",
+                        device.name,
+                    )
+                else:
+                    device.attributes["channelStatuses"] = channel_statuses  # Raw list
+                    device.attributes["channel_1_on"] = "CHANNEL_1_ON" in channel_statuses
+                    device.attributes["channel_2_on"] = "CHANNEL_2_ON" in channel_statuses
 
             # LightSwitchDimmer: Parse brightness attributes (at root level)
             if "actualBrightnessCh1" in device_data:
@@ -1688,12 +1701,32 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
                 device.attributes["panelColor"] = device_data.get("panelColor")
 
             if "buttonOne" in device_data or "buttonTwo" in device_data:
-                button_one = device_data.get("buttonOne", {})
-                button_two = device_data.get("buttonTwo", {})
+                button_one = device_data.get("buttonOne")
+                button_two = device_data.get("buttonTwo")
+                _LOGGER.debug(
+                    "LightSwitch %s (%s): buttonOne=%s (type=%s), buttonTwo=%s (type=%s)",
+                    device.name,
+                    device.raw_type,
+                    button_one,
+                    type(button_one).__name__,
+                    button_two,
+                    type(button_two).__name__,
+                )
+                # Handle both formats: string directly ("Switch 1") or object {"buttonName": "..."}
                 if button_one:
-                    device.attributes["channel_1_name"] = button_one.get("buttonName", "Channel 1")
+                    if isinstance(button_one, str):
+                        device.attributes["channel_1_name"] = button_one
+                    elif isinstance(button_one, dict):
+                        device.attributes["channel_1_name"] = button_one.get("buttonName", "Channel 1")
+                    else:
+                        device.attributes["channel_1_name"] = "Channel 1"
                 if button_two:
-                    device.attributes["channel_2_name"] = button_two.get("buttonName", "Channel 2")
+                    if isinstance(button_two, str):
+                        device.attributes["channel_2_name"] = button_two
+                    elif isinstance(button_two, dict):
+                        device.attributes["channel_2_name"] = button_two.get("buttonName", "Channel 2")
+                    else:
+                        device.attributes["channel_2_name"] = "Channel 2"
                 # Multi-gang only if BOTH buttons exist (LightSwitchTwoGang, LightSwitchTwoChannelTwoWay)
                 # LightSwitchTwoWay has only buttonOne (single channel with two-way control)
                 device.attributes["is_multi_gang"] = bool(button_one and button_two)
@@ -2527,8 +2560,6 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
 
     def _register_ha_action(self, hub_id: str) -> None:
         """Register that Home Assistant triggered an action on this hub."""
-        import time
-
         self._pending_ha_actions[hub_id] = time.time()
 
     def has_pending_ha_action(self, hub_id: str) -> bool:
@@ -2537,8 +2568,6 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
         Returns True if HA action was within the last 10 seconds.
         Does NOT consume the pending action (can be called multiple times).
         """
-        import time
-
         timestamp = self._pending_ha_actions.get(hub_id, 0)
         return time.time() - timestamp < 10
 
@@ -2548,8 +2577,6 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
         Returns True if HA action was within the last 10 seconds.
         Clears the pending action after returning True.
         """
-        import time
-
         timestamp = self._pending_ha_actions.get(hub_id, 0)
         if time.time() - timestamp < 10:
             # Clear the pending action

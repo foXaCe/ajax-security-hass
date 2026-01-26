@@ -31,6 +31,7 @@ from .glass_break import GlassBreakHandler
 from .hub import HubHandler
 from .life_quality import LifeQualityHandler
 from .light import LightHandler
+from .lightswitch import LightSwitchHandler
 from .manual_call_point import ManualCallPointHandler
 from .motion_detector import MotionDetectorHandler
 from .repeater import RepeaterHandler
@@ -52,6 +53,7 @@ __all__ = [
     "HubHandler",
     "LifeQualityHandler",
     "LightHandler",
+    "LightSwitchHandler",
     "ManualCallPointHandler",
     "MotionDetectorHandler",
     "RepeaterHandler",

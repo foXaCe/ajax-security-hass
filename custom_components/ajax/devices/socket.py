@@ -256,6 +256,17 @@ class SocketHandler(AjaxDeviceHandler):
 
     def _get_multi_gang_switches(self) -> list[dict]:
         """Return switch entities for multi-gang LightSwitch devices."""
+        import logging
+
+        _LOGGER = logging.getLogger(__name__)
+        _LOGGER.debug(
+            "Multi-gang switches for %s: has_ch1=%s, has_ch2=%s, ch1_name=%s, ch2_name=%s",
+            self.device.name,
+            self.device.attributes.get("has_channel_1"),
+            self.device.attributes.get("has_channel_2"),
+            self.device.attributes.get("channel_1_name"),
+            self.device.attributes.get("channel_2_name"),
+        )
         switches = []
 
         # Channel 1 (API uses 0-indexed channels)

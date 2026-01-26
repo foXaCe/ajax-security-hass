@@ -292,10 +292,15 @@ class SSEManager:
             source_name = "Home Assistant"
 
         # Group arm/disarm events need a FULL refresh to update group states
+        # because the final state depends on how many groups are armed
         is_group_event = event_tag in ("grouparm", "groupdisarm")
-        if is_group_event:
+
+        # Full arm/disarm also affects all groups - need refresh to update them
+        is_full_arm_disarm = event_tag in ("arm", "disarm")
+
+        if is_group_event or is_full_arm_disarm:
             _LOGGER.info(
-                "SSE: Group event '%s' detected for hub %s, waiting before refresh",
+                "SSE: Security event '%s' detected for hub %s, refreshing groups",
                 event_tag,
                 space.hub_id,
             )
@@ -303,11 +308,17 @@ class SSEManager:
             # Without this delay, the API may return stale state
             await asyncio.sleep(1.0)
             try:
-                # Bypass proxy cache to get fresh data after state change
-                await self.coordinator.async_request_refresh_bypass_cache()
-                _LOGGER.info("SSE: Refresh with cache bypass completed after group event")
+                # Set flag to skip event creation during refresh (SSE already created it)
+                self.coordinator._skip_state_change_event = True
+                # Use async_force_metadata_refresh to ensure full_refresh=True
+                # This updates groups, not just hub state
+                await self.coordinator.async_force_metadata_refresh()
+                _LOGGER.info("SSE: Metadata refresh completed after security event")
             except Exception as err:
-                _LOGGER.error("SSE: Metadata refresh failed after group event: %s", err)
+                _LOGGER.error("SSE: Metadata refresh failed after security event: %s", err)
+            finally:
+                # Always reset the flag
+                self.coordinator._skip_state_change_event = False
 
         if state_changed and not is_group_event:
             space.security_state = new_state

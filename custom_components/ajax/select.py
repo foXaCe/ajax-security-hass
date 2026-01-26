@@ -106,6 +106,27 @@ def is_dimmer_device(device: AjaxDevice) -> bool:
     return "lightswitchdimmer" in raw_type or raw_type == "dimmer"
 
 
+def is_lightswitch_device(device: AjaxDevice) -> bool:
+    """Check if device is a LightSwitch (non-dimmer)."""
+    raw_type = (device.raw_type or "").lower().replace("_", "").replace(" ", "")
+    return "lightswitch" in raw_type and "dimmer" not in raw_type
+
+
+# LightSwitch touch mode select definition
+LIGHTSWITCH_TOUCH_MODE_SELECT = {
+    "key": "touch_mode",
+    "translation_key": "touch_mode",
+    "attr_key": "touchMode",
+    "api_key": "touchMode",
+    "options": ["touch_mode_toggle_and_slider", "touch_mode_toggle", "touch_mode_blocked"],
+    "api_options": {
+        "touch_mode_toggle_and_slider": "TOUCH_MODE_TOGGLE_AND_SLIDER",
+        "touch_mode_toggle": "TOUCH_MODE_TOGGLE",
+        "touch_mode_blocked": "TOUCH_MODE_BLOCKED",
+    },
+}
+
+
 def _get_dimmer_attr(device: AjaxDevice, attr_key: str):
     """Get nested attribute value from device."""
     if "." in attr_key:
@@ -160,6 +181,14 @@ async def async_setup_entry(
                             select_def["key"],
                             device.name,
                         )
+
+            # LightSwitch (non-dimmer) touch mode select
+            if is_lightswitch_device(device) and "touchMode" in device.attributes:
+                entities.append(AjaxDimmerSelect(coordinator, space_id, device_id, LIGHTSWITCH_TOUCH_MODE_SELECT))
+                _LOGGER.debug(
+                    "Created LightSwitch select 'touch_mode' for device: %s",
+                    device.name,
+                )
 
             # Handler-based selects (sirens, etc.)
             handler_class = SELECT_DEVICE_HANDLERS.get(device.type)

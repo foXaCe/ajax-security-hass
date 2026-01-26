@@ -113,6 +113,12 @@ def is_dimmer_device(device: AjaxDevice) -> bool:
     return "lightswitchdimmer" in raw_type or raw_type == "dimmer"
 
 
+def is_lightswitch_device(device: AjaxDevice) -> bool:
+    """Check if device is a LightSwitch (non-dimmer)."""
+    raw_type = (device.raw_type or "").lower().replace("_", "").replace(" ", "")
+    return "lightswitch" in raw_type and "dimmer" not in raw_type
+
+
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: AjaxConfigEntry,
@@ -162,6 +168,30 @@ async def async_setup_entry(
                             number_def["key"],
                             device.name,
                         )
+
+            # LightSwitch (non-dimmer) touch sensitivity
+            if is_lightswitch_device(device) and "touchSensitivity" in device.attributes:
+                entities.append(
+                    AjaxDimmerNumber(
+                        coordinator=coordinator,
+                        space_id=space_id,
+                        device_id=device_id,
+                        number_def={
+                            "key": "touch_sensitivity",
+                            "translation_key": "touch_sensitivity",
+                            "attr_key": "touchSensitivity",
+                            "api_key": "touchSensitivity",
+                            "min_value": 1,
+                            "max_value": 7,
+                            "step": 1,
+                            "entity_category": "config",
+                        },
+                    )
+                )
+                _LOGGER.debug(
+                    "Created LightSwitch number 'touch_sensitivity' for device: %s",
+                    device.name,
+                )
 
     if entities:
         async_add_entities(entities)

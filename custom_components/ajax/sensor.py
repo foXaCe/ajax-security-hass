@@ -848,11 +848,13 @@ class AjaxVideoEdgeSensor(CoordinatorEntity[AjaxDataCoordinator], SensorEntity):
         if "enabled_by_default" in sensor_desc:
             self._attr_entity_registry_enabled_default = sensor_desc["enabled_by_default"]
 
-        # Set device class for enum sensors
-        if sensor_desc.get("device_class") == "enum":
-            self._attr_device_class = SensorDeviceClass.ENUM
-            if "options" in sensor_desc:
-                self._attr_options = sensor_desc["options"]
+        # Set device class if provided
+        if "device_class" in sensor_desc:
+            self._attr_device_class = sensor_desc["device_class"]
+
+        # Set options for enum sensors (required for translations)
+        if "options" in sensor_desc:
+            self._attr_options = sensor_desc["options"]
 
         # Set native unit of measurement
         if "native_unit_of_measurement" in sensor_desc:

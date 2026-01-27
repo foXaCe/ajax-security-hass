@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.13.2] - 2026-01-27
+
+### Fixed
+- Video edge uptime sensor now properly uses timestamp device class (#85)
+- Enum sensor options for translations (#84)
+- Auto-remove devices deleted from Ajax account
+
 ## [0.13.1] - 2026-01-26
 
 ### Added

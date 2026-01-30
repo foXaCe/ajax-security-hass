@@ -1256,9 +1256,9 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
         stale_devices: list[tuple[str, str]] = []  # (ha_device_id, ajax_id)
 
         for ha_device in device_registry.devices.values():
-            for domain, identifier in ha_device.identifiers:
-                if domain == DOMAIN and identifier not in known_ids:
-                    stale_devices.append((ha_device.id, identifier))
+            for id_tuple in ha_device.identifiers:
+                if len(id_tuple) == 2 and id_tuple[0] == DOMAIN and id_tuple[1] not in known_ids:
+                    stale_devices.append((ha_device.id, id_tuple[1]))
 
         # Remove stale devices
         for ha_device_id, ajax_id in stale_devices:

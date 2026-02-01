@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.14.0] - 2026-02-01
+
+### Added
+- Smart lock support (LockBridge Jeweller): read-only lock entity with state from SSE/SQS events
+- Smart lock door binary sensor (open/close state)
+- Smart lock event code mapping for reliable lock/unlock and door state
+- Auto-discovery of smart locks from SSE/SQS events
+- Smart lock translations in 7 languages (de, en, es, fr, nl, sv, uk)
+
 ## [0.13.4] - 2026-01-30
 
 ### Fixed

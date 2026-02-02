@@ -18,6 +18,9 @@ import time
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
+from homeassistant.helpers.dispatcher import async_dispatcher_send
+
+from .const import SIGNAL_NEW_SMART_LOCK
 from .event_codes import DEFAULT_LANGUAGE, parse_event_code
 from .models import AjaxSmartLock
 from .sqs_manager import (  # Import event mappings from SQS manager to avoid duplication
@@ -630,6 +633,8 @@ class SSEManager:
                     smart_lock.name,
                     source_id,
                 )
+                # Signal platforms to create entities for the new smart lock
+                async_dispatcher_send(self.coordinator.hass, SIGNAL_NEW_SMART_LOCK, space.id, source_id)
             else:
                 _LOGGER.warning(
                     "SSE: Smart lock event without source_id: tag=%s, name=%s",

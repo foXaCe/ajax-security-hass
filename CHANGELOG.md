@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.14.2] - 2026-02-04
+
+### Added
+- Yale cloud lock detection: after 5 minutes without SSE events, locks are marked unavailable with guidance to use native Yale integration
+
+### Fixed
+- CI workflow using incorrect setup-python action version
+- Ruff SIM910 lint error in coordinator.py
+
 ## [0.14.1] - 2026-02-03
 
 ### Fixed

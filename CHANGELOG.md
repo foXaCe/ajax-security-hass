@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.14.3] - 2026-02-04
+
+### Fixed
+- DHCP discovery no longer shows duplicate notifications for already configured hubs
+- Hassfest badge link in README now points to correct workflow
+
 ## [0.14.2] - 2026-02-04
 
 ### Added

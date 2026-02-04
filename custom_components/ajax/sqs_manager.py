@@ -1110,6 +1110,7 @@ class SQSManager:
 
         smart_lock.last_event_tag = event_tag
         smart_lock.last_event_time = datetime.now(UTC)
+        smart_lock.last_sse_event_time = datetime.now(UTC)
 
         return True
 

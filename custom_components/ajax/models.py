@@ -314,12 +314,26 @@ class AjaxSmartLock:
     last_event_tag: str | None = None
     last_event_time: datetime | None = None
     last_changed_by: str | None = None  # Who locked/unlocked (from additionalData)
+    last_sse_event_time: datetime | None = None  # Track SSE events for Yale cloud detection
 
     # Raw data from API
     raw_data: dict[str, Any] = field(default_factory=dict)
 
     def __str__(self) -> str:
         return f"SmartLock({self.name}, locked={self.is_locked})"
+
+    @property
+    def is_yale_cloud_device(self) -> bool:
+        """Check if this is likely a Yale cloud device (no SSE events).
+
+        Returns True if:
+        - We have raw_data from API (device was discovered via polling)
+        - No SSE event has ever been received for this device
+        - This indicates a Yale cloud lock that doesn't send SSE events
+        """
+        # SSE-discovered device (LockBridge) - definitely not Yale cloud
+        # Or received SSE events - this is a LockBridge
+        return bool(self.raw_data and self.last_sse_event_time is None)
 
 
 @dataclass

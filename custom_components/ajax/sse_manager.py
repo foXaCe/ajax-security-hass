@@ -672,6 +672,7 @@ class SSEManager:
 
         smart_lock.last_event_tag = event_tag
         smart_lock.last_event_time = datetime.now(UTC)
+        smart_lock.last_sse_event_time = datetime.now(UTC)
 
     def _handle_scenario_event(self, space, event: dict, event_tag: str) -> None:
         """Handle scenario events that might be triggered by a Button.

@@ -542,10 +542,65 @@ class AjaxConfigFlow(ConfigFlow, domain=DOMAIN):
                 # This hub is already configured, abort discovery
                 return self.async_abort(reason="already_configured")
 
-        # Store discovered MAC to add to entry data when created
+        # Store discovered MAC and check for existing entries
         self.context["discovered_mac"] = discovered_mac
         self.context["title_placeholders"] = {"name": discovery_info.hostname or "Ajax Hub"}
+
+        # If there are existing entries, ask user if they want to associate
+        existing_entries = self._async_current_entries()
+        if existing_entries:
+            return await self.async_step_dhcp_confirm()
+
         return await self.async_step_user()
+
+    async def async_step_dhcp_confirm(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+        """Ask user whether to associate discovered hub with existing entry."""
+        errors: dict[str, str] = {}
+        discovered_mac = self.context.get("discovered_mac", "")
+
+        if user_input is not None:
+            action = user_input.get("action")
+            if action == "new":
+                # User wants to create a new configuration
+                return await self.async_step_user()
+            else:
+                # Associate with existing entry
+                entry_id = action
+                entry = self.hass.config_entries.async_get_entry(entry_id)
+                if entry:
+                    # Add MAC to existing entry
+                    existing_macs = list(entry.data.get(CONF_DISCOVERED_MACS, []))
+                    if discovered_mac not in existing_macs:
+                        existing_macs.append(discovered_mac)
+                        new_data = {**entry.data, CONF_DISCOVERED_MACS: existing_macs}
+                        self.hass.config_entries.async_update_entry(entry, data=new_data)
+                    return self.async_abort(reason="hub_associated")
+                errors["base"] = "entry_not_found"
+
+        # Build options from existing entries
+        options = []
+        for entry in self._async_current_entries():
+            email = entry.data.get(CONF_EMAIL, "Unknown")
+            options.append({"value": entry.entry_id, "label": f"{email}"})
+        options.append({"value": "new", "label": "Create new configuration"})
+
+        data_schema = vol.Schema(
+            {
+                vol.Required("action"): SelectSelector(
+                    SelectSelectorConfig(options=options, mode=SelectSelectorMode.LIST)
+                ),
+            }
+        )
+
+        return self.async_show_form(
+            step_id="dhcp_confirm",
+            data_schema=data_schema,
+            errors=errors,
+            description_placeholders={
+                "mac": discovered_mac,
+                "hostname": self.context.get("title_placeholders", {}).get("name", "Ajax Hub"),
+            },
+        )
 
     async def async_step_reauth(self, entry_data: dict[str, Any] | None = None) -> ConfigFlowResult:
         """Handle re-authentication when token expires."""

@@ -2,12 +2,14 @@
   "config": {
     "abort": {
       "already_configured": "Ця інтеграція Ajax вже налаштована.",
+      "hub_associated": "Хаб пов'язано з існуючою конфігурацією.",
       "no_spaces_available": "Немає доступних просторів. Будь ласка, перезавантажте інтеграцію.",
       "reauth_failed": "Повторна автентифікація не вдалася. Будь ласка, переналаштуйте інтеграцію.",
       "reauth_successful": "Повторна автентифікація успішна."
     },
     "error": {
       "cannot_connect": "Не вдалося підключитися до Ajax API. Перевірте підключення до інтернету.",
+      "entry_not_found": "Конфігурацію не знайдено. Будь ласка, спробуйте ще раз.",
       "invalid_2fa": "Невірний код підтвердження. Будь ласка, спробуйте ще раз.",
       "invalid_account_type": "Тип облікового запису не підтримується. Використовуйте обліковий запис користувача (не PRO/Enterprise).",
       "invalid_api_key": "Невірний або відсутній API-ключ. Перевірте ваш корпоративний API-ключ.",
@@ -27,6 +29,13 @@
         },
         "description": "Введіть 6-значний код підтвердження, надісланий на ваш пристрій для {email}",
         "title": "Двофакторна автентифікація"
+      },
+      "dhcp_confirm": {
+        "data": {
+          "action": "Дія"
+        },
+        "description": "У вашій мережі виявлено хаб Ajax ({hostname}) з MAC-адресою {mac}.\n\nБажаєте пов'язати його з існуючою конфігурацією чи створити нову?",
+        "title": "Виявлено хаб Ajax"
       },
       "direct": {
         "data": {
@@ -1485,6 +1494,13 @@
         },
         "description": "Налаштуйте облікові дані AWS для сповіщень про події в реальному часі.\n\n**Поточна конфігурація:**\n- Access Key: {current_access_key}\n- Secret Key: {current_secret_key}\n- Черга SQS: {current_queue}\n\nЗалиште поле порожнім, щоб зберегти поточне значення.",
         "title": "Облікові дані AWS SQS"
+      },
+      "dhcp_confirm": {
+        "data": {
+          "action": "Action"
+        },
+        "description": "An Ajax hub ({hostname}) with MAC address {mac} was discovered on your network.\n\nDo you want to associate it with an existing configuration or create a new one?",
+        "title": "Ajax Hub Discovered"
       },
       "enabled_spaces": {
         "data": {

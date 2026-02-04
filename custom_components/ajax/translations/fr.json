@@ -2,12 +2,14 @@
   "config": {
     "abort": {
       "already_configured": "Cette intégration Ajax est déjà configurée.",
+      "hub_associated": "Hub associé à la configuration existante.",
       "no_spaces_available": "Aucun espace disponible. Veuillez recharger l'intégration.",
       "reauth_failed": "Échec de la ré-authentification. Veuillez reconfigurer l'intégration.",
       "reauth_successful": "Ré-authentification réussie."
     },
     "error": {
       "cannot_connect": "Échec de la connexion à l'API Ajax. Vérifiez votre connexion Internet.",
+      "entry_not_found": "Configuration introuvable. Veuillez réessayer.",
       "invalid_2fa": "Code de vérification invalide. Veuillez réessayer.",
       "invalid_account_type": "Type de compte non supporté. Utilisez un compte utilisateur (pas un compte PRO/Entreprise).",
       "invalid_api_key": "Clé API invalide ou manquante. Vérifiez votre clé API entreprise.",
@@ -27,6 +29,13 @@
         },
         "description": "Entrez le code de vérification à 6 chiffres envoyé sur votre appareil pour {email}",
         "title": "Authentification à deux facteurs"
+      },
+      "dhcp_confirm": {
+        "data": {
+          "action": "Action"
+        },
+        "description": "Un hub Ajax ({hostname}) avec l'adresse MAC {mac} a été découvert sur votre réseau.\\n\\nSouhaitez-vous l'associer à une configuration existante ou créer une nouvelle configuration ?",
+        "title": "Hub Ajax découvert"
       },
       "direct": {
         "data": {

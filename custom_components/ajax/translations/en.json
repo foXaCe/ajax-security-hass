@@ -2,12 +2,14 @@
   "config": {
     "abort": {
       "already_configured": "This Ajax integration is already configured.",
+      "hub_associated": "Hub associated with existing configuration.",
       "no_spaces_available": "No spaces available. Please reload the integration.",
       "reauth_failed": "Re-authentication failed. Please reconfigure the integration.",
       "reauth_successful": "Re-authentication successful."
     },
     "error": {
       "cannot_connect": "Failed to connect to Ajax API. Check your internet connection.",
+      "entry_not_found": "Configuration not found. Please try again.",
       "invalid_2fa": "Invalid verification code. Please try again.",
       "invalid_account_type": "Account type not supported. Use a user account (not a PRO/Enterprise account).",
       "invalid_api_key": "Invalid or missing API key. Check your enterprise API key.",
@@ -27,6 +29,13 @@
         },
         "description": "Enter the 6-digit verification code sent to your device for {email}",
         "title": "Two-Factor Authentication"
+      },
+      "dhcp_confirm": {
+        "data": {
+          "action": "Action"
+        },
+        "description": "An Ajax hub ({hostname}) with MAC address {mac} was discovered on your network.\n\nDo you want to associate it with an existing configuration or create a new one?",
+        "title": "Ajax Hub Discovered"
       },
       "direct": {
         "data": {
@@ -1485,6 +1494,13 @@
         },
         "description": "Configure AWS credentials for real-time event notifications.\n\n**Current configuration:**\n- Access Key: {current_access_key}\n- Secret Key: {current_secret_key}\n- SQS Queue: {current_queue}\n\nLeave a field empty to keep current value.",
         "title": "AWS SQS Credentials"
+      },
+      "dhcp_confirm": {
+        "data": {
+          "action": "Action"
+        },
+        "description": "An Ajax hub ({hostname}) with MAC address {mac} was discovered on your network.\n\nDo you want to associate it with an existing configuration or create a new one?",
+        "title": "Ajax Hub Discovered"
       },
       "enabled_spaces": {
         "data": {

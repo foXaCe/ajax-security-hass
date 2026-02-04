@@ -2,12 +2,14 @@
   "config": {
     "abort": {
       "already_configured": "Deze Ajax-integratie is al geconfigureerd.",
+      "hub_associated": "Hub gekoppeld aan bestaande configuratie.",
       "no_spaces_available": "Geen ruimtes beschikbaar. Herlaad de integratie.",
       "reauth_failed": "Herauthenticatie mislukt. Configureer de integratie opnieuw.",
       "reauth_successful": "Herauthenticatie succesvol."
     },
     "error": {
       "cannot_connect": "Kan geen verbinding maken met Ajax API. Controleer je internetverbinding.",
+      "entry_not_found": "Configuratie niet gevonden. Probeer het opnieuw.",
       "invalid_2fa": "Ongeldige verificatiecode. Probeer opnieuw.",
       "invalid_account_type": "Accounttype niet ondersteund. Gebruik een gebruikersaccount (geen PRO/Enterprise-account).",
       "invalid_api_key": "Ongeldige of ontbrekende API-sleutel. Controleer je enterprise API-sleutel.",
@@ -27,6 +29,13 @@
         },
         "description": "Voer de 6-cijferige verificatiecode in die naar je apparaat is verzonden voor {email}",
         "title": "Tweefactorauthenticatie"
+      },
+      "dhcp_confirm": {
+        "data": {
+          "action": "Actie"
+        },
+        "description": "Er is een Ajax Hub ({hostname}) met MAC-adres {mac} ontdekt op uw netwerk.\n\nWilt u deze koppelen aan een bestaande configuratie of een nieuwe maken?",
+        "title": "Ajax Hub Ontdekt"
       },
       "direct": {
         "data": {
@@ -1485,6 +1494,13 @@
         },
         "description": "Configureer AWS-referenties voor real-time gebeurtenismeldingen.\n\n**Huidige configuratie:**\n- Access Key: {current_access_key}\n- Secret Key: {current_secret_key}\n- SQS-wachtrij: {current_queue}\n\nLaat een veld leeg om de huidige waarde te behouden.",
         "title": "AWS SQS-referenties"
+      },
+      "dhcp_confirm": {
+        "data": {
+          "action": "Action"
+        },
+        "description": "An Ajax hub ({hostname}) with MAC address {mac} was discovered on your network.\n\nDo you want to associate it with an existing configuration or create a new one?",
+        "title": "Ajax Hub Discovered"
       },
       "enabled_spaces": {
         "data": {

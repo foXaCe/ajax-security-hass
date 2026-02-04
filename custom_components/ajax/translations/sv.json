@@ -2,12 +2,14 @@
   "config": {
     "abort": {
       "already_configured": "Denna Ajax-integration är redan konfigurerad.",
+      "hub_associated": "Hubb associerad med befintlig konfiguration.",
       "no_spaces_available": "Inga space tillgängliga. Pröva att ladda om integrationen.",
       "reauth_failed": "Re-authentisering misslyckades. Vänligen omkonfigurera integrationen.",
       "reauth_successful": "Re-authentisering lyckades."
     },
     "error": {
       "cannot_connect": "Misslyckades att ansluta till Ajax API. Kontollera internetanslutningen.",
+      "entry_not_found": "Konfigurationen hittades inte. Försök igen.",
       "invalid_2fa": "Ogiltig verifikationskod. Vänligen försök igen.",
       "invalid_account_type": "Kontotypen stöds ej. Använd ett användarkonto (inte ett PRO/Enterprise konto).",
       "invalid_api_key": "Ogiltig eller saknad API nyckel. Kontrollera din enterprise API-nyckel.",
@@ -27,6 +29,13 @@
         },
         "description": "Ange den 6-siffriga koden som skickats till din enhet för {email}",
         "title": "Tvåfaktorautentisering"
+      },
+      "dhcp_confirm": {
+        "data": {
+          "action": "Åtgärd"
+        },
+        "description": "En Ajax Hubb ({hostname}) med MAC-adress {mac} har upptäckts på ditt nätverk.\n\nVill du associera den med en befintlig konfiguration eller skapa en ny?",
+        "title": "Ajax Hubb Upptäckt"
       },
       "direct": {
         "data": {
@@ -1485,6 +1494,13 @@
         },
         "description": "Konfigurera AWS-uppgifter för realtidsnotiser.\n\n**Nuvarande konfiguration:**\n- Access Key: {current_access_key}\n- Secret Key: {current_secret_key}\n- SQS Queue: {current_queue}\n\nLämna fältet tomt för att behålla nuvarande värde.",
         "title": "AWS SQS-uppgifter"
+      },
+      "dhcp_confirm": {
+        "data": {
+          "action": "Action"
+        },
+        "description": "An Ajax hub ({hostname}) with MAC address {mac} was discovered on your network.\n\nDo you want to associate it with an existing configuration or create a new one?",
+        "title": "Ajax Hub Discovered"
       },
       "enabled_spaces": {
         "data": {

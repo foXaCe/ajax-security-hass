@@ -2,12 +2,14 @@
   "config": {
     "abort": {
       "already_configured": "Diese Ajax-Integration ist bereits konfiguriert.",
+      "hub_associated": "Hub mit bestehender Konfiguration verknüpft.",
       "no_spaces_available": "Keine Bereiche verfügbar. Bitte laden Sie die Integration neu.",
       "reauth_failed": "Erneute Authentifizierung fehlgeschlagen. Bitte konfigurieren Sie die Integration neu.",
       "reauth_successful": "Erneute Authentifizierung erfolgreich."
     },
     "error": {
       "cannot_connect": "Verbindung zur Ajax-API fehlgeschlagen. Überprüfen Sie Ihre Internetverbindung.",
+      "entry_not_found": "Konfiguration nicht gefunden. Bitte versuchen Sie es erneut.",
       "invalid_2fa": "Ungültiger Bestätigungscode. Bitte versuchen Sie es erneut.",
       "invalid_account_type": "Kontotyp nicht unterstützt. Verwenden Sie ein Benutzerkonto (kein PRO/Enterprise-Konto).",
       "invalid_api_key": "Ungültiger oder fehlender API-Schlüssel. Überprüfen Sie Ihren Enterprise-API-Schlüssel.",
@@ -27,6 +29,13 @@
         },
         "description": "Geben Sie den 6-stelligen Bestätigungscode ein, der an Ihr Gerät für {email} gesendet wurde",
         "title": "Zwei-Faktor-Authentifizierung"
+      },
+      "dhcp_confirm": {
+        "data": {
+          "action": "Aktion"
+        },
+        "description": "Ein Ajax Hub ({hostname}) mit MAC-Adresse {mac} wurde in Ihrem Netzwerk entdeckt.\n\nMöchten Sie ihn mit einer bestehenden Konfiguration verknüpfen oder eine neue erstellen?",
+        "title": "Ajax Hub Entdeckt"
       },
       "direct": {
         "data": {
@@ -1485,6 +1494,13 @@
         },
         "description": "AWS-Anmeldedaten für Echtzeit-Ereignisbenachrichtigungen konfigurieren.\n\n**Aktuelle Konfiguration:**\n- Access Key: {current_access_key}\n- Secret Key: {current_secret_key}\n- SQS-Warteschlange: {current_queue}\n\nLassen Sie ein Feld leer, um den aktuellen Wert beizubehalten.",
         "title": "AWS SQS-Anmeldedaten"
+      },
+      "dhcp_confirm": {
+        "data": {
+          "action": "Action"
+        },
+        "description": "An Ajax hub ({hostname}) with MAC address {mac} was discovered on your network.\n\nDo you want to associate it with an existing configuration or create a new one?",
+        "title": "Ajax Hub Discovered"
       },
       "enabled_spaces": {
         "data": {

@@ -2,7 +2,7 @@
 
 
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://github.com/hacs/integration)
-[![Hassfest](https://github.com/foXaCe/ajax-security-hass/actions/workflows/lint.yml/badge.svg)](https://github.com/foXaCe/ajax-security-hass/actions/workflows/lint.yml)
+[![Hassfest](https://github.com/foXaCe/ajax-security-hass/actions/workflows/hassfest.yml/badge.svg)](https://github.com/foXaCe/ajax-security-hass/actions/workflows/hassfest.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Community Forum](https://img.shields.io/badge/Home_Assistant-Community-blue?logo=home-assistant)](https://community.home-assistant.io/t/custom-component-ajax-systems/948939/2)
 [![Donate](https://img.shields.io/badge/Donate-PayPal-blue.svg)](https://paypal.me/foXaCe66)

@@ -148,9 +148,9 @@ class TransmitterHandler(AjaxDeviceHandler):
                 {
                     "key": "power_supply_mode",
                     "translation_key": "power_supply_mode",
-                    "value_fn": lambda: self.device.attributes.get("externalDevicePowerSupplyMode", "")
-                    .lower()
-                    .replace("_", " "),
+                    "value_fn": lambda: (
+                        self.device.attributes.get("externalDevicePowerSupplyMode", "").lower().replace("_", " ")
+                    ),
                     "enabled_by_default": False,
                 }
             )

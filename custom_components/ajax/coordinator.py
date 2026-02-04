@@ -1415,7 +1415,7 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
                         "WEAK": 30,
                         "POOR": 15,
                     }
-                    device.signal_strength = signal_map.get(signal_level.upper(), None)
+                    device.signal_strength = signal_map.get(signal_level.upper())
                 elif signal_level is not None:
                     # Round to int to avoid jitter on last decimal
                     device.signal_strength = round(signal_level)

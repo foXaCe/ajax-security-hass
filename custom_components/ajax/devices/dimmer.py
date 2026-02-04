@@ -126,9 +126,9 @@ class DimmerHandler(AjaxDeviceHandler):
                 {
                     "key": "data_channel_quality",
                     "translation_key": "data_channel_quality",
-                    "value_fn": lambda: self.device.attributes.get("dataChannelSignalQuality", "")
-                    .lower()
-                    .replace("_", " "),
+                    "value_fn": lambda: (
+                        self.device.attributes.get("dataChannelSignalQuality", "").lower().replace("_", " ")
+                    ),
                     "enabled_by_default": False,
                     "entity_category": "diagnostic",
                 }
@@ -226,8 +226,9 @@ class DimmerHandler(AjaxDeviceHandler):
                 {
                     "key": "dimmer_calibration",
                     "translation_key": "dimmer_calibration",
-                    "value_fn": lambda: self.device.attributes.get("dimmerSettings", {}).get("calibration")
-                    == "ENABLED",
+                    "value_fn": lambda: (
+                        self.device.attributes.get("dimmerSettings", {}).get("calibration") == "ENABLED"
+                    ),
                     "api_nested_key": "dimmerSettings",
                     "api_key": "calibration",
                     "api_value_on": "ENABLED",

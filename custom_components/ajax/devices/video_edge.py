@@ -390,9 +390,9 @@ class VideoEdgeHandler:
                 "translation_key": "video_edge_connection",
                 "device_class": SensorDeviceClass.ENUM,
                 "options": ["online", "offline", "unknown"],
-                "value_fn": lambda: self.video_edge.connection_state.lower()
-                if self.video_edge.connection_state
-                else "unknown",
+                "value_fn": lambda: (
+                    self.video_edge.connection_state.lower() if self.video_edge.connection_state else "unknown"
+                ),
                 "enabled_by_default": True,
                 "entity_category": "diagnostic",
             }
@@ -420,9 +420,9 @@ class VideoEdgeHandler:
                     "key": "wifi_signal",
                     "translation_key": "video_edge_wifi_signal",
                     "native_unit_of_measurement": "%",
-                    "value_fn": lambda: self.video_edge.raw_data.get("networkInterface", {})
-                    .get("wifi", {})
-                    .get("signalStrength"),
+                    "value_fn": lambda: (
+                        self.video_edge.raw_data.get("networkInterface", {}).get("wifi", {}).get("signalStrength")
+                    ),
                     "enabled_by_default": True,
                     "entity_category": "diagnostic",
                 }

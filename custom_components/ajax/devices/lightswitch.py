@@ -115,9 +115,9 @@ class LightSwitchHandler(AjaxDeviceHandler):
                 {
                     "key": "data_channel_quality",
                     "translation_key": "data_channel_quality",
-                    "value_fn": lambda: self.device.attributes.get("dataChannelSignalQuality", "")
-                    .lower()
-                    .replace("_", " "),
+                    "value_fn": lambda: (
+                        self.device.attributes.get("dataChannelSignalQuality", "").lower().replace("_", " ")
+                    ),
                     "enabled_by_default": False,
                     "entity_category": "diagnostic",
                 }

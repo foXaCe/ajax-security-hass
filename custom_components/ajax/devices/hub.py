@@ -167,9 +167,11 @@ class HubHandler(AjaxDeviceHandler):
                 {
                     "key": "active_connection",
                     "translation_key": "active_connection",
-                    "value_fn": lambda: ", ".join(sorted(self.device.attributes.get("active_connection", [])))
-                    if isinstance(self.device.attributes.get("active_connection"), list)
-                    else self.device.attributes.get("active_connection"),
+                    "value_fn": lambda: (
+                        ", ".join(sorted(self.device.attributes.get("active_connection", [])))
+                        if isinstance(self.device.attributes.get("active_connection"), list)
+                        else self.device.attributes.get("active_connection")
+                    ),
                     "enabled_by_default": True,
                 }
             )
@@ -265,11 +267,13 @@ class HubHandler(AjaxDeviceHandler):
                 {
                     "key": "malfunctions",
                     "translation_key": "malfunctions",
-                    "value_fn": lambda: ", ".join(str(m) for m in self.device.malfunctions)
-                    if isinstance(self.device.malfunctions, list)
-                    else str(self.device.malfunctions)
-                    if self.device.malfunctions
-                    else "None",
+                    "value_fn": lambda: (
+                        ", ".join(str(m) for m in self.device.malfunctions)
+                        if isinstance(self.device.malfunctions, list)
+                        else str(self.device.malfunctions)
+                        if self.device.malfunctions
+                        else "None"
+                    ),
                     "enabled_by_default": True,
                 }
             )

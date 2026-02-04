@@ -180,11 +180,13 @@ class SmokeDetectorHandler(AjaxDeviceHandler):
                 {
                     "key": "malfunctions",
                     "translation_key": "malfunctions",
-                    "value_fn": lambda: ", ".join(str(m) for m in self.device.malfunctions)
-                    if isinstance(self.device.malfunctions, list)
-                    else str(self.device.malfunctions)
-                    if self.device.malfunctions
-                    else "None",
+                    "value_fn": lambda: (
+                        ", ".join(str(m) for m in self.device.malfunctions)
+                        if isinstance(self.device.malfunctions, list)
+                        else str(self.device.malfunctions)
+                        if self.device.malfunctions
+                        else "None"
+                    ),
                     "enabled_by_default": True,
                 }
             )
@@ -290,8 +292,10 @@ class SmokeDetectorHandler(AjaxDeviceHandler):
                     {
                         "key": "siren_trigger_co",
                         "translation_key": "siren_trigger_co",
-                        "value_fn": lambda: "CO" in self.device.attributes.get("siren_triggers", [])
-                        or "CCO" in self.device.attributes.get("siren_triggers", []),
+                        "value_fn": lambda: (
+                            "CO" in self.device.attributes.get("siren_triggers", [])
+                            or "CCO" in self.device.attributes.get("siren_triggers", [])
+                        ),
                         "api_key": "sirenTriggers",
                         "trigger_key": "CO",
                         "enabled_by_default": True,

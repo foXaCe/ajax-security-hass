@@ -273,9 +273,11 @@ SPACE_SENSORS: tuple[AjaxSpaceSensorDescription, ...] = (
         translation_key="devices_with_malfunctions",
         state_class=SensorStateClass.MEASUREMENT,
         entity_category=EntityCategory.DIAGNOSTIC,
-        value_fn=lambda space: space.hub_details.get("warnings", {}).get("allDevices", 0)
-        if space.hub_details
-        else len(space.get_devices_with_malfunctions()),
+        value_fn=lambda space: (
+            space.hub_details.get("warnings", {}).get("allDevices", 0)
+            if space.hub_details
+            else len(space.get_devices_with_malfunctions())
+        ),
     ),
     AjaxSpaceSensorDescription(
         key="bypassed_devices",
@@ -295,44 +297,46 @@ SPACE_SENSORS: tuple[AjaxSpaceSensorDescription, ...] = (
         device_class=SensorDeviceClass.BATTERY,
         native_unit_of_measurement=PERCENTAGE,
         state_class=SensorStateClass.MEASUREMENT,
-        value_fn=lambda space: space.hub_details.get("battery", {}).get("chargeLevelPercentage")
-        if space.hub_details
-        else None,
+        value_fn=lambda space: (
+            space.hub_details.get("battery", {}).get("chargeLevelPercentage") if space.hub_details else None
+        ),
     ),
     # Note: hub_tamper removed - use binary_sensor.tamper from hub device instead
     AjaxSpaceSensorDescription(
         key="hub_external_power",
         translation_key="hub_external_power",
-        value_fn=lambda space: "connected"
-        if space.hub_details.get("externallyPowered")
-        else "disconnected"
-        if space.hub_details
-        else None,
+        value_fn=lambda space: (
+            "connected" if space.hub_details.get("externallyPowered") else "disconnected" if space.hub_details else None
+        ),
     ),
     AjaxSpaceSensorDescription(
         key="hub_ethernet_ip",
         translation_key="hub_ethernet_ip",
         entity_category=EntityCategory.DIAGNOSTIC,
-        value_fn=lambda space: space.hub_details.get("ethernet", {}).get("ip")
-        if space.hub_details and space.hub_details.get("ethernet", {}).get("enabled")
-        else None,
+        value_fn=lambda space: (
+            space.hub_details.get("ethernet", {}).get("ip")
+            if space.hub_details and space.hub_details.get("ethernet", {}).get("enabled")
+            else None
+        ),
     ),
     AjaxSpaceSensorDescription(
         key="hub_wifi",
         translation_key="hub_wifi",
         entity_category=EntityCategory.DIAGNOSTIC,
-        value_fn=lambda space: format_signal_level(space.hub_details.get("wifi", {}).get("signalLevel"))
-        if space.hub_details and space.hub_details.get("wifi", {}).get("enabled")
-        else None,
+        value_fn=lambda space: (
+            format_signal_level(space.hub_details.get("wifi", {}).get("signalLevel"))
+            if space.hub_details and space.hub_details.get("wifi", {}).get("enabled")
+            else None
+        ),
         should_create=lambda space: bool(space.hub_details and space.hub_details.get("wifi", {}).get("enabled", False)),
     ),
     AjaxSpaceSensorDescription(
         key="hub_gsm",
         translation_key="hub_gsm",
         entity_category=EntityCategory.DIAGNOSTIC,
-        value_fn=lambda space: format_signal_level(space.hub_details.get("gsm", {}).get("signalLevel"))
-        if space.hub_details
-        else None,
+        value_fn=lambda space: (
+            format_signal_level(space.hub_details.get("gsm", {}).get("signalLevel")) if space.hub_details else None
+        ),
         should_create=lambda space: bool(space.hub_details and space.hub_details.get("gsm") is not None),
     ),
     AjaxSpaceSensorDescription(
@@ -367,13 +371,15 @@ SPACE_SENSORS: tuple[AjaxSpaceSensorDescription, ...] = (
         key="hub_grade_mode",
         translation_key="hub_grade_mode",
         entity_category=EntityCategory.DIAGNOSTIC,
-        value_fn=lambda space: {
-            "GRADE_1": "Grade 1",
-            "GRADE_2": "Grade 2",
-            "GRADE_3": "Grade 3",
-        }.get(str(space.hub_details.get("gradeMode", "")), space.hub_details.get("gradeMode"))
-        if space.hub_details
-        else None,
+        value_fn=lambda space: (
+            {
+                "GRADE_1": "Grade 1",
+                "GRADE_2": "Grade 2",
+                "GRADE_3": "Grade 3",
+            }.get(str(space.hub_details.get("gradeMode", "")), space.hub_details.get("gradeMode"))
+            if space.hub_details
+            else None
+        ),
         should_create=lambda space: bool(space.hub_details and space.hub_details.get("gradeMode")),
     ),
     # Active Channels (WiFi, Ethernet, GSM) - disabled by default (changes too often)
@@ -383,9 +389,11 @@ SPACE_SENSORS: tuple[AjaxSpaceSensorDescription, ...] = (
         translation_key="hub_active_channels",
         entity_category=EntityCategory.DIAGNOSTIC,
         entity_registry_enabled_default=False,
-        value_fn=lambda space: ", ".join(sorted(space.hub_details.get("activeChannels", [])))
-        if space.hub_details and space.hub_details.get("activeChannels")
-        else None,
+        value_fn=lambda space: (
+            ", ".join(sorted(space.hub_details.get("activeChannels", [])))
+            if space.hub_details and space.hub_details.get("activeChannels")
+            else None
+        ),
         should_create=lambda space: bool(space.hub_details and space.hub_details.get("activeChannels")),
     ),
     # Ping Period
@@ -411,11 +419,13 @@ SPACE_SENSORS: tuple[AjaxSpaceSensorDescription, ...] = (
         key="hub_noise_level",
         translation_key="hub_noise_level",
         entity_category=EntityCategory.DIAGNOSTIC,
-        value_fn=lambda space: "high"
-        if space.hub_details.get("noiseLevel", {}).get("high", False)
-        else "normal"
-        if space.hub_details and space.hub_details.get("noiseLevel")
-        else None,
+        value_fn=lambda space: (
+            "high"
+            if space.hub_details.get("noiseLevel", {}).get("high", False)
+            else "normal"
+            if space.hub_details and space.hub_details.get("noiseLevel")
+            else None
+        ),
         should_create=lambda space: bool(space.hub_details and space.hub_details.get("noiseLevel")),
     ),
     # Limits (sensors, rooms, etc.)
@@ -423,9 +433,11 @@ SPACE_SENSORS: tuple[AjaxSpaceSensorDescription, ...] = (
         key="hub_limits",
         translation_key="hub_limits",
         entity_category=EntityCategory.DIAGNOSTIC,
-        value_fn=lambda space: f"{len(space.devices)}/{space.hub_details.get('limits', {}).get('sensors', 0)}"
-        if space.hub_details and space.hub_details.get("limits")
-        else None,
+        value_fn=lambda space: (
+            f"{len(space.devices)}/{space.hub_details.get('limits', {}).get('sensors', 0)}"
+            if space.hub_details and space.hub_details.get("limits")
+            else None
+        ),
         should_create=lambda space: bool(space.hub_details and space.hub_details.get("limits")),
     ),
 )
@@ -1015,9 +1027,9 @@ def _get_hub_sensors(space: AjaxSpace) -> list[dict]:
             {
                 "key": "gsm_signal",
                 "translation_key": "gsm_signal_level",
-                "value_fn": lambda hd=hub_details: hd.get("gsm", {}).get("signalLevel", "").lower()
-                if hd.get("gsm", {}).get("signalLevel")
-                else None,
+                "value_fn": lambda hd=hub_details: (
+                    hd.get("gsm", {}).get("signalLevel", "").lower() if hd.get("gsm", {}).get("signalLevel") else None
+                ),
                 "enabled_by_default": True,
             }
         )
@@ -1028,9 +1040,11 @@ def _get_hub_sensors(space: AjaxSpace) -> list[dict]:
             {
                 "key": "gsm_network",
                 "translation_key": "gsm_type",
-                "value_fn": lambda hd=hub_details: hd.get("gsm", {}).get("networkStatus", "").lower()
-                if hd.get("gsm", {}).get("networkStatus")
-                else None,
+                "value_fn": lambda hd=hub_details: (
+                    hd.get("gsm", {}).get("networkStatus", "").lower()
+                    if hd.get("gsm", {}).get("networkStatus")
+                    else None
+                ),
                 "enabled_by_default": True,
             }
         )
@@ -1041,9 +1055,9 @@ def _get_hub_sensors(space: AjaxSpace) -> list[dict]:
             {
                 "key": "sim_status",
                 "translation_key": "sim_status",
-                "value_fn": lambda hd=hub_details: hd.get("gsm", {}).get("simCardState", "").lower()
-                if hd.get("gsm", {}).get("simCardState")
-                else None,
+                "value_fn": lambda hd=hub_details: (
+                    hd.get("gsm", {}).get("simCardState", "").lower() if hd.get("gsm", {}).get("simCardState") else None
+                ),
                 "enabled_by_default": True,
             }
         )
@@ -1057,9 +1071,9 @@ def _get_hub_sensors(space: AjaxSpace) -> list[dict]:
             {
                 "key": "active_connection",
                 "translation_key": "active_connection",
-                "value_fn": lambda hd=hub_details: ", ".join(sorted(hd.get("activeChannels", [])))
-                if hd.get("activeChannels")
-                else None,
+                "value_fn": lambda hd=hub_details: (
+                    ", ".join(sorted(hd.get("activeChannels", []))) if hd.get("activeChannels") else None
+                ),
                 "enabled_by_default": True,
             }
         )

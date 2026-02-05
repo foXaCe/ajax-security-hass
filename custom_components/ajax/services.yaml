@@ -15,3 +15,5 @@ get_raw_devices:
 refresh_metadata:
 
 get_nvr_recordings:
+
+get_smart_locks:

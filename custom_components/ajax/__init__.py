@@ -57,6 +57,7 @@ SERVICE_FORCE_ARM_NIGHT = "force_arm_night"
 SERVICE_GET_RAW_DEVICES = "get_raw_devices"
 SERVICE_REFRESH_METADATA = "refresh_metadata"
 SERVICE_GET_NVR_RECORDINGS = "get_nvr_recordings"
+SERVICE_GET_SMART_LOCKS = "get_smart_locks"
 
 PLATFORMS: list[Platform] = [
     Platform.ALARM_CONTROL_PANEL,
@@ -602,6 +603,105 @@ async def _async_setup_services(hass: HomeAssistant) -> None:
             DOMAIN,
             SERVICE_GET_NVR_RECORDINGS,
             handle_get_nvr_recordings,
+        )
+
+    async def handle_get_smart_locks(call: ServiceCall) -> None:
+        """Handle get smart locks service call - diagnostic tool for smart lock data."""
+        _LOGGER.info("Getting smart lock data for diagnostic purposes")
+
+        entries = await _extract_config_entry(call)
+        entry = entries[0]
+        coordinator = entry.runtime_data
+
+        smart_locks_data: list[dict[str, Any]] = []
+
+        if coordinator.account:
+            for _space_id, space in coordinator.account.spaces.items():
+                real_space_id = space.real_space_id
+                if not real_space_id:
+                    _LOGGER.debug("No real_space_id for space %s, skipping", space.name)
+                    continue
+
+                # Get raw API data for smart locks
+                try:
+                    api_smart_locks = await coordinator.api.async_get_smart_locks(real_space_id)
+                    for sl in api_smart_locks:
+                        sl["_source"] = "api"
+                        sl["_space_name"] = space.name
+                        sl["_space_id"] = _space_id
+                        smart_locks_data.append(sl)
+                except Exception as err:
+                    _LOGGER.warning(
+                        "Failed to get smart locks from API for space %s: %s",
+                        space.name,
+                        err,
+                    )
+
+                # Also include SSE/SQS-discovered locks (not in API)
+                for sl_id, smart_lock in space.smart_locks.items():
+                    # Check if already in API data
+                    if any(sl.get("id") == sl_id for sl in smart_locks_data):
+                        continue
+                    # This is an SSE/SQS-discovered lock
+                    smart_locks_data.append(
+                        {
+                            "id": sl_id,
+                            "name": smart_lock.name,
+                            "type": "SMART_LOCK",
+                            "_source": "sse_sqs_discovered",
+                            "_space_name": space.name,
+                            "_space_id": _space_id,
+                            "_is_locked": smart_lock.is_locked,
+                            "_is_door_open": smart_lock.is_door_open,
+                            "_last_event_tag": smart_lock.last_event_tag,
+                            "_last_event_time": smart_lock.last_event_time.isoformat()
+                            if smart_lock.last_event_time
+                            else None,
+                            "_last_changed_by": smart_lock.last_changed_by,
+                            "_raw_data": smart_lock.raw_data,
+                        }
+                    )
+
+        # Write to file
+        output_path = Path(hass.config.path("ajax_smart_locks.json"))
+
+        def write_json():
+            with open(output_path, "w", encoding="utf-8") as f:
+                json.dump(smart_locks_data, f, indent=2, default=str, ensure_ascii=False)
+
+        await hass.async_add_executor_job(write_json)
+
+        # Count by source
+        api_count = sum(1 for sl in smart_locks_data if sl.get("_source") == "api")
+        sse_count = sum(1 for sl in smart_locks_data if sl.get("_source") == "sse_sqs_discovered")
+
+        message = (
+            f"**Smart locks found:** {len(smart_locks_data)}\n"
+            f"- From API: {api_count}\n"
+            f"- From SSE/SQS events: {sse_count}\n\n"
+            f"Saved to: {output_path}\n\n"
+            "Check the JSON file for full details including all API fields."
+        )
+
+        async_create(
+            hass,
+            message,
+            title="Ajax Smart Locks",
+            notification_id="ajax_get_smart_locks",
+        )
+
+        _LOGGER.info(
+            "Smart locks data written to %s (%d from API, %d from SSE/SQS)",
+            output_path,
+            api_count,
+            sse_count,
+        )
+
+    if not hass.services.has_service(DOMAIN, SERVICE_GET_SMART_LOCKS):
+        hass.services.async_register(
+            DOMAIN,
+            SERVICE_GET_SMART_LOCKS,
+            handle_get_smart_locks,
         )
 
 

@@ -192,14 +192,11 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
             _LOGGER,
             name=DOMAIN,
             update_interval=timedelta(seconds=UPDATE_INTERVAL),
-            # Debouncer: Wait 1.5s of silence before triggering refresh
-            # Prevents flooding when multiple SQS/SSE events arrive rapidly
-            request_refresh_debouncer=Debouncer(
-                hass,
-                _LOGGER,
-                cooldown=1.5,
-                immediate=False,
-            ),
+            # Debouncer removed - not needed because:
+            # 1. SSE manager already has deduplication (_recent_events dict)
+            # 2. SSE manager has built-in sleep(0.3) delay before refresh
+            # 3. Ajax API doesn't spam events
+            # 4. Debouncer was causing zones 2 and 4 to not update in real-time
         )
 
     def _update_polling_interval(self, security_state: SecurityState) -> None:

@@ -206,7 +206,20 @@ class SSEManager:
             _LOGGER.debug("SSE raw event data: %s", event)
 
             # Deduplication: ignore duplicate events within window
-            event_key = f"{source_id}:{event_tag}:{transition}"
+            # For group events, include group ID to allow multiple zones from same user
+            group_id = None
+            if event_tag in ("grouparm", "groupdisarm"):
+                # Extract group ID from event data
+                related_groups = event.get("additionalData", {}).get("relatedGroupsInfo", [])
+                if related_groups:
+                    group_id = related_groups[0].get("id")
+
+            # Build deduplication key - include group_id for group events
+            if group_id:
+                event_key = f"{source_id}:{event_tag}:{group_id}:{transition}"
+            else:
+                event_key = f"{source_id}:{event_tag}:{transition}"
+
             now = time.time()
             last_time = self._recent_events.get(event_key, 0)
             if now - last_time < self._dedup_window:
@@ -311,21 +324,26 @@ class SSEManager:
         is_full_arm_disarm = event_tag in ("arm", "disarm")
 
         if is_group_event or is_full_arm_disarm:
+            start_time = time.time()
             _LOGGER.info(
-                "SSE: Security event '%s' detected for hub %s, refreshing groups",
+                "SSE: Security event '%s' detected for hub %s at t=0ms, refreshing groups",
                 event_tag,
                 space.hub_id,
             )
-            # Wait for Ajax backend to process the change before refreshing
-            # Without this delay, the API may return stale state
-            await asyncio.sleep(1.0)
+            # Small delay to let Ajax backend process the change
+            # Reduced from 1.0s to 0.3s for faster real-time updates
+            await asyncio.sleep(0.3)
+            _LOGGER.debug("SSE: Sleep completed at t=%dms", int((time.time() - start_time) * 1000))
             try:
                 # Set flag to skip event creation during refresh (SSE already created it)
                 self.coordinator._skip_state_change_event = True
+                # CRITICAL: Bypass proxy cache to get fresh group states from Ajax API
+                self.coordinator._bypass_cache_next_refresh = True
                 # Use async_force_metadata_refresh to ensure full_refresh=True
                 # This updates groups, not just hub state
                 await self.coordinator.async_force_metadata_refresh()
-                _LOGGER.info("SSE: Metadata refresh completed after security event")
+                elapsed = int((time.time() - start_time) * 1000)
+                _LOGGER.info("SSE: Group refresh completed at t=%dms", elapsed)
             except Exception as err:
                 _LOGGER.error("SSE: Metadata refresh failed after security event: %s", err)
             finally:

@@ -24,7 +24,6 @@ from typing import TYPE_CHECKING, Any
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers import device_registry as dr
-from homeassistant.helpers.debounce import Debouncer
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .api import AjaxRestApi, AjaxRestApiError, AjaxRestAuthError

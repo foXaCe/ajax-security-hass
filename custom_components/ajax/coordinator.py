@@ -2276,6 +2276,15 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
                         space_id=space_id,
                         raw_data=sl_data,
                     )
+
+                    # Detect Yale cloud locks (minimal API data: only 'id', no 'name'/'type')
+                    if smart_lock.is_yale_cloud_device:
+                        _LOGGER.info(
+                            "Skipping Yale cloud lock %s (no name/type in API, use native Yale integration)",
+                            sl_id,
+                        )
+                        continue
+
                     space.smart_locks[sl_id] = smart_lock
                     _LOGGER.info("Discovered smart lock: %s (%s)", smart_lock.name, sl_id)
                 else:

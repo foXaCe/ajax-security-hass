@@ -326,14 +326,30 @@ class AjaxSmartLock:
     def is_yale_cloud_device(self) -> bool:
         """Check if this is likely a Yale cloud device (no SSE events).
 
-        Returns True if:
-        - We have raw_data from API (device was discovered via polling)
-        - No SSE event has ever been received for this device
-        - This indicates a Yale cloud lock that doesn't send SSE events
+        Yale cloud locks are detected by:
+        1. API returns minimal data (only 'id', no 'name' or 'type')
+        2. No SSE events have been received
+
+        LockBridge devices either:
+        - Are discovered via SSE/SQS events (no raw_data)
+        - Have full API data including 'name' and 'type'
+        - Have received SSE events (last_sse_event_time is set)
         """
         # SSE-discovered device (LockBridge) - definitely not Yale cloud
-        # Or received SSE events - this is a LockBridge
-        return bool(self.raw_data and self.last_sse_event_time is None)
+        if not self.raw_data:
+            return False
+
+        # Received SSE events - this is a working LockBridge
+        if self.last_sse_event_time is not None:
+            return False
+
+        # Yale cloud locks return minimal API data (only 'id', no 'name'/'type')
+        # LockBridge returns full data including 'name' and 'type'
+        has_name = bool(self.raw_data.get("name"))
+        has_type = bool(self.raw_data.get("type"))
+
+        # If API data has only 'id' (no name/type), it's a Yale cloud lock
+        return not has_name and not has_type
 
 
 @dataclass

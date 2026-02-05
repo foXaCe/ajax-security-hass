@@ -1586,6 +1586,10 @@
     "get_nvr_recordings": {
       "description": "Get NVR recordings data from the API (last 24 hours). Saves the response to ajax_nvr_recordings.json for diagnostic purposes.",
       "name": "Get NVR recordings"
+    },
+    "get_smart_locks": {
+      "description": "Get smart lock data from API and SSE/SQS-discovered locks. Saves the response to ajax_smart_locks.json for diagnostic purposes.",
+      "name": "Get smart locks"
     }
   }
 }

@@ -192,12 +192,13 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
             _LOGGER,
             name=DOMAIN,
             update_interval=timedelta(seconds=UPDATE_INTERVAL),
-            # Debouncer: Wait 1.5s of silence before triggering refresh
-            # Prevents flooding when multiple SQS/SSE events arrive rapidly
+            # Debouncer: Wait 0.5s of silence before triggering refresh
+            # Groups rapid multi-zone events into fewer API calls (proxy load)
+            # while keeping real-time updates fast enough
             request_refresh_debouncer=Debouncer(
                 hass,
                 _LOGGER,
-                cooldown=1.5,
+                cooldown=0.5,
                 immediate=False,
             ),
         )

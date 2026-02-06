@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.14.7] - 2026-02-06
+
+### Fixed
+- SSE group event deduplication now includes group ID to prevent multi-zone updates from being rejected as duplicates (#90, #32)
+- Reduced debouncer cooldown from 1.5s to 0.5s for faster real-time zone updates
+- Reduced SSE sleep delay from 1.0s to 0.3s before group state refresh
+- Added proxy cache bypass after SSE security events for fresh group states
+
+Thanks to @Kolia56 for the contribution (#90)
+
 ## [0.14.6] - 2026-02-05
 
 ### Fixed

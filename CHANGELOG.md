@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.14.8] - 2026-02-07
+
+### Fixed
+- System state no longer gets stuck at armed_home when full arming after partial arm (#91)
+- Added fallback state update when metadata refresh fails after security events
+
+Thanks to @Kolia56 for the contribution (#91)
+
 ## [0.14.7] - 2026-02-06
 
 ### Fixed

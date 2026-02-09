@@ -382,6 +382,8 @@ class AjaxVideoEdgeCamera(CoordinatorEntity[AjaxDataCoordinator], Camera):
                     rtsp_url,
                     "-frames:v",
                     "1",
+                    "-q:v",
+                    "2",
                     "-f",
                     "image2",
                     "-",

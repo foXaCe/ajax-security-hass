@@ -466,6 +466,7 @@ DEVICE_HANDLERS = {
     DeviceType.MULTI_TRANSMITTER: SirenHandler,
     DeviceType.KEYPAD: SirenHandler,
     DeviceType.BUTTON: ButtonHandler,
+    DeviceType.REMOTE_CONTROL: ButtonHandler,
     DeviceType.DOORBELL: DoorbellHandler,
     DeviceType.REPEATER: RepeaterHandler,
     DeviceType.HUB: HubHandler,

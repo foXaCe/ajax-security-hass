@@ -61,6 +61,7 @@ DEVICE_HANDLERS = {
     DeviceType.RELAY: SocketHandler,
     DeviceType.WALLSWITCH: SocketHandler,
     DeviceType.BUTTON: ButtonHandler,
+    DeviceType.REMOTE_CONTROL: ButtonHandler,
     DeviceType.DOORBELL: DoorbellHandler,
     DeviceType.REPEATER: RepeaterHandler,
     DeviceType.LIFE_QUALITY: LifeQualityHandler,

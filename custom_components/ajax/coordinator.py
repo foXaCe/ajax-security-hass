@@ -262,7 +262,7 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
         """
         # Check if fast polling is enabled (can be disabled to reduce API calls)
         # Also disable fast polling in proxy mode to reduce load on shared proxy
-        if not self._door_sensor_fast_poll_enabled or self._sse_url:
+        if not self._door_sensor_fast_poll_enabled:
             should_poll = False
 
         # Store security state for the polling loop

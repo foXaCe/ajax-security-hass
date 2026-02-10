@@ -30,6 +30,7 @@ from .sqs_manager import (  # Import event mappings from SQS manager to avoid du
     EVENT_TAG_TO_STATE,
     FLOOD_EVENTS,
     GLASS_EVENTS,
+    HUB_EVENTS,
     LOCK_DOOR_EVENT_CODE_STATES,
     LOCK_DOOR_EVENTS,
     LOCK_EVENT_CODE_STATES,
@@ -277,6 +278,8 @@ class SSEManager:
                 self._handle_doorbell_event(space, source_name, source_id)
             elif event_tag in LOCK_EVENTS or event_tag in LOCK_DOOR_EVENTS:
                 self._handle_lock_event(space, event_tag, source_name, source_id, event_code, event)
+            elif event_tag in HUB_EVENTS:
+                _LOGGER.info("SSE: Hub event: %s (%s)", event_tag, source_name)
             else:
                 _LOGGER.warning(
                     "SSE event not handled: tag=%s, type=%s, typeV2=%s, source=%s (id=%s). Raw: %s",

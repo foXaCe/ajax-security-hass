@@ -143,6 +143,22 @@ DOORBELL_EVENTS = {
     "doorbell": True,
 }
 
+# Hub system/malfunction events (informational, logged but not actionable)
+HUB_EVENTS: set[str] = {
+    "firmwareupdateinprogress",
+    "firmwareupdatecompleted",
+    "ethernetconnectionloss",
+    "ethernetconnectionrestored",
+    "gsmconnectionloss",
+    "gsmconnectionrestored",
+    "serverconnectionloss",
+    "serverconnectionrestored",
+    "huboffline",
+    "hubonline",
+    "powersupplyloss",
+    "powersupplyrestored",
+}
+
 # Scenario events that might be triggered by a Button
 SCENARIO_EVENTS = {
     "relayonbyscenario": "scenario_triggered",
@@ -378,6 +394,8 @@ class SQSManager:
                 await self._handle_video_event(space, event_tag, event_type, source_name, source_id)
             elif event_tag in LOCK_EVENTS or event_tag in LOCK_DOOR_EVENTS:
                 await self._handle_lock_event(space, event_tag, source_name, source_id, event_code, event)
+            elif event_tag in HUB_EVENTS:
+                _LOGGER.info("SQS: Hub event: %s (%s)", event_tag, source_name)
             else:
                 _LOGGER.warning(
                     "SQS event not handled: tag=%s, type=%s, source=%s (id=%s). Raw: %s",

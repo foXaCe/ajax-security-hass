@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.17.0] - 2026-02-11
+
+### Added
+- Smart lock "last changed by" sensor showing who locked/unlocked the device
+- Hub system events handling: firmware update notifications and connectivity status changes (#95)
+
 ## [0.16.0] - 2026-02-09
 
 ### Added

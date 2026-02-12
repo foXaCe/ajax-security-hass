@@ -31,6 +31,9 @@ RETRY_BACKOFF_MAX = 30.0  # Maximum delay in seconds
 RATE_LIMIT_REQUESTS = 60  # Max requests per window
 RATE_LIMIT_WINDOW = 60  # Window in seconds
 
+# Login cooldown to avoid 429 on rapid re-authentication
+MIN_LOGIN_INTERVAL = 120  # Minimum seconds between full logins
+
 
 class AjaxRestApiError(Exception):
     """Base exception for Ajax REST API errors."""
@@ -135,6 +138,11 @@ class AjaxRestApi:
         # Rate limiting state
         self._request_timestamps: list[float] = []
         self._rate_limit_lock: asyncio.Lock = asyncio.Lock()
+
+        # Login cooldown to avoid 429 on rapid re-authentication
+        self._last_login_time: float = 0.0
+        # Token version to detect if another coroutine already refreshed
+        self._token_version: int = 0
 
         # Base headers with API key (may be empty for proxy modes initially)
         self._base_headers = {
@@ -353,6 +361,8 @@ class AjaxRestApi:
                 if not self.session_token:
                     raise AjaxRestApiError("No sessionToken in login response")
 
+                self._token_version += 1
+                self._last_login_time = time.monotonic()
                 _LOGGER.info(
                     "Login successful, session token obtained (userId: %s)",
                     self.user_id,
@@ -464,7 +474,19 @@ class AjaxRestApi:
                 _LOGGER.debug("Refresh response status: %s", response.status)
 
                 if response.status == 401:
+                    # Log detailed error for debugging
+                    error_body = ""
+                    with contextlib.suppress(Exception):
+                        error_body = await response.text()
+                    _LOGGER.warning(
+                        "Refresh token rejected (401): %s",
+                        error_body[:200] if error_body else "no response body",
+                    )
                     raise AjaxRestAuthError("Refresh token expired or invalid")
+
+                if response.status == 429:
+                    _LOGGER.warning("Refresh endpoint rate limited (429)")
+                    raise AjaxRestAuthError("Refresh rate limited")
 
                 response.raise_for_status()
                 result = await response.json()
@@ -477,6 +499,7 @@ class AjaxRestApi:
                 if not self.session_token:
                     raise AjaxRestApiError("No sessionToken in refresh response")
 
+                self._token_version += 1
                 _LOGGER.info("Session token refreshed successfully (userId: %s)", self.user_id)
                 return self.session_token
 
@@ -553,24 +576,44 @@ class AjaxRestApi:
                 if response.status == 401:
                     if _retry_on_auth_error:
                         # Token expired, try to refresh it first
-                        # Use lock to prevent concurrent token refresh
+                        # Save token version before acquiring lock to detect
+                        # if another coroutine already refreshed while we waited
+                        token_version_before = self._token_version
                         async with self._auth_lock:
-                            try:
-                                # Try refresh token first (faster, no password needed)
-                                await self.async_refresh_token()
-                                _LOGGER.info("Token refreshed successfully, retrying request")
-                            except AjaxRestAuthError:
-                                # Refresh token expired or invalid, fallback to full login
-                                _LOGGER.warning("Refresh token failed, falling back to full login")
+                            if self._token_version != token_version_before:
+                                # Another coroutine already refreshed tokens
+                                _LOGGER.debug(
+                                    "Token already refreshed by another coroutine (v%d → v%d)",
+                                    token_version_before,
+                                    self._token_version,
+                                )
+                            else:
                                 try:
-                                    await self.async_login()
-                                    _LOGGER.info("Full login successful")
+                                    await self.async_refresh_token()
+                                    _LOGGER.info("Token refreshed successfully, retrying request")
+                                except AjaxRestAuthError:
+                                    # Refresh token expired or invalid, fallback to full login
+                                    _LOGGER.warning("Refresh token failed, falling back to full login")
+                                    # Check login cooldown to avoid 429
+                                    elapsed = time.monotonic() - self._last_login_time
+                                    if elapsed < MIN_LOGIN_INTERVAL:
+                                        wait = MIN_LOGIN_INTERVAL - elapsed
+                                        _LOGGER.warning(
+                                            "Login cooldown active, last login %.0fs ago (min %ds), waiting %.0fs",
+                                            elapsed,
+                                            MIN_LOGIN_INTERVAL,
+                                            wait,
+                                        )
+                                        await asyncio.sleep(wait)
+                                    try:
+                                        await self.async_login()
+                                        _LOGGER.info("Full login successful")
+                                    except Exception as err:
+                                        _LOGGER.error("Failed to renew token: %s", err)
+                                        raise AjaxRestAuthError("Token renewal failed") from err
                                 except Exception as err:
-                                    _LOGGER.error("Failed to renew token: %s", err)
-                                    raise AjaxRestAuthError("Token renewal failed") from err
-                            except Exception as err:
-                                _LOGGER.error("Token refresh failed: %s", err)
-                                raise AjaxRestAuthError("Token refresh failed") from err
+                                    _LOGGER.error("Token refresh failed: %s", err)
+                                    raise AjaxRestAuthError("Token refresh failed") from err
                         # Retry the request with the new token (only once)
                         return await self._request(method, endpoint, data, _retry_on_auth_error=False)
                     else:

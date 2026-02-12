@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.18.0] - 2026-02-12
+
+### Added
+- Handle ArmAttempt SQS event (arm attempt with device malfunction) (#95)
+
+### Fixed
+- Authentication 429 rate limiting when refresh token fails repeatedly (#97)
+  - Login cooldown (120s) prevents rapid re-authentication
+  - Token freshness check avoids redundant refresh from concurrent requests
+  - Better error logging for refresh token 401 responses
+
+### Changed
+- Bump actions/setup-python from 5 to 6
+
 ## [0.17.0] - 2026-02-11
 
 ### Added

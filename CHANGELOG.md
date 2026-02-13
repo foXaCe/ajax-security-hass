@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.18.2] - 2026-02-13
+
+### Changed
+- Disable `use_stream_for_stills` to use single-frame FFmpeg instead of full x265 stream pipeline
+- Increase snapshot cache duration from 30s to 60s to reduce FFmpeg calls on multi-camera dashboards
+- Use sub stream (640x480) for snapshots instead of main stream (2560x1440) for ~4x faster decode
+- Extract `_build_rtsp_url()` method for stream type selection in snapshot and live stream paths
+
 ## [0.18.1] - 2026-02-13
 
 ### Fixed

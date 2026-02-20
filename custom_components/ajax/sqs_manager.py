@@ -299,7 +299,7 @@ class SQSManager:
     async def _handle_event(self, event_data: dict[str, Any]) -> None:
         """Handle SQS event by directly updating state (instant response)."""
         if not self._enabled:
-            return
+            return True
 
         try:
             self._last_event_time = time.time()
@@ -335,19 +335,18 @@ class SQSManager:
 
             if not hub_id or not event_tag:
                 _LOGGER.debug("SQS event missing hubId or eventTag")
-                return
+                return True
 
             # Deduplicate: SQS may redeliver messages
             event_key = f"{event_tag}_{source_id}_{timestamp}"
             if self._is_duplicate_event(event_key):
                 _LOGGER.debug("Duplicate SQS event ignored: %s", event_key)
-                return
+                return True
 
             # Find the space for this hub
             space = self._find_space(hub_id)
             if not space:
-                _LOGGER.warning("SQS: No space found for hub %s", hub_id)
-                return
+                return False
 
             # Create event record for history
             event_record = self._create_event_record(
@@ -414,6 +413,8 @@ class SQSManager:
             # Always update UI to show new event in history
             if self.coordinator.account is not None:
                 self.coordinator.async_set_updated_data(self.coordinator.account)
+
+            return True
 
         except asyncio.CancelledError:
             raise

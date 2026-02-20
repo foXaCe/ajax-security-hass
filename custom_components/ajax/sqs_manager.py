@@ -420,6 +420,7 @@ class SQSManager:
             raise
         except Exception as err:
             _LOGGER.error("Error handling SQS event: %s", err, exc_info=True)
+            return True
 
     def _find_space(self, hub_id: str):
         """Find space by hub ID."""

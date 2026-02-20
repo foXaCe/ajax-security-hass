@@ -191,7 +191,7 @@ class AjaxSQSClient:
             hub_id = event.get("hubId", "?")
             timestamp = event.get("timestamp", 0)
 
-            if isinstance(timestamp, (int, float)) and time.time() - timestamp/1000 > 300:
+            if isinstance(timestamp, (int, float)) and time.time() - timestamp / 1000 > 300:
                 async with self._make_client() as client:
                     await client.delete_message(
                         QueueUrl=self._queue_url,

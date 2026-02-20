@@ -6,9 +6,9 @@ import asyncio
 import json
 import logging
 import threading
+import time
 from collections.abc import Callable
 from typing import Any
-import time
 
 try:
     from aiobotocore.session import get_session
@@ -190,7 +190,7 @@ class AjaxSQSClient:
             event_tag = event.get("eventTag", "?")
             hub_id = event.get("hubId", "?")
             timestamp = event.get("timestamp", 0)
-            
+
             if isinstance(timestamp, (int, float)) and time.time() - timestamp > 300:
                 async with self._make_client() as client:
                     await client.delete_message(

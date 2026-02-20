@@ -6,12 +6,12 @@ import asyncio
 import json
 import logging
 import threading
+import time
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
-import time
 
 if TYPE_CHECKING:
-    from .coordinator import AjaxDataCoordinator
+    pass
 
 try:
     from aiobotocore.session import get_session
@@ -174,7 +174,7 @@ class AjaxSQSClient:
         except ClientError as err:
             _LOGGER.error("SQS error: %s", err.response["Error"]["Code"])
             raise
-    
+
     def _find_space(self, hub_id: str):
         """Find space by hub ID."""
         if self.coordinator.account is None:
@@ -202,7 +202,7 @@ class AjaxSQSClient:
             event_tag = event.get("eventTag", "?")
             hub_id = event.get("hubId", "?")
             timestamp = event.get("timestamp", 0)
-            
+
             if isinstance(timestamp, (int, float)) and time.time() - timestamp > 300:
                 async with self._make_client() as client:
                     await client.delete_message(

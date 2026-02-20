@@ -296,7 +296,7 @@ class SQSManager:
         self._recent_event_ids[event_key] = now
         return False
 
-    async def _handle_event(self, event_data: dict[str, Any]) -> None:
+    async def _handle_event(self, event_data: dict[str, Any]) -> bool:
         """Handle SQS event by directly updating state (instant response)."""
         if not self._enabled:
             return True

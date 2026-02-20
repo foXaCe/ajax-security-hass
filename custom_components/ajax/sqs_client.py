@@ -7,7 +7,11 @@ import json
 import logging
 import threading
 from collections.abc import Callable
-from typing import Any
+from typing import TYPE_CHECKING, Any
+import time
+
+if TYPE_CHECKING:
+    from .coordinator import AjaxDataCoordinator
 
 try:
     from aiobotocore.session import get_session
@@ -170,6 +174,15 @@ class AjaxSQSClient:
         except ClientError as err:
             _LOGGER.error("SQS error: %s", err.response["Error"]["Code"])
             raise
+    
+    def _find_space(self, hub_id: str):
+        """Find space by hub ID."""
+        if self.coordinator.account is None:
+            return None
+        for space in self.coordinator.account.spaces.values():
+            if space.hub_id == hub_id or space.id == hub_id:
+                return space
+        return None
 
     async def _handle_message(self, message: dict) -> None:
         """Process a single SQS message."""
@@ -188,6 +201,16 @@ class AjaxSQSClient:
             event = body.get("event", {})
             event_tag = event.get("eventTag", "?")
             hub_id = event.get("hubId", "?")
+            timestamp = event.get("timestamp", 0)
+            
+            if isinstance(timestamp, (int, float)) and time.time() - timestamp > 300:
+                async with self._make_client() as client:
+                    await client.delete_message(
+                        QueueUrl=self._queue_url,
+                        ReceiptHandle=receipt,
+                    )
+                    _LOGGER.error("SQS: deleted message because too old %s", msg_id)
+                return
 
             _LOGGER.info("SQS: %s from hub %s (msg=%s)", event_tag, hub_id, msg_id)
 
@@ -196,7 +219,8 @@ class AjaxSQSClient:
                 future = asyncio.run_coroutine_threadsafe(self._callback(body), self._hass_loop)
                 # Wait for callback to complete (with timeout)
                 try:
-                    future.result(timeout=15)
+                    if not future.result(timeout=15):
+                        return
                 except Exception as err:
                     _LOGGER.error("Callback error: %s", err)
 

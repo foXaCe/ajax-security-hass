@@ -346,6 +346,7 @@ class SQSManager:
             # Find the space for this hub
             space = self._find_space(hub_id)
             if not space:
+                _LOGGER.debug("SQS: hub %s not managed by this instance, leaving message in queue", hub_id)
                 return False
 
             # Create event record for history

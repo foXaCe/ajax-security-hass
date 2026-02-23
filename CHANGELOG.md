@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.19.0] - 2026-02-23
+
+### Changed
+- Comprehensive code review and refactoring across 21 files (223 insertions, 308 deletions)
+- Centralize device handlers (DEVICE_HANDLERS, DIMMER_RAW_TYPES, get_device_handler) in single location, eliminating duplication across binary_sensor, sensor, switch, and light platforms
+- Fix FFmpeg zombie processes: add process.kill() + await process.wait() for proper cleanup
+- ONVIF PullPoint auto-reconnect with exponential backoff on subscription failures
+- Fix ISO 8601 duration parser to support days component
+- Replace string literal "enum" with SensorDeviceClass.ENUM in WaterStop handler
+- Use UTC-aware datetime throughout codebase
+- Add 8 missing sensitive fields to diagnostics redaction
+- Add SSE sock_read timeout (300s) for dead proxy detection
+- Reduce SQS thread.join timeout from 25s to 5s for faster shutdown
+- Safe sensitivity label accessors in glass break and motion detector handlers
+- Replace assert statements with proper error handling in coordinator
+- Remove dead code (ALL_EVENTS list, SUPPORTED_LANGUAGES dict)
+- Move runtime imports to top-level for faster module loading
+- Update pre-commit hooks configuration
+
 ## [0.18.4] - 2026-02-16
 
 ### Fixed

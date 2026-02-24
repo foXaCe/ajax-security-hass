@@ -299,7 +299,7 @@ class SQSManager:
     async def _handle_event(self, event_data: dict[str, Any]) -> bool:
         """Handle SQS event by directly updating state (instant response)."""
         if not self._enabled:
-            return True
+            return False
 
         try:
             self._last_event_time = time.time()

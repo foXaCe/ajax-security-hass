@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.19.2] - 2026-02-24
+
+### Fixed
+- Transmitter (MultiTransmitter wired sensors) contact state stuck at closed: `externalContactTriggered` was only updated in fast polling loop (disabled by default), now extracted in main polling cycle (#103)
+- Store `customAlarmType` in camelCase for TransmitterHandler device class compatibility
+
 ## [0.19.1] - 2026-02-23
 
 ### Fixed

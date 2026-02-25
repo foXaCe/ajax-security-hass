@@ -208,6 +208,13 @@ class AjaxSQSClient:
                 # Wait for callback to complete (with timeout)
                 try:
                     if not future.result(timeout=15):
+                        async with self._make_client() as client:
+                            await client.change_message_visibility(
+                                QueueUrl=self._queue_url,
+                                ReceiptHandle=receipt,
+                                VisibilityTimeout=0,
+                            )
+                            _LOGGER.error("SQS: message made visible again %s", msg_id)
                         return
                 except Exception as err:
                     _LOGGER.error("Callback error: %s", err)

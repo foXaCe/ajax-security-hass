@@ -214,7 +214,7 @@ class AjaxSQSClient:
                                 ReceiptHandle=receipt,
                                 VisibilityTimeout=0,
                             )
-                            _LOGGER.error("SQS: message made visible again %s", msg_id)
+                            _LOGGER.debug("SQS: message made visible again %s", msg_id)
                         return
                 except Exception as err:
                     _LOGGER.error("Callback error: %s", err)

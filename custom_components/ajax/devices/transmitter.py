@@ -52,7 +52,10 @@ class TransmitterHandler(AjaxDeviceHandler):
                 "key": "external_contact",
                 "device_class": device_class,
                 "translation_key": "external_contact",
-                "value_fn": lambda: self.device.attributes.get("externalContactTriggered", False),
+                "value_fn": lambda: self.device.attributes.get(
+                    "externalContactTriggered",
+                    self.device.attributes.get("door_opened", False),
+                ),
                 "enabled_by_default": True,
             }
         )

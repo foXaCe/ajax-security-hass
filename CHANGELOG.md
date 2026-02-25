@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.19.3] - 2026-02-25
+
+### Fixed
+- Transmitter binary sensor fallback to `door_opened` when API returns `externalContactState` instead of `externalContactTriggered` (#103)
+- SQS message handling resilience: prune stale messages >300s, don't delete messages for unknown hubs, explicit boolean return contract, poison-pill prevention (#101)
+
 ## [0.19.2] - 2026-02-24
 
 ### Fixed

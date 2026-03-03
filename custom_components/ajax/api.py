@@ -694,6 +694,10 @@ class AjaxRestApi:
         if (bypass_cache or bypass_once) and self.proxy_mode == AUTH_MODE_PROXY_SECURE:
             headers["X-Cache-Control"] = "no-cache"
 
+        # Capture token version BEFORE the request to detect if another
+        # coroutine refreshes the token while our request is in flight
+        token_version_before = self._token_version
+
         try:
             async with session.request(
                 method,
@@ -704,10 +708,6 @@ class AjaxRestApi:
             ) as response:
                 if response.status == 401:
                     if _retry_on_auth_error:
-                        # Token expired, try to refresh it first
-                        # Save token version before acquiring lock to detect
-                        # if another coroutine already refreshed while we waited
-                        token_version_before = self._token_version
                         async with self._auth_lock:
                             if self._token_version != token_version_before:
                                 # Another coroutine already refreshed tokens
@@ -1131,6 +1131,9 @@ class AjaxRestApi:
         headers: dict[str, str] = {k: v for k, v in self._base_headers.items() if v is not None}
         headers["X-Session-Token"] = self.session_token
 
+        # Capture token version BEFORE the request to detect concurrent refresh
+        token_version_before = self._token_version
+
         try:
             async with session.get(
                 url,
@@ -1140,7 +1143,10 @@ class AjaxRestApi:
                 if response.status == 401:
                     # Try to recover auth and retry once
                     async with self._auth_lock:
-                        await self._recover_auth()
+                        if self._token_version != token_version_before:
+                            _LOGGER.debug("Token already refreshed by another coroutine")
+                        else:
+                            await self._recover_auth()
                     headers["X-Session-Token"] = self.session_token
                     async with session.get(
                         url,
@@ -1630,6 +1636,10 @@ class AjaxRestApi:
             "X-Session-Token": self.session_token,
         }
 
+        # Capture token version BEFORE the request to detect if another
+        # coroutine refreshes the token while our request is in flight
+        token_version_before = self._token_version
+
         try:
             async with session.request(
                 method,
@@ -1640,7 +1650,6 @@ class AjaxRestApi:
             ) as response:
                 if response.status == 401:
                     if _retry_on_auth_error:
-                        token_version_before = self._token_version
                         async with self._auth_lock:
                             if self._token_version != token_version_before:
                                 _LOGGER.debug(

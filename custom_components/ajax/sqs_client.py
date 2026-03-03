@@ -223,7 +223,7 @@ class AjaxSQSClient:
                                 requeue_err,
                             )
                         return
-                        
+
             # Delete message from queue
             async with self._make_client() as client:
                 await client.delete_message(

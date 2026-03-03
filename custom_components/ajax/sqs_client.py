@@ -206,23 +206,22 @@ class AjaxSQSClient:
             if self._callback and self._hass_loop:
                 future = asyncio.run_coroutine_threadsafe(self._callback(body), self._hass_loop)
                 # Wait for callback to complete (with timeout)
-                try:
-                    if not future.result(timeout=15):
-                        try:
-                            async with self._make_client() as client:
-                                await client.change_message_visibility(
-                                    QueueUrl=self._queue_url,
-                                    ReceiptHandle=receipt,
-                                    VisibilityTimeout=0,
-                                )
-                            _LOGGER.debug("SQS: message made visible again %s", msg_id)
-                        except Exception as requeue_err:
-                            _LOGGER.error(
-                                "SQS: failed to make message visible again %s: %s",
-                                msg_id,
-                                requeue_err,
+                if not future.result(timeout=15):
+                    try:
+                        async with self._make_client() as client:
+                            await client.change_message_visibility(
+                                QueueUrl=self._queue_url,
+                                ReceiptHandle=receipt,
+                                VisibilityTimeout=0,
                             )
-                        return
+                        _LOGGER.debug("SQS: message made visible again %s", msg_id)
+                    except Exception as requeue_err:
+                        _LOGGER.error(
+                            "SQS: failed to make message visible again %s: %s",
+                            msg_id,
+                            requeue_err,
+                        )
+                    return
 
             # Delete message from queue
             async with self._make_client() as client:

@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.19.5] - 2026-03-08
+
+### Fixed
+- Transmitter switches (night mode, always active, siren triggers) not persisting: add `api_nested_key: wiredDeviceSettings` so API receives correct nested payload (#103)
+- SQS message re-queuing when callback returns false: make unhandled messages visible again instead of deleting (#105)
+- SQS callback error handling: restore try/except around `future.result()` to catch timeouts and exceptions (#105)
+
 ## [0.19.4] - 2026-03-03
 
 ### Fixed

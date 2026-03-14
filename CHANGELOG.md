@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.20.0] - 2026-03-14
+
+### Added
+- Event platform for Button, DoubleButton, SpaceControl, and Doorbell devices with event types: single_press, double_press, long_press, panic, emergency, ring
+
+### Fixed
+- Device update API 422 error: keep `deviceTransmissionPowerMode` in PUT payload as required by API (#103)
+
 ## [0.19.5] - 2026-03-08
 
 ### Fixed

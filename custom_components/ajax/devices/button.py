@@ -116,6 +116,23 @@ class ButtonHandler(AjaxDeviceHandler):
 
         return sensors
 
+    def get_events(self) -> list[dict]:
+        """Return event entities for buttons."""
+        return [
+            {
+                "key": "button_press",
+                "translation_key": "button_press",
+                "event_types": [
+                    "single_press",
+                    "double_press",
+                    "long_press",
+                    "panic",
+                    "emergency",
+                ],
+                "enabled_by_default": True,
+            },
+        ]
+
     def get_switches(self) -> list[dict]:
         """Return switch entities for buttons."""
         # Buttons typically don't have configurable switches

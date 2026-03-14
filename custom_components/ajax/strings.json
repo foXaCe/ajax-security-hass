@@ -363,6 +363,32 @@
         "name": "Panic Button"
       }
     },
+    "event": {
+      "button_press": {
+        "name": "Button",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "single_press": "Single press",
+              "double_press": "Double press",
+              "long_press": "Long press",
+              "panic": "Panic",
+              "emergency": "Emergency"
+            }
+          }
+        }
+      },
+      "doorbell_press": {
+        "name": "Doorbell",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "ring": "Ring"
+            }
+          }
+        }
+      }
+    },
     "light": {
       "dimmer_light": {
         "name": "Dimmer"

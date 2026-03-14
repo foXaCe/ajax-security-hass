@@ -82,6 +82,17 @@ class DoorbellHandler(AjaxDeviceHandler):
 
         return sensors
 
+    def get_events(self) -> list[dict]:
+        """Return event entities for doorbell."""
+        return [
+            {
+                "key": "doorbell_press",
+                "translation_key": "doorbell_press",
+                "event_types": ["ring"],
+                "enabled_by_default": True,
+            },
+        ]
+
     def get_switches(self) -> list[dict]:
         """Return switch entities for doorbell."""
         # Doorbell typically doesn't have configurable switches

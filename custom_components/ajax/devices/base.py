@@ -106,6 +106,18 @@ class AjaxDeviceHandler(ABC):
         """
         return []
 
+    def get_events(self) -> list[dict]:
+        """Return event entity descriptions for this device.
+
+        Returns:
+            List of dicts with keys:
+                - key: Unique key for the event entity
+                - translation_key: Translation key
+                - event_types: List of possible event type strings
+                - enabled_by_default: Whether enabled by default
+        """
+        return []
+
     def get_alarm_control_panels(self) -> list[dict]:
         """Return alarm control panel descriptions for this device.
 

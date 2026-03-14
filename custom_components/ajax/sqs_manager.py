@@ -758,7 +758,7 @@ class SQSManager:
             device.attributes["last_action"] = action
             device.last_trigger_time = datetime.now(UTC)
 
-            # Fire a Home Assistant event for automations
+            # Fire a Home Assistant event for automations (legacy bus event)
             self.coordinator.hass.bus.async_fire(
                 "ajax_button_pressed",
                 {
@@ -768,6 +768,11 @@ class SQSManager:
                     "space_name": space.name,
                 },
             )
+
+            # Fire event entity (modern HA event platform)
+            event_entity = self.coordinator._event_entities.get(device.id)
+            if event_entity:
+                event_entity.fire(action)
 
             message = get_event_message(action, self._language)
             _LOGGER.info("SQS instant: %s -> %s (button)", source_name, message)
@@ -787,7 +792,7 @@ class SQSManager:
             # Set the doorbell_ring state to True (will auto-reset)
             device.attributes["doorbell_ring"] = True
 
-            # Fire a Home Assistant event for automations
+            # Fire a Home Assistant event for automations (legacy bus event)
             self.coordinator.hass.bus.async_fire(
                 "ajax_doorbell_ring",
                 {
@@ -796,6 +801,11 @@ class SQSManager:
                     "space_name": space.name,
                 },
             )
+
+            # Fire event entity (modern HA event platform)
+            event_entity = self.coordinator._event_entities.get(device.id)
+            if event_entity:
+                event_entity.fire("ring")
 
             _LOGGER.info("SQS instant: %s -> doorbell ring", source_name)
 

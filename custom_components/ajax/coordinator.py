@@ -182,6 +182,9 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
         # Door sensor fast polling option (disabled by default to reduce API calls)
         self._door_sensor_fast_poll_enabled: bool = False
 
+        # Event entity registry: device_id -> AjaxEventEntity
+        self._event_entities: dict[str, Any] = {}
+
         # Flag to skip state change event creation when SQS already created the event
         self._skip_state_change_event: bool = False
 

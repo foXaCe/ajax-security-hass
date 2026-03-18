@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.21.0] - 2026-03-18
+
+### Added
+- ONE_EOL wiring scheme support: read door state from `wiringSchemeSpecificDetails.contactDetails.contactState` (#103)
+
 ## [0.20.1] - 2026-03-16
 
 ### Fixed

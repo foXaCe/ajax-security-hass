@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.24.0] - 2026-03-19
+
+### Added
+- ONVIF `Rule` extraction: detection zone name passed as `rule` attribute in camera detection events for zone-based automations
+
 ## [0.23.0] - 2026-03-19
 
 ### Added

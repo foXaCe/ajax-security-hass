@@ -79,6 +79,8 @@ async def async_setup_entry(
 class AjaxLock(CoordinatorEntity[AjaxDataCoordinator], LockEntity):
     """Representation of an Ajax smart lock (read-only)."""
 
+    __slots__ = ("_space_id", "_smart_lock_id")
+
     _attr_has_entity_name = True
 
     def __init__(

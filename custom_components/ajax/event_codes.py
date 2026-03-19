@@ -1026,8 +1026,6 @@ ACTION_CATEGORIES = {
     "alarm": "alarm",
     "alarm_recovered": "alarm",
 }
-
-
 # Default language fallback order
 DEFAULT_LANGUAGE = "en"
 

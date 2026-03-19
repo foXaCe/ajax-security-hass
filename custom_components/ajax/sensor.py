@@ -45,8 +45,6 @@ PARALLEL_UPDATES = 1
 # ==============================================================================
 # Helper Functions
 # ==============================================================================
-
-
 def format_timezone(tz_string: str | None) -> str | None:
     """Format timezone string to be more readable."""
     if not tz_string:
@@ -223,8 +221,6 @@ def _format_time_ago(timestamp: datetime) -> str:
 # ==============================================================================
 # Space-level Sensor Descriptions
 # ==============================================================================
-
-
 @dataclass(frozen=True)
 class AjaxSpaceSensorDescription(SensorEntityDescription):
     """Description for Ajax space-level sensors."""
@@ -427,8 +423,6 @@ SPACE_SENSORS: tuple[AjaxSpaceSensorDescription, ...] = (
 # ==============================================================================
 # Setup
 # ==============================================================================
-
-
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: AjaxConfigEntry,
@@ -573,8 +567,6 @@ async def async_setup_entry(
 # ==============================================================================
 # Space-level Sensors
 # ==============================================================================
-
-
 class AjaxSpaceSensor(CoordinatorEntity[AjaxDataCoordinator], SensorEntity):
     """Representation of an Ajax space-level sensor (statistics about the space/hub)."""
 
@@ -651,8 +643,6 @@ class AjaxSpaceSensor(CoordinatorEntity[AjaxDataCoordinator], SensorEntity):
 # ==============================================================================
 # Device-level Sensors (using handlers)
 # ==============================================================================
-
-
 class AjaxDeviceSensor(CoordinatorEntity[AjaxDataCoordinator], SensorEntity):
     """Representation of an Ajax device sensor."""
 
@@ -764,8 +754,6 @@ class AjaxDeviceSensor(CoordinatorEntity[AjaxDataCoordinator], SensorEntity):
 # ==============================================================================
 # Video Edge Sensors
 # ==============================================================================
-
-
 class AjaxVideoEdgeSensor(CoordinatorEntity[AjaxDataCoordinator], SensorEntity):
     """Representation of an Ajax Video Edge sensor."""
 
@@ -951,8 +939,6 @@ class AjaxVideoEdgeSensor(CoordinatorEntity[AjaxDataCoordinator], SensorEntity):
 # ==============================================================================
 # Hub-level Sensors (from hub_details)
 # ==============================================================================
-
-
 def _get_hub_sensors(space: AjaxSpace) -> list[dict]:
     """Get hub sensor definitions based on available hub_details fields."""
     sensors = []
@@ -1145,8 +1131,6 @@ class AjaxHubSensor(CoordinatorEntity[AjaxDataCoordinator], SensorEntity):
 # ==============================================================================
 # Smart Lock Sensors
 # ==============================================================================
-
-
 class AjaxSmartLockSensor(CoordinatorEntity[AjaxDataCoordinator], SensorEntity):
     """Sensor for Ajax smart lock - shows who last locked/unlocked."""
 

@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.22.0] - 2026-03-19
+
+### Added
+- Video Doorbell support: `DOORBELL` VideoEdge type with event entity for ring detection
+- MultiTransmitter `WIRE_INPUT` devices included in fast polling loop (5s when enabled) (#103)
+- `EventDeviceClass.BUTTON` and `EventDeviceClass.DOORBELL` for proper event entity naming
+
+### Changed
+- Add `from __future__ import annotations` to all Python files
+- Add `__slots__` to `AjaxLock` entity class
+- Pre-commit hooks updated (#111)
+
 ## [0.21.2] - 2026-03-19
 
 ### Fixed

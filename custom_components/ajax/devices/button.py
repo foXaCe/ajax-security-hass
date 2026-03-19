@@ -118,10 +118,13 @@ class ButtonHandler(AjaxDeviceHandler):
 
     def get_events(self) -> list[dict]:
         """Return event entities for buttons."""
+        from homeassistant.components.event import EventDeviceClass
+
         return [
             {
                 "key": "button_press",
                 "translation_key": "button_press",
+                "device_class": EventDeviceClass.BUTTON,
                 "event_types": [
                     "single_press",
                     "double_press",

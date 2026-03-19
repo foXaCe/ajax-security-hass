@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import logging
 
-from homeassistant.components.event import EventEntity
+from homeassistant.components.event import EventDeviceClass, EventEntity
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -18,6 +18,7 @@ from . import AjaxConfigEntry
 from .const import DOMAIN, MANUFACTURER
 from .coordinator import AjaxDataCoordinator
 from .devices import get_device_handler
+from .models import VIDEO_EDGE_MODEL_NAMES, VideoEdgeType
 
 _LOGGER = logging.getLogger(__name__)
 PARALLEL_UPDATES = 1
@@ -67,6 +68,35 @@ async def async_setup_entry(
                         device.name,
                     )
 
+        # Create event entities for Video Edge doorbells
+        for ve_id, video_edge in space.video_edges.items():
+            if video_edge.video_edge_type == VideoEdgeType.DOORBELL:
+                unique_id = f"{ve_id}_doorbell_press"
+                if unique_id in seen_unique_ids:
+                    continue
+                seen_unique_ids.add(unique_id)
+
+                event_desc = {
+                    "key": "doorbell_press",
+                    "translation_key": "doorbell_press",
+                    "device_class": EventDeviceClass.DOORBELL,
+                    "event_types": ["ring"],
+                    "enabled_by_default": True,
+                }
+                entity = AjaxEventEntity(
+                    coordinator=coordinator,
+                    space_id=space_id,
+                    device_id=ve_id,
+                    event_key="doorbell_press",
+                    event_desc=event_desc,
+                )
+                entities.append(entity)
+                coordinator._event_entities[ve_id] = entity
+                _LOGGER.debug(
+                    "Created event entity 'doorbell_press' for video edge: %s",
+                    video_edge.name,
+                )
+
     async_add_entities(entities)
     if entities:
         _LOGGER.info("Added %d Ajax event entit(ies)", len(entities))
@@ -74,6 +104,8 @@ async def async_setup_entry(
 
 class AjaxEventEntity(CoordinatorEntity[AjaxDataCoordinator], EventEntity):
     """Event entity for Ajax button/doorbell devices."""
+
+    __slots__ = ("_space_id", "_device_id", "_event_key", "_event_desc")
 
     _attr_has_entity_name = True
 
@@ -94,7 +126,10 @@ class AjaxEventEntity(CoordinatorEntity[AjaxDataCoordinator], EventEntity):
 
         self._attr_unique_id = f"{device_id}_{event_key}"
         self._attr_translation_key = event_desc.get("translation_key", event_key)
+        self._attr_device_class = event_desc.get("device_class")
         self._attr_event_types = event_desc["event_types"]
+        # Fallback name if translation_key is not resolved
+        self._attr_name = event_desc.get("name")
         self._attr_entity_registry_enabled_default = event_desc.get("enabled_by_default", True)
 
     @property
@@ -111,6 +146,16 @@ class AjaxEventEntity(CoordinatorEntity[AjaxDataCoordinator], EventEntity):
                     name=device.name,
                     manufacturer=MANUFACTURER,
                     model=device.type.value,
+                )
+            # Check video_edges (for doorbell)
+            video_edge = space.video_edges.get(self._device_id)
+            if video_edge:
+                model_name = VIDEO_EDGE_MODEL_NAMES.get(video_edge.video_edge_type, "Video Edge")
+                return DeviceInfo(
+                    identifiers={(DOMAIN, self._device_id)},
+                    name=video_edge.name,
+                    manufacturer=MANUFACTURER,
+                    model=model_name,
                 )
         return None
 

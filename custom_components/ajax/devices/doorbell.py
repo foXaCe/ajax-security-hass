@@ -84,10 +84,13 @@ class DoorbellHandler(AjaxDeviceHandler):
 
     def get_events(self) -> list[dict]:
         """Return event entities for doorbell."""
+        from homeassistant.components.event import EventDeviceClass
+
         return [
             {
                 "key": "doorbell_press",
                 "translation_key": "doorbell_press",
+                "device_class": EventDeviceClass.DOORBELL,
                 "event_types": ["ring"],
                 "enabled_by_default": True,
             },

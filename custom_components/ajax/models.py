@@ -232,6 +232,7 @@ class VideoEdgeType(Enum):
     MINIDOME = "MINIDOME"
     MINIDOME_HL = "MINIDOME_HL"
     INDOOR = "INDOOR"  # Indoor WiFi camera
+    DOORBELL = "DOORBELL"  # Ajax Video Doorbell
     UNKNOWN = "UNKNOWN"
 
 
@@ -288,6 +289,7 @@ VIDEO_EDGE_MODEL_NAMES: dict[VideoEdgeType, str] = {
     VideoEdgeType.MINIDOME: "MiniDome",
     VideoEdgeType.MINIDOME_HL: "MiniDome HL",
     VideoEdgeType.INDOOR: "Indoor Camera",
+    VideoEdgeType.DOORBELL: "Video Doorbell",
     VideoEdgeType.UNKNOWN: "Video Edge",
 }
 

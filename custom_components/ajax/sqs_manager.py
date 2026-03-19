@@ -782,39 +782,54 @@ class SQSManager:
         return False
 
     async def _handle_doorbell_event(self, space, event_tag: str, source_name: str, source_id: str) -> bool:
-        """Handle doorbell ring events."""
+        """Handle doorbell ring events.
+
+        The Ajax Doorbell is a Video Edge device, so we search both
+        devices and video_edges to find it.
+        """
+        # Try regular devices first
         device = self._find_device(space, source_name, source_id)
+        device_id = None
+        device_name = None
+
         if device:
-            # Store the last ring time in device attributes
+            device_id = device.id
+            device_name = device.name
             device.attributes["last_ring"] = datetime.now(UTC).isoformat()
             device.last_trigger_time = datetime.now(UTC)
-
-            # Set the doorbell_ring state to True (will auto-reset)
             device.attributes["doorbell_ring"] = True
-
-            # Fire a Home Assistant event for automations (legacy bus event)
-            self.coordinator.hass.bus.async_fire(
-                "ajax_doorbell_ring",
-                {
-                    "device_id": device.id,
-                    "device_name": device.name,
-                    "space_name": space.name,
-                },
-            )
-
-            # Fire event entity (modern HA event platform)
-            event_entity = self.coordinator._event_entities.get(device.id)
-            if event_entity:
-                event_entity.fire("ring")
-
-            _LOGGER.info("SQS instant: %s -> doorbell ring", source_name)
 
             # Schedule auto-reset of doorbell_ring state after 10 seconds
             self.coordinator.hass.loop.call_later(
                 10.0,
                 lambda: self._reset_doorbell_ring(space.id, device.id),
             )
+        else:
+            # Search in video_edges (Ajax Doorbell is a Video Edge)
+            for ve in space.video_edges.values():
+                if (source_id and ve.id == source_id) or (source_name and ve.name == source_name):
+                    device_id = ve.id
+                    device_name = ve.name
+                    ve.detections["doorbell_ring"] = True
+                    break
 
+        if device_id:
+            # Fire a Home Assistant event for automations (legacy bus event)
+            self.coordinator.hass.bus.async_fire(
+                "ajax_doorbell_ring",
+                {
+                    "device_id": device_id,
+                    "device_name": device_name,
+                    "space_name": space.name,
+                },
+            )
+
+            # Fire event entity (modern HA event platform)
+            event_entity = self.coordinator._event_entities.get(device_id)
+            if event_entity:
+                event_entity.fire("ring")
+
+            _LOGGER.info("SQS instant: %s -> doorbell ring", source_name)
             return True
 
         _LOGGER.warning("SQS: Doorbell device %s not found", source_name)

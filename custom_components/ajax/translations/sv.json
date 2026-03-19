@@ -377,6 +377,46 @@
         "name": "Position"
       }
     },
+    "event": {
+      "button_press": {
+        "name": "Knapp",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "double_press": "Dubbeltryck",
+              "emergency": "Nödsituation",
+              "long_press": "Långt tryck",
+              "panic": "Panik",
+              "single_press": "Enkelt tryck"
+            }
+          }
+        }
+      },
+      "camera_detection": {
+        "name": "Detektion",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "human": "Person",
+              "line_crossing": "Linjekorsning",
+              "motion": "Rörelse",
+              "pet": "Husdjur",
+              "vehicle": "Fordon"
+            }
+          }
+        }
+      },
+      "doorbell_press": {
+        "name": "Dörrklocka",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "ring": "Ringning"
+            }
+          }
+        }
+      }
+    },
     "light": {
       "dimmer_light": {
         "name": "Dimmer"

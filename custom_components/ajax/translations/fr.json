@@ -377,6 +377,46 @@
         "name": "Position"
       }
     },
+    "event": {
+      "button_press": {
+        "name": "Bouton",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "double_press": "Double appui",
+              "emergency": "Urgence",
+              "long_press": "Appui long",
+              "panic": "Panique",
+              "single_press": "Appui simple"
+            }
+          }
+        }
+      },
+      "camera_detection": {
+        "name": "Détection",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "human": "Personne",
+              "line_crossing": "Franchissement de ligne",
+              "motion": "Mouvement",
+              "pet": "Animal",
+              "vehicle": "Véhicule"
+            }
+          }
+        }
+      },
+      "doorbell_press": {
+        "name": "Sonnette",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "ring": "Sonnerie"
+            }
+          }
+        }
+      }
+    },
     "light": {
       "dimmer_light": {
         "name": "Variateur"

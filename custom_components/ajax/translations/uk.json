@@ -377,6 +377,46 @@
         "name": "Позиція"
       }
     },
+    "event": {
+      "button_press": {
+        "name": "Кнопка",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "double_press": "Подвійне натискання",
+              "emergency": "Екстрена ситуація",
+              "long_press": "Довге натискання",
+              "panic": "Паніка",
+              "single_press": "Одинарне натискання"
+            }
+          }
+        }
+      },
+      "camera_detection": {
+        "name": "Виявлення",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "human": "Людина",
+              "line_crossing": "Перетин лінії",
+              "motion": "Рух",
+              "pet": "Тварина",
+              "vehicle": "Транспорт"
+            }
+          }
+        }
+      },
+      "doorbell_press": {
+        "name": "Дверний дзвінок",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "ring": "Дзвінок"
+            }
+          }
+        }
+      }
+    },
     "light": {
       "dimmer_light": {
         "name": "Димер"

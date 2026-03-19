@@ -377,6 +377,46 @@
         "name": "Positie"
       }
     },
+    "event": {
+      "button_press": {
+        "name": "Knop",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "double_press": "Dubbele druk",
+              "emergency": "Noodgeval",
+              "long_press": "Lange druk",
+              "panic": "Paniek",
+              "single_press": "Enkele druk"
+            }
+          }
+        }
+      },
+      "camera_detection": {
+        "name": "Detectie",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "human": "Persoon",
+              "line_crossing": "Lijnkruising",
+              "motion": "Beweging",
+              "pet": "Huisdier",
+              "vehicle": "Voertuig"
+            }
+          }
+        }
+      },
+      "doorbell_press": {
+        "name": "Deurbel",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "ring": "Bel"
+            }
+          }
+        }
+      }
+    },
     "light": {
       "dimmer_light": {
         "name": "Dimmer"

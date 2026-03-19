@@ -387,6 +387,20 @@
             }
           }
         }
+      },
+      "camera_detection": {
+        "name": "Detection",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "motion": "Motion",
+              "human": "Human",
+              "vehicle": "Vehicle",
+              "pet": "Pet",
+              "line_crossing": "Line crossing"
+            }
+          }
+        }
       }
     },
     "light": {

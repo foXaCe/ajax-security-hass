@@ -377,6 +377,46 @@
         "name": "Position"
       }
     },
+    "event": {
+      "button_press": {
+        "name": "Button",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "double_press": "Double press",
+              "emergency": "Emergency",
+              "long_press": "Long press",
+              "panic": "Panic",
+              "single_press": "Single press"
+            }
+          }
+        }
+      },
+      "camera_detection": {
+        "name": "Detection",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "human": "Human",
+              "line_crossing": "Line crossing",
+              "motion": "Motion",
+              "pet": "Pet",
+              "vehicle": "Vehicle"
+            }
+          }
+        }
+      },
+      "doorbell_press": {
+        "name": "Doorbell",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "ring": "Ring"
+            }
+          }
+        }
+      }
+    },
     "light": {
       "dimmer_light": {
         "name": "Dimmer"

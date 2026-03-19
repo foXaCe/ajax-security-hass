@@ -319,14 +319,14 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
                         contact_sensors = [
                             device
                             for device in space.devices.values()
-                            if device.type in (DeviceType.DOOR_CONTACT, DeviceType.TRANSMITTER)
+                            if device.type in (DeviceType.DOOR_CONTACT, DeviceType.TRANSMITTER, DeviceType.WIRE_INPUT)
                         ]
                     elif current_state == SecurityState.NIGHT_MODE:
                         # When in night mode: only poll sensors excluded from night mode
                         contact_sensors = [
                             device
                             for device in space.devices.values()
-                            if device.type in (DeviceType.DOOR_CONTACT, DeviceType.TRANSMITTER)
+                            if device.type in (DeviceType.DOOR_CONTACT, DeviceType.TRANSMITTER, DeviceType.WIRE_INPUT)
                             and not device.attributes.get("night_mode_arm", True)
                         ]
                     else:
@@ -415,6 +415,40 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
                                             new_triggered,
                                         )
                                         updated = True
+
+                                elif device.type == DeviceType.WIRE_INPUT:
+                                    # Handle MultiTransmitter WireInput (same logic as DOOR_CONTACT)
+                                    old_door_state = device.attributes.get("door_opened")
+                                    external_state = device_data.get("externalContactState")
+
+                                    if external_state is not None:
+                                        new_door_state = external_state != "OK"
+                                        wiring_details = device_data.get("wiringSchemeSpecificDetails", {})
+                                        wiring_type = wiring_details.get("wiringSchemeType")
+                                        if wiring_type == "TWO_EOL":
+                                            contact_two = wiring_details.get("contactTwoDetails", {})
+                                            contact_state = contact_two.get("contactState")
+                                            if contact_state:
+                                                new_door_state = contact_state != "OK"
+                                        elif wiring_type == "ONE_EOL":
+                                            contact_details = wiring_details.get("contactDetails", {})
+                                            contact_state = contact_details.get("contactState")
+                                            if contact_state:
+                                                new_door_state = contact_state != "OK"
+                                        elif wiring_type == "NO_EOL":
+                                            contact_state = wiring_details.get("contactState")
+                                            if contact_state:
+                                                new_door_state = contact_state != "OK"
+
+                                        if old_door_state != new_door_state:
+                                            device.attributes["door_opened"] = new_door_state
+                                            _LOGGER.debug(
+                                                "WireInput %s state changed: %s -> %s",
+                                                device.name,
+                                                old_door_state,
+                                                new_door_state,
+                                            )
+                                            updated = True
 
                         if updated:
                             self.async_set_updated_data(self.account)

@@ -683,14 +683,27 @@ class SSEManager:
 
         event_code_upper = event_code.upper() if event_code else ""
 
-        if event_tag in LOCK_DOOR_EVENTS:
+        if event_tag == "smartlockdoorbellbuttonpressed":
+            self.coordinator.hass.bus.async_fire(
+                "ajax_smart_lock_doorbell",
+                {
+                    "device_id": smart_lock.id,
+                    "device_name": smart_lock.name,
+                    "space_name": space.name,
+                },
+            )
+            _LOGGER.info("SSE instant: Smart lock %s -> doorbell pressed", smart_lock.name)
+        elif event_tag in LOCK_DOOR_EVENTS:
             if event_code_upper in LOCK_DOOR_EVENT_CODE_STATES:
                 smart_lock.is_door_open = LOCK_DOOR_EVENT_CODE_STATES[event_code_upper]
-            _LOGGER.info(
-                "SSE instant: Smart lock %s door -> %s",
-                smart_lock.name,
-                "open" if smart_lock.is_door_open else "closed",
-            )
+            if event_tag == "smartlockdoorleftopen":
+                _LOGGER.warning("SSE: Smart lock %s door left open", smart_lock.name)
+            else:
+                _LOGGER.info(
+                    "SSE instant: Smart lock %s door -> %s",
+                    smart_lock.name,
+                    "open" if smart_lock.is_door_open else "closed",
+                )
         elif event_tag in LOCK_EVENTS:
             if event_code_upper in LOCK_EVENT_CODE_STATES:
                 smart_lock.is_locked = LOCK_EVENT_CODE_STATES[event_code_upper]

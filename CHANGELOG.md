@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.25.0] - 2026-03-29
+
+### Added
+- Smart lock doorbell button press event (`M_7E_40`) and door left open warning (`M_7E_37`) for LockBridge L3 (#88)
+
+### Fixed
+- AI detection binary sensors (human, vehicle, pet) stuck ON: now cleared when object type disappears or motion ends (#114)
+
+### Changed
+- Pre-commit hooks updated (#113)
+
 ## [0.24.0] - 2026-03-19
 
 ### Added

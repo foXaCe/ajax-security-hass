@@ -1029,6 +1029,11 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
             detection_key = event.detection_type.lower()  # e.g., "video_human"
             target_ve.detections[detection_key] = event.active
 
+            # When motion clears, also clear all AI detections
+            if detection_key == "video_motion" and not event.active:
+                for ai_key in ("video_human", "video_vehicle", "video_pet"):
+                    target_ve.detections[ai_key] = False
+
             # Fire event entities for ONVIF detections
             if event.active:
                 if detection_key == "doorbell_ring":

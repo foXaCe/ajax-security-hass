@@ -406,44 +406,35 @@ class AjaxOnvifClient:
                 # Ajax can send comma-separated: "Animal,Human,Vehicle"
                 class_types = [c.strip() for c in class_types_raw.split(",") if c.strip()]
 
-                if not class_types:
-                    # Empty ClassTypes = end of detection
-                    return None
-
-                # Emit events for all detected types (not just highest priority)
-                # This ensures automations on pet/vehicle work even when human is also detected
-                detection_types: list[str] = []
+                all_ai_types = {"VIDEO_HUMAN", "VIDEO_VEHICLE", "VIDEO_PET"}
+                detection_types: set[str] = set()
                 for ct in class_types:
                     if ct in ("human", "person"):
-                        detection_types.append("VIDEO_HUMAN")
+                        detection_types.add("VIDEO_HUMAN")
                     elif ct == "vehicle":
-                        detection_types.append("VIDEO_VEHICLE")
+                        detection_types.add("VIDEO_VEHICLE")
                     elif ct in ("animal", "dog", "cat", "pet"):
-                        detection_types.append("VIDEO_PET")
+                        detection_types.add("VIDEO_PET")
 
-                # Emit callback for each detection type
-                for det_type in detection_types[1:]:
-                    event = OnvifDetectionEvent(
+                # Emit active for detected types, cleared for others
+                first_event = None
+                for det_type in all_ai_types:
+                    is_active = det_type in detection_types
+                    evt = OnvifDetectionEvent(
                         video_edge_id=self.video_edge.id,
                         channel_id=channel_id,
                         detection_type=det_type,
-                        active=True,
+                        active=is_active,
                     )
-                    if self._event_callback:
-                        state_key = f"{event.channel_id}_{event.detection_type}"
-                        if self._last_states.get(state_key) != event.active:
-                            self._last_states[state_key] = event.active
-                            self._event_callback(event)
+                    if first_event is None and is_active:
+                        first_event = evt
+                    elif self._event_callback:
+                        state_key = f"{evt.channel_id}_{evt.detection_type}"
+                        if self._last_states.get(state_key) != evt.active:
+                            self._last_states[state_key] = evt.active
+                            self._event_callback(evt)
 
-                # Return the first detection type via normal flow
-                if detection_types:
-                    return OnvifDetectionEvent(
-                        video_edge_id=self.video_edge.id,
-                        channel_id=channel_id,
-                        detection_type=detection_types[0],
-                        active=True,
-                    )
-                return None
+                return first_event
 
             # Parse Ajax Motion Detection
             # Topic: tns1:RuleEngine/tnsajax:MotionDetector/Detection

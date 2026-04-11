@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.25.1] - 2026-04-11
+
+### Fixed
+- SQS connection error with newer botocore: bump `aiobotocore` minimum to `>=2.22.0` (#116)
+
+### Changed
+- Pre-commit hooks updated (#115)
+
 ## [0.25.0] - 2026-03-29
 
 ### Added

@@ -377,14 +377,16 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
                                             if contact_state:
                                                 new_door_state = contact_state != "OK"
                                         elif wiring_type == "ONE_EOL":
+                                            # OR logic: open if externalContactState OR contactDetails says TRIGGERED
                                             contact_details = wiring_details.get("contactDetails", {})
                                             contact_state = contact_details.get("contactState")
-                                            if contact_state:
-                                                new_door_state = contact_state != "OK"
+                                            if contact_state and contact_state != "OK":
+                                                new_door_state = True
                                         elif wiring_type == "NO_EOL":
+                                            # OR logic: open if externalContactState OR contactState says TRIGGERED
                                             contact_state = wiring_details.get("contactState")
-                                            if contact_state:
-                                                new_door_state = contact_state != "OK"
+                                            if contact_state and contact_state != "OK":
+                                                new_door_state = True
                                     else:
                                         # Try attributes as fallback
                                         api_attrs = device_data.get("attributes", {})
@@ -431,14 +433,16 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
                                             if contact_state:
                                                 new_door_state = contact_state != "OK"
                                         elif wiring_type == "ONE_EOL":
+                                            # OR logic: open if externalContactState OR contactDetails says TRIGGERED
                                             contact_details = wiring_details.get("contactDetails", {})
                                             contact_state = contact_details.get("contactState")
-                                            if contact_state:
-                                                new_door_state = contact_state != "OK"
+                                            if contact_state and contact_state != "OK":
+                                                new_door_state = True
                                         elif wiring_type == "NO_EOL":
+                                            # OR logic: open if externalContactState OR contactState says TRIGGERED
                                             contact_state = wiring_details.get("contactState")
-                                            if contact_state:
-                                                new_door_state = contact_state != "OK"
+                                            if contact_state and contact_state != "OK":
+                                                new_door_state = True
 
                                         if old_door_state != new_door_state:
                                             device.attributes["door_opened"] = new_door_state
@@ -1689,16 +1693,16 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
                     if contact_state:
                         door_opened = contact_state != "OK"
                 elif wiring_type == "ONE_EOL":
-                    # ONE_EOL: contactDetails contains the door contact state
+                    # OR logic: open if externalContactState OR contactDetails says TRIGGERED
                     contact_details = wiring_details.get("contactDetails", {})
                     contact_state = contact_details.get("contactState")
-                    if contact_state:
-                        door_opened = contact_state != "OK"
+                    if contact_state and contact_state != "OK":
+                        door_opened = True
                 elif wiring_type == "NO_EOL":
-                    # NO_EOL: contactState directly in wiringSchemeSpecificDetails
+                    # OR logic: open if externalContactState OR contactState says TRIGGERED
                     contact_state = wiring_details.get("contactState")
-                    if contact_state:
-                        door_opened = contact_state != "OK"
+                    if contact_state and contact_state != "OK":
+                        door_opened = True
 
                 device.attributes["door_opened"] = door_opened
 
@@ -2099,16 +2103,16 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
                     if tamper_state:
                         normalized["tampered"] = tamper_state != "OK"
                 elif wiring_type == "ONE_EOL":
-                    # ONE_EOL: contactDetails contains the door contact state
+                    # OR logic: open if externalContactState OR contactDetails says TRIGGERED
                     contact_details = wiring_details.get("contactDetails", {})
                     contact_state = contact_details.get("contactState")
-                    if contact_state:
-                        door_opened = contact_state != "OK"
+                    if contact_state and contact_state != "OK":
+                        door_opened = True
                 elif wiring_type == "NO_EOL":
-                    # NO_EOL: contactState directly in wiringSchemeSpecificDetails
+                    # OR logic: open if externalContactState OR contactState says TRIGGERED
                     contact_state = wiring_details.get("contactState")
-                    if contact_state:
-                        door_opened = contact_state != "OK"
+                    if contact_state and contact_state != "OK":
+                        door_opened = True
 
                 normalized["door_opened"] = door_opened
 

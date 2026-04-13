@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.26.0] - 2026-04-13
+
+### Added
+- Smart lock event entity exposing `doorbell_pressed` and `door_left_open` as triggers in automation UI (#88)
+- Translations for smart lock events in all 7 languages
+
+### Fixed
+- NO_EOL/ONE_EOL door state detection: use OR logic between `externalContactState` and `contactState` to support both static and dynamic firmwares (#103)
+
 ## [0.25.1] - 2026-04-11
 
 ### Fixed

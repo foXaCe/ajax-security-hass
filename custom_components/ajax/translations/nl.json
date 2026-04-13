@@ -415,6 +415,17 @@
             }
           }
         }
+      },
+      "smart_lock_event": {
+        "name": "Gebeurtenis",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "door_left_open": "Deur open gelaten",
+              "doorbell_pressed": "Deurbel ingedrukt"
+            }
+          }
+        }
       }
     },
     "light": {

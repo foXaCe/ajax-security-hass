@@ -415,6 +415,17 @@
             }
           }
         }
+      },
+      "smart_lock_event": {
+        "name": "Event",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "door_left_open": "Door left open",
+              "doorbell_pressed": "Doorbell pressed"
+            }
+          }
+        }
       }
     },
     "light": {

@@ -415,6 +415,17 @@
             }
           }
         }
+      },
+      "smart_lock_event": {
+        "name": "Evento",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "door_left_open": "Puerta dejada abierta",
+              "doorbell_pressed": "Timbre pulsado"
+            }
+          }
+        }
       }
     },
     "light": {

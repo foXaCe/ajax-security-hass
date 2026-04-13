@@ -415,6 +415,17 @@
             }
           }
         }
+      },
+      "smart_lock_event": {
+        "name": "Händelse",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "door_left_open": "Dörr lämnad öppen",
+              "doorbell_pressed": "Dörrklocka tryckt"
+            }
+          }
+        }
       }
     },
     "light": {

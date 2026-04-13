@@ -125,6 +125,34 @@ async def async_setup_entry(
                     video_edge.name,
                 )
 
+        # Create event entities for smart locks
+        for sl_id, smart_lock in space.smart_locks.items():
+            event_desc = {
+                "key": "smart_lock_event",
+                "translation_key": "smart_lock_event",
+                "device_class": EventDeviceClass.DOORBELL,
+                "event_types": ["doorbell_pressed", "door_left_open"],
+                "enabled_by_default": True,
+            }
+            unique_id = f"{sl_id}_smart_lock_event"
+            if unique_id in seen_unique_ids:
+                continue
+            seen_unique_ids.add(unique_id)
+
+            entity = AjaxEventEntity(
+                coordinator=coordinator,
+                space_id=space_id,
+                device_id=sl_id,
+                event_key="smart_lock_event",
+                event_desc=event_desc,
+            )
+            entities.append(entity)
+            coordinator._event_entities[unique_id] = entity
+            _LOGGER.debug(
+                "Created event entity 'smart_lock_event' for smart lock: %s",
+                smart_lock.name,
+            )
+
     async_add_entities(entities)
     if entities:
         _LOGGER.info("Added %d Ajax event entit(ies)", len(entities))
@@ -184,6 +212,15 @@ class AjaxEventEntity(CoordinatorEntity[AjaxDataCoordinator], EventEntity):
                     name=video_edge.name,
                     manufacturer=MANUFACTURER,
                     model=model_name,
+                )
+            # Check smart_locks
+            smart_lock = space.smart_locks.get(self._device_id)
+            if smart_lock:
+                return DeviceInfo(
+                    identifiers={(DOMAIN, self._device_id)},
+                    name=smart_lock.name,
+                    manufacturer=MANUFACTURER,
+                    model="LockBridge Jeweller",
                 )
         return None
 

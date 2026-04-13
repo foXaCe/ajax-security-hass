@@ -1143,6 +1143,8 @@ class SQSManager:
 
         event_code_upper = event_code.upper() if event_code else ""
 
+        event_entity = self.coordinator._event_entities.get(f"{smart_lock.id}_smart_lock_event")
+
         if event_tag == "smartlockdoorbellbuttonpressed":
             # Doorbell button on smart lock — fire HA event
             self.coordinator.hass.bus.async_fire(
@@ -1153,12 +1155,16 @@ class SQSManager:
                     "space_name": space.name,
                 },
             )
+            if event_entity:
+                event_entity.fire("doorbell_pressed")
             _LOGGER.info("SQS instant: Smart lock %s -> doorbell pressed", smart_lock.name)
         elif event_tag in LOCK_DOOR_EVENTS:
             # Door open/close/left open — use event code mapping
             if event_code_upper in LOCK_DOOR_EVENT_CODE_STATES:
                 smart_lock.is_door_open = LOCK_DOOR_EVENT_CODE_STATES[event_code_upper]
             if event_tag == "smartlockdoorleftopen":
+                if event_entity:
+                    event_entity.fire("door_left_open")
                 _LOGGER.warning(
                     "SQS: Smart lock %s door left open",
                     smart_lock.name,

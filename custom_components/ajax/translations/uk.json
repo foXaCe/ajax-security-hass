@@ -415,6 +415,17 @@
             }
           }
         }
+      },
+      "smart_lock_event": {
+        "name": "Подія",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "door_left_open": "Двері залишилися відчиненими",
+              "doorbell_pressed": "Дзвінок натиснуто"
+            }
+          }
+        }
       }
     },
     "light": {

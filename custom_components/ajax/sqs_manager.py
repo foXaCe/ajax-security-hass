@@ -123,6 +123,12 @@ RELAY_EVENTS = {
     "turnedoff": ("light_off", False),
     "relayonbyuser": ("relay_on", True),
     "relayoffbyuser": ("relay_off", False),
+    # WallSwitch Jeweller — relay toggled automatically on arm/disarm
+    # eventTypeV2=SMART_HOME_ACTUATOR, sourceObjectType=WALL_SWITCH
+    "relayonbyarming": ("relay_on_by_arming", True),
+    "relayoffbyarming": ("relay_off_by_arming", False),
+    "relayonbydisarming": ("relay_on_by_disarming", True),
+    "relayoffbydisarming": ("relay_off_by_disarming", False),
 }
 
 BUTTON_EVENTS = {

@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.26.3] - 2026-04-18
+
+### Changed
+- Migrate 15 device handlers to shared helpers in `devices/base.py` (dimmer, door_contact, flood_detector, hub, life_quality, lightswitch, manual_call_point, motion_detector, siren, smoke_detector, socket, transmitter, waterstop — on top of the 4 already done in 0.26.2). Removes ~500 lines of duplicated battery/signal/tamper/temperature/firmware sensor boilerplate.
+- Extract `EventHandlerMixin` in `_event_helpers.py`: SSE and SQS managers now share the same implementation of `_find_video_edge`, `_update_video_detection` and `_reset_doorbell_ring` (-196 lines of duplication).
+- `coordinator.py`: cache `space_binding` per hub so `async_get_space_by_hub` is only hit on `full_refresh` (not on every poll tick); motion-reset error path drops the unparsable `motion_detected_at` instead of spamming a WARNING every tick.
+- `event_codes.py`: extend `EVENT_MESSAGES` to all 7 supported languages (de/nl/sv/uk added) — 861 messages total, up from fr/en/es only.
+- Extend `entity.camera.nvr_channel` / `nvr_channel_sub` translation keys so untitled NVR channels follow the user's HA language (7 languages).
+
+### Fixed
+- `camera.py`: guard snapshot cache with an `asyncio.Lock` so two concurrent requests can no longer spawn two FFmpeg processes against the same RTSP stream.
+- `__init__.py`: add `async_remove_config_entry_device` so users can delete orphaned Ajax devices (e.g. entities removed by previous releases) from the registry; redact sensitive fields before writing `ajax_raw_devices.json`; escape markdown in persistent-notification source/space names to neutralise `[text](javascript:…)` injection.
+- `api.py`: bound aiohttp connector pool (`limit=20`, `limit_per_host=10`) to prevent connector exhaustion under stalls; expose `bypass_cache_next()` as public helper instead of poking `_bypass_cache_once` from the coordinator.
+- `fr.json`: use "serrures intelligentes" instead of "smart locks" in `lock_not_supported` for terminology consistency.
+
 ## [0.26.2] - 2026-04-18
 
 ### Security

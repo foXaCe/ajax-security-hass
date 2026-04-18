@@ -1535,6 +1535,9 @@
     "no_hubs_found": {
       "message": "Keine Hubs gefunden."
     },
+    "panic_cooldown": {
+      "message": "Paniktaste abgelehnt: bitte {seconds} Sekunden zwischen den Drücken warten, um doppelte Alarme zu vermeiden."
+    },
     "space_not_found": {
       "message": "Bereich nicht gefunden."
     },
@@ -1649,18 +1652,42 @@
     },
     "get_nvr_recordings": {
       "description": "NVR-Aufnahmedaten von der API abrufen (letzte 24 Stunden). Speichert die Antwort in ajax_nvr_recordings.json zu Diagnosezwecken.",
+      "fields": {
+        "config_entry_id": {
+          "description": "Ajax-Integrationseintrag abfragen.",
+          "name": "Integrationseintrag"
+        }
+      },
       "name": "NVR-Aufnahmen abrufen"
     },
     "get_raw_devices": {
       "description": "Rohe API-JSON-Daten für alle Geräte abrufen. Speichert die vollständige API-Antwort in ajax_raw_devices.json.",
+      "fields": {
+        "config_entry_id": {
+          "description": "Ajax-Integrationseintrag abfragen.",
+          "name": "Integrationseintrag"
+        }
+      },
       "name": "Rohdaten abrufen"
     },
     "get_smart_locks": {
       "description": "Ruft Smart-Lock-Daten von der API und über SSE/SQS erkannten Schlössern ab. Speichert die Antwort zur Diagnose in ajax_smart_locks.json.",
+      "fields": {
+        "config_entry_id": {
+          "description": "Ajax-Integrationseintrag abfragen.",
+          "name": "Integrationseintrag"
+        }
+      },
       "name": "Smart Locks abrufen"
     },
     "refresh_metadata": {
       "description": "Vollständige Aktualisierung von Räumen, Benutzern und Gruppen von Ajax erzwingen.",
+      "fields": {
+        "config_entry_id": {
+          "description": "Ajax-Integrationseintrag aktualisieren.",
+          "name": "Integrationseintrag"
+        }
+      },
       "name": "Metadaten aktualisieren"
     }
   }

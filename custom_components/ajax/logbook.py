@@ -86,7 +86,73 @@ _MESSAGES: dict[str, dict[str, str]] = {
         "sv": "utlöst",
         "uk": "спрацювало",
     },
+    "detected": {
+        "en": "detected {what}",
+        "fr": "a détecté {what}",
+        "es": "detectó {what}",
+        "de": "hat {what} erkannt",
+        "nl": "heeft {what} gedetecteerd",
+        "sv": "upptäckte {what}",
+        "uk": "виявлено {what}",
+    },
 }
+
+# Per-language label for each ONVIF/cloud video detection type, used by
+# the camera-detection logbook describer below.
+_DETECTION_LABELS: dict[str, dict[str, str]] = {
+    "motion": {
+        "en": "motion",
+        "fr": "un mouvement",
+        "es": "movimiento",
+        "de": "Bewegung",
+        "nl": "beweging",
+        "sv": "rörelse",
+        "uk": "рух",
+    },
+    "human": {
+        "en": "a person",
+        "fr": "une personne",
+        "es": "una persona",
+        "de": "eine Person",
+        "nl": "een persoon",
+        "sv": "en person",
+        "uk": "людину",
+    },
+    "vehicle": {
+        "en": "a vehicle",
+        "fr": "un véhicule",
+        "es": "un vehículo",
+        "de": "ein Fahrzeug",
+        "nl": "een voertuig",
+        "sv": "ett fordon",
+        "uk": "транспортний засіб",
+    },
+    "pet": {
+        "en": "an animal",
+        "fr": "un animal",
+        "es": "un animal",
+        "de": "ein Tier",
+        "nl": "een dier",
+        "sv": "ett djur",
+        "uk": "тварину",
+    },
+    "line_crossing": {
+        "en": "a line crossing",
+        "fr": "un franchissement de ligne",
+        "es": "un cruce de línea",
+        "de": "Linienüberschreitung",
+        "nl": "een lijnoverschrijding",
+        "sv": "linjeöverträdelse",
+        "uk": "перетин лінії",
+    },
+}
+
+
+def _detection_label(hass: HomeAssistant, event_type: str) -> str:
+    """Return the localised label for a video detection ``event_type``."""
+    lang = (hass.config.language or "en")[:2]
+    table = _DETECTION_LABELS.get(event_type, {})
+    return table.get(lang) or table.get("en") or event_type
 
 
 def _tr(hass: HomeAssistant, key: str, **kwargs: str) -> str:
@@ -111,6 +177,7 @@ EVENT_AJAX_SECURITY_STATE_CHANGED = "ajax_security_state_changed"
 EVENT_AJAX_BUTTON_PRESSED = "ajax_button_pressed"
 EVENT_AJAX_DOORBELL_RING = "ajax_doorbell_ring"
 EVENT_AJAX_SCENARIO_TRIGGERED = "ajax_scenario_triggered"
+EVENT_AJAX_CAMERA_DETECTION = "ajax_camera_detection"
 
 
 @callback
@@ -197,6 +264,16 @@ def async_describe_events(
             LOGBOOK_ENTRY_ICON: "mdi:play-circle",
         }
 
+    @callback
+    def async_describe_camera_detection(event: Event) -> dict[str, str]:
+        device = event.data.get("device_name", "Camera")
+        event_type = event.data.get("event_type", "")
+        return {
+            LOGBOOK_ENTRY_NAME: device,
+            LOGBOOK_ENTRY_MESSAGE: _tr(hass, "detected", what=_detection_label(hass, event_type)),
+            LOGBOOK_ENTRY_ICON: "mdi:cctv",
+        }
+
     async_describe_event(DOMAIN, EVENT_AJAX_ARMED, async_describe_armed)
     async_describe_event(DOMAIN, EVENT_AJAX_DISARMED, async_describe_disarmed)
     async_describe_event(DOMAIN, EVENT_AJAX_ARMED_NIGHT, async_describe_armed_night)
@@ -205,3 +282,4 @@ def async_describe_events(
     async_describe_event(DOMAIN, EVENT_AJAX_BUTTON_PRESSED, async_describe_button)
     async_describe_event(DOMAIN, EVENT_AJAX_DOORBELL_RING, async_describe_doorbell)
     async_describe_event(DOMAIN, EVENT_AJAX_SCENARIO_TRIGGERED, async_describe_scenario)
+    async_describe_event(DOMAIN, EVENT_AJAX_CAMERA_DETECTION, async_describe_camera_detection)

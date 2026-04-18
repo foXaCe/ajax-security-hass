@@ -1535,6 +1535,9 @@
     "no_hubs_found": {
       "message": "No hubs found."
     },
+    "panic_cooldown": {
+      "message": "Panic button rejected: please wait {seconds} seconds between presses to avoid duplicate alarms."
+    },
     "space_not_found": {
       "message": "Space not found."
     },
@@ -1649,18 +1652,42 @@
     },
     "get_nvr_recordings": {
       "description": "Get NVR recordings data from the API (last 24 hours). Saves the response to ajax_nvr_recordings.json for diagnostic purposes.",
+      "fields": {
+        "config_entry_id": {
+          "description": "Ajax integration entry to query.",
+          "name": "Integration entry"
+        }
+      },
       "name": "Get NVR recordings"
     },
     "get_raw_devices": {
       "description": "Get raw API JSON data for all devices. Saves the complete API response to ajax_raw_devices.json.",
+      "fields": {
+        "config_entry_id": {
+          "description": "Ajax integration entry to query.",
+          "name": "Integration entry"
+        }
+      },
       "name": "Get raw devices"
     },
     "get_smart_locks": {
       "description": "Get smart lock data from API and SSE/SQS-discovered locks. Saves the response to ajax_smart_locks.json for diagnostic purposes.",
+      "fields": {
+        "config_entry_id": {
+          "description": "Ajax integration entry to query.",
+          "name": "Integration entry"
+        }
+      },
       "name": "Get smart locks"
     },
     "refresh_metadata": {
       "description": "Force a full refresh of rooms, users, and groups from Ajax.",
+      "fields": {
+        "config_entry_id": {
+          "description": "Ajax integration entry to refresh.",
+          "name": "Integration entry"
+        }
+      },
       "name": "Refresh metadata"
     }
   }

@@ -1535,6 +1535,9 @@
     "no_hubs_found": {
       "message": "Geen hubs gevonden."
     },
+    "panic_cooldown": {
+      "message": "Paniekknop geweigerd: wacht {seconds} seconden tussen drukken om dubbele alarmen te voorkomen."
+    },
     "space_not_found": {
       "message": "Ruimte niet gevonden."
     },
@@ -1649,18 +1652,42 @@
     },
     "get_nvr_recordings": {
       "description": "Haal NVR-opnamegegevens op van de API (laatste 24 uur). Slaat het antwoord op in ajax_nvr_recordings.json voor diagnostische doeleinden.",
+      "fields": {
+        "config_entry_id": {
+          "description": "Ajax-integratie-invoer om te bevragen.",
+          "name": "Integratie-invoer"
+        }
+      },
       "name": "NVR-opnames ophalen"
     },
     "get_raw_devices": {
       "description": "Haal ruwe API JSON-data op voor alle apparaten. Slaat de volledige API-respons op in ajax_raw_devices.json.",
+      "fields": {
+        "config_entry_id": {
+          "description": "Ajax-integratie-invoer om te bevragen.",
+          "name": "Integratie-invoer"
+        }
+      },
       "name": "Haal ruwe apparaten op"
     },
     "get_smart_locks": {
       "description": "Haalt smart lock-gegevens op uit de API en SSE/SQS-ontdekte sloten. Slaat het antwoord op in ajax_smart_locks.json voor diagnostiek.",
+      "fields": {
+        "config_entry_id": {
+          "description": "Ajax-integratie-invoer om te bevragen.",
+          "name": "Integratie-invoer"
+        }
+      },
       "name": "Smart locks ophalen"
     },
     "refresh_metadata": {
       "description": "Forceer een volledige verversing van kamers, gebruikers en groepen van Ajax.",
+      "fields": {
+        "config_entry_id": {
+          "description": "Ajax-integratie-invoer om te vernieuwen.",
+          "name": "Integratie-invoer"
+        }
+      },
       "name": "Ververs metadata"
     }
   }

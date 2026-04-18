@@ -1535,6 +1535,9 @@
     "no_hubs_found": {
       "message": "Inga hubbar hittades."
     },
+    "panic_cooldown": {
+      "message": "Panikknappen avvisad: vänta {seconds} sekunder mellan tryck för att undvika dubbla larm."
+    },
     "space_not_found": {
       "message": "Space kan ej hittas."
     },
@@ -1649,18 +1652,42 @@
     },
     "get_nvr_recordings": {
       "description": "Hämta NVR-inspelningsdata från API:t (senaste 24 timmarna). Sparar svaret till ajax_nvr_recordings.json för diagnostik.",
+      "fields": {
+        "config_entry_id": {
+          "description": "Ajax-integrationspost att fråga.",
+          "name": "Integrationspost"
+        }
+      },
       "name": "Hämta NVR-inspelningar"
     },
     "get_raw_devices": {
       "description": "Hämta rådata för ella enheter i JSON-format. Resultatet sparas i  ajax_raw_devices.json.",
+      "fields": {
+        "config_entry_id": {
+          "description": "Ajax-integrationspost att fråga.",
+          "name": "Integrationspost"
+        }
+      },
       "name": "Hämta rådata för enheter"
     },
     "get_smart_locks": {
       "description": "Hämtar data från smart locks via API:t och lås upptäckta via SSE/SQS. Sparar svaret i ajax_smart_locks.json för diagnostik.",
+      "fields": {
+        "config_entry_id": {
+          "description": "Ajax-integrationspost att fråga.",
+          "name": "Integrationspost"
+        }
+      },
       "name": "Hämta smart locks"
     },
     "refresh_metadata": {
       "description": "Forcera fullständig omladdning av rum, användare och grupper från Ajax",
+      "fields": {
+        "config_entry_id": {
+          "description": "Ajax-integrationspost att uppdatera.",
+          "name": "Integrationspost"
+        }
+      },
       "name": "Uppdatera metadata"
     }
   }

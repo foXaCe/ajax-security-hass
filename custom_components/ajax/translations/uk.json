@@ -1535,6 +1535,9 @@
     "no_hubs_found": {
       "message": "Хабів не знайдено."
     },
+    "panic_cooldown": {
+      "message": "Кнопку паніки відхилено: зачекайте {seconds} секунд між натисканнями, щоб уникнути повторних тривог."
+    },
     "space_not_found": {
       "message": "Простір не знайдено."
     },
@@ -1649,18 +1652,42 @@
     },
     "get_nvr_recordings": {
       "description": "Отримати дані записів NVR з API (за останні 24 години). Зберігає відповідь у ajax_nvr_recordings.json для діагностики.",
+      "fields": {
+        "config_entry_id": {
+          "description": "Запис інтеграції Ajax для запиту.",
+          "name": "Запис інтеграції"
+        }
+      },
       "name": "Отримати записи NVR"
     },
     "get_raw_devices": {
       "description": "Отримати необроблені JSON-дані API для всіх пристроїв. Зберігає повну відповідь API у ajax_raw_devices.json.",
+      "fields": {
+        "config_entry_id": {
+          "description": "Запис інтеграції Ajax для запиту.",
+          "name": "Запис інтеграції"
+        }
+      },
       "name": "Отримати необроблені дані"
     },
     "get_smart_locks": {
       "description": "Отримує дані смарт-замків з API та замків, виявлених через SSE/SQS. Зберігає відповідь у ajax_smart_locks.json для діагностики.",
+      "fields": {
+        "config_entry_id": {
+          "description": "Запис інтеграції Ajax для запиту.",
+          "name": "Запис інтеграції"
+        }
+      },
       "name": "Отримати смарт-замки"
     },
     "refresh_metadata": {
       "description": "Примусове повне оновлення кімнат, користувачів та груп з Ajax.",
+      "fields": {
+        "config_entry_id": {
+          "description": "Запис інтеграції Ajax для оновлення.",
+          "name": "Запис інтеграції"
+        }
+      },
       "name": "Оновити метадані"
     }
   }

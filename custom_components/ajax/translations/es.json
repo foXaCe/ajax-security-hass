@@ -1535,6 +1535,9 @@
     "no_hubs_found": {
       "message": "No se encontraron hubs."
     },
+    "panic_cooldown": {
+      "message": "Botón de pánico rechazado: espera {seconds} segundos entre pulsaciones para evitar alarmas duplicadas."
+    },
     "space_not_found": {
       "message": "Espacio no encontrado."
     },
@@ -1649,18 +1652,42 @@
     },
     "get_nvr_recordings": {
       "description": "Obtiene los datos de grabaciones del NVR desde la API (últimas 24 horas). Guarda la respuesta en ajax_nvr_recordings.json con fines de diagnóstico.",
+      "fields": {
+        "config_entry_id": {
+          "description": "Entrada de integración Ajax a consultar.",
+          "name": "Entrada de integración"
+        }
+      },
       "name": "Obtener grabaciones NVR"
     },
     "get_raw_devices": {
       "description": "Obtiene los datos JSON brutos de la API para todos los dispositivos. Guarda la respuesta completa en ajax_raw_devices.json.",
+      "fields": {
+        "config_entry_id": {
+          "description": "Entrada de integración Ajax a consultar.",
+          "name": "Entrada de integración"
+        }
+      },
       "name": "Obtener dispositivos brutos"
     },
     "get_smart_locks": {
       "description": "Obtener datos de los smart locks desde la API y desde los locks descubiertos por SSE/SQS. Guarda la respuesta en ajax_smart_locks.json para diagnóstico.",
+      "fields": {
+        "config_entry_id": {
+          "description": "Entrada de integración Ajax a consultar.",
+          "name": "Entrada de integración"
+        }
+      },
       "name": "Obtener smart locks"
     },
     "refresh_metadata": {
       "description": "Fuerza una actualización completa de habitaciones, usuarios y grupos desde Ajax.",
+      "fields": {
+        "config_entry_id": {
+          "description": "Entrada de integración Ajax a actualizar.",
+          "name": "Entrada de integración"
+        }
+      },
       "name": "Actualizar metadatos"
     }
   }

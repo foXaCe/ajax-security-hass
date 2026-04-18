@@ -11,9 +11,29 @@ force_arm_night:
       domain: alarm_control_panel
 
 get_raw_devices:
+  fields:
+    config_entry_id:
+      selector:
+        config_entry:
+          integration: ajax
 
 refresh_metadata:
+  fields:
+    config_entry_id:
+      selector:
+        config_entry:
+          integration: ajax
 
 get_nvr_recordings:
+  fields:
+    config_entry_id:
+      selector:
+        config_entry:
+          integration: ajax
 
 get_smart_locks:
+  fields:
+    config_entry_id:
+      selector:
+        config_entry:
+          integration: ajax

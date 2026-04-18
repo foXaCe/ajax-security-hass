@@ -2,12 +2,14 @@
   "config": {
     "abort": {
       "already_configured": "This Ajax integration is already configured.",
+      "hub_associated": "Hub associated to existing configuration.",
       "no_spaces_available": "No spaces available. Please reload the integration.",
       "reauth_failed": "Re-authentication failed. Please reconfigure the integration.",
       "reauth_successful": "Re-authentication successful."
     },
     "error": {
       "cannot_connect": "Failed to connect to Ajax API. Check your internet connection.",
+      "entry_not_found": "Configuration not found. Please try again.",
       "invalid_2fa": "Invalid verification code. Please try again.",
       "invalid_account_type": "Account type not supported. Use a user account (not a PRO/Enterprise account).",
       "invalid_api_key": "Invalid or missing API key. Check your enterprise API key.",
@@ -27,6 +29,13 @@
         },
         "description": "Enter the 6-digit verification code sent to your device for {email}",
         "title": "Two-Factor Authentication"
+      },
+      "dhcp_confirm": {
+        "data": {
+          "action": "Action"
+        },
+        "description": "An Ajax Hub ({hostname}) with MAC address {mac} has been detected on your network.\n\nDo you want to associate it with an existing configuration or create a new one?",
+        "title": "Ajax Hub Detected"
       },
       "direct": {
         "data": {
@@ -162,20 +171,6 @@
           "on": "High CO₂"
         }
       },
-      "temperature_problem": {
-        "name": "Temperature",
-        "state": {
-          "off": "Normal",
-          "on": "Out of range"
-        }
-      },
-      "humidity_problem": {
-        "name": "Humidity",
-        "state": {
-          "off": "Normal",
-          "on": "Out of range"
-        }
-      },
       "connection": {
         "name": "Hub connection",
         "state": {
@@ -183,15 +178,22 @@
           "on": "Connected"
         }
       },
-      "doorbell_ring": {
-        "name": "Doorbell"
-      },
-      "mcp_fire_alarm": {
-        "name": "Fire alarm",
+      "current_limit": {
+        "name": "Current protection",
         "state": {
           "off": "Normal",
-          "on": "Alarm triggered"
+          "on": "Current limit reached"
         }
+      },
+      "data_channel_ok": {
+        "name": "Data channel",
+        "state": {
+          "off": "Problem",
+          "on": "OK"
+        }
+      },
+      "doorbell_ring": {
+        "name": "Doorbell"
       },
       "external_contact": {
         "name": "Door (external contact)"
@@ -208,8 +210,29 @@
       "gsm_antenna": {
         "name": "GSM antenna"
       },
+      "high_temperature": {
+        "name": "High temperature",
+        "state": {
+          "off": "Normal",
+          "on": "Temperature threshold exceeded"
+        }
+      },
+      "humidity_problem": {
+        "name": "Humidity",
+        "state": {
+          "off": "Normal",
+          "on": "Out of range"
+        }
+      },
       "jeweller_radio": {
         "name": "Jeweller radio"
+      },
+      "mcp_fire_alarm": {
+        "name": "Fire alarm",
+        "state": {
+          "off": "Normal",
+          "on": "Alarm triggered"
+        }
       },
       "problem": {
         "name": "Problem detected",
@@ -225,28 +248,28 @@
           }
         }
       },
+      "rapid_temperature_rise": {
+        "name": "Rapid temperature rise",
+        "state": {
+          "off": "Normal",
+          "on": "Rapid temperature increase detected"
+        }
+      },
       "shock": {
         "name": "Shock"
+      },
+      "smart_lock_door": {
+        "name": "Door",
+        "state": {
+          "off": "Closed",
+          "on": "Open"
+        }
       },
       "steam": {
         "name": "Steam detected",
         "state": {
           "off": "Clear",
           "on": "Steam detected"
-        }
-      },
-      "high_temperature": {
-        "name": "High temperature",
-        "state": {
-          "off": "Normal",
-          "on": "Temperature threshold exceeded"
-        }
-      },
-      "rapid_temperature_rise": {
-        "name": "Rapid temperature rise",
-        "state": {
-          "off": "Normal",
-          "on": "Rapid temperature increase detected"
         }
       },
       "system_problems": {
@@ -267,14 +290,49 @@
           }
         }
       },
+      "temperature_limit": {
+        "name": "Temperature protection",
+        "state": {
+          "off": "Normal",
+          "on": "Temperature limit reached"
+        }
+      },
+      "temperature_problem": {
+        "name": "Temperature",
+        "state": {
+          "off": "Normal",
+          "on": "Out of range"
+        }
+      },
       "tilt": {
         "name": "Tilt"
+      },
+      "video_edge_lid_closed": {
+        "name": "Lid",
+        "state": {
+          "off": "Closed",
+          "on": "Open"
+        }
+      },
+      "video_edge_onvif_enabled": {
+        "name": "ONVIF integration",
+        "state": {
+          "off": "Disabled",
+          "on": "Enabled"
+        }
       },
       "video_human": {
         "name": "Human detection",
         "state": {
           "off": "None",
           "on": "Human detected"
+        }
+      },
+      "video_line_crossing": {
+        "name": "Line crossing",
+        "state": {
+          "off": "None",
+          "on": "Detected"
         }
       },
       "video_motion": {
@@ -298,69 +356,25 @@
           "on": "Vehicle detected"
         }
       },
-      "video_edge_lid_closed": {
-        "name": "Lid",
-        "state": {
-          "off": "Closed",
-          "on": "Open"
-        }
-      },
-      "video_edge_onvif_enabled": {
-        "name": "ONVIF integration",
-        "state": {
-          "on": "Enabled",
-          "off": "Disabled"
-        }
-      },
       "waterstop_temp_protect": {
         "name": "Frost protection",
         "state": {
-          "on": "Active",
-          "off": "Inactive"
+          "off": "Inactive",
+          "on": "Active"
         }
       },
       "wings_radio": {
         "name": "Wings radio"
-      },
-      "current_limit": {
-        "name": "Current protection",
-        "state": {
-          "off": "Normal",
-          "on": "Current limit reached"
-        }
-      },
-      "temperature_limit": {
-        "name": "Temperature protection",
-        "state": {
-          "off": "Normal",
-          "on": "Temperature limit reached"
-        }
-      },
-      "data_channel_ok": {
-        "name": "Data channel",
-        "state": {
-          "off": "Problem",
-          "on": "OK"
-        }
-      },
-      "video_line_crossing": {
-        "name": "Line crossing",
-        "state": {
-          "off": "None",
-          "on": "Detected"
-        }
-      },
-      "smart_lock_door": {
-        "name": "Door",
-        "state": {
-          "off": "Closed",
-          "on": "Open"
-        }
       }
     },
     "button": {
       "panic": {
         "name": "Panic Button"
+      }
+    },
+    "device_tracker": {
+      "position": {
+        "name": "Position"
       }
     },
     "event": {
@@ -369,11 +383,25 @@
         "state_attributes": {
           "event_type": {
             "state": {
-              "single_press": "Single press",
               "double_press": "Double press",
+              "emergency": "Emergency",
               "long_press": "Long press",
               "panic": "Panic",
-              "emergency": "Emergency"
+              "single_press": "Single press"
+            }
+          }
+        }
+      },
+      "camera_detection": {
+        "name": "Detection",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "human": "Human",
+              "line_crossing": "Line crossing",
+              "motion": "Motion",
+              "pet": "Pet",
+              "vehicle": "Vehicle"
             }
           }
         }
@@ -388,27 +416,13 @@
           }
         }
       },
-      "camera_detection": {
-        "name": "Detection",
-        "state_attributes": {
-          "event_type": {
-            "state": {
-              "motion": "Motion",
-              "human": "Human",
-              "vehicle": "Vehicle",
-              "pet": "Pet",
-              "line_crossing": "Line crossing"
-            }
-          }
-        }
-      },
       "smart_lock_event": {
         "name": "Event",
         "state_attributes": {
           "event_type": {
             "state": {
-              "doorbell_pressed": "Doorbell pressed",
-              "door_left_open": "Door left open"
+              "door_left_open": "Door left open",
+              "doorbell_pressed": "Doorbell pressed"
             }
           }
         }
@@ -419,98 +433,58 @@
         "name": "Dimmer"
       }
     },
-    "device_tracker": {
-      "position": {
-        "name": "Position"
+    "lock": {
+      "smart_lock": {
+        "name": "Lock"
       }
     },
     "number": {
-      "tilt_degrees": {
-        "name": "Tilt threshold"
-      },
-      "current_threshold": {
-        "name": "Current limit"
-      },
-      "led_brightness_level": {
-        "name": "LED brightness"
-      },
-      "touch_sensitivity": {
-        "name": "Touch sensitivity"
+      "arm_brightness": {
+        "name": "Brightness when armed"
       },
       "brightness_change_speed": {
         "name": "Brightness change speed"
       },
-      "min_brightness": {
-        "name": "Minimum brightness"
+      "current_threshold": {
+        "name": "Current limit"
+      },
+      "disarm_brightness": {
+        "name": "Brightness when disarmed"
+      },
+      "led_brightness_level": {
+        "name": "LED brightness"
       },
       "max_brightness": {
         "name": "Maximum brightness"
       },
-      "arm_brightness": {
-        "name": "Brightness when armed"
+      "min_brightness": {
+        "name": "Minimum brightness"
       },
-      "disarm_brightness": {
-        "name": "Brightness when disarmed"
+      "tilt_degrees": {
+        "name": "Tilt threshold"
+      },
+      "touch_sensitivity": {
+        "name": "Touch sensitivity"
       }
     },
     "select": {
-      "shock_sensitivity": {
-        "name": "Shock sensitivity",
+      "alarm_duration_select": {
+        "name": "Alarm duration",
         "state": {
-          "high": "High",
-          "low": "Low",
-          "normal": "Normal"
-        }
-      },
-      "led_brightness": {
-        "name": "LED brightness",
-        "state": {
-          "min": "Low",
-          "max": "High"
-        }
-      },
-      "indication_mode": {
-        "name": "Backlight mode",
-        "state": {
-          "always": "Always on",
-          "off": "Off",
-          "if_on": "When active"
-        }
-      },
-      "siren_volume": {
-        "name": "Siren volume",
-        "state": {
-          "disabled": "Disabled",
-          "quiet": "Quiet",
-          "loud": "Loud",
-          "very_loud": "Very loud"
+          "1": "1 minute",
+          "10": "10 minutes",
+          "15": "15 minutes",
+          "2": "2 minutes",
+          "3": "3 minutes",
+          "5": "5 minutes"
         }
       },
       "beep_volume": {
         "name": "Beep volume",
         "state": {
-          "quiet": "Quiet",
           "loud": "Loud",
+          "quiet": "Quiet",
           "very_loud": "Very loud"
-        }
-      },
-      "alarm_duration_select": {
-        "name": "Alarm duration",
-        "state": {
-          "1": "1 minute",
-          "2": "2 minutes",
-          "3": "3 minutes",
-          "5": "5 minutes",
-          "10": "10 minutes",
-          "15": "15 minutes"
-        }
-      },
-      "touch_mode": {
-        "name": "Touch mode",
-        "state": {
-          "touch_mode_toggle_and_slider": "Toggle and slider",
-          "touch_mode_toggle": "Toggle only",
-          "touch_mode_blocked": "Blocked"
         }
       },
       "dimmer_curve": {
@@ -521,6 +495,21 @@
           "curve_type_logarithmic": "Logarithmic"
         }
       },
+      "indication_mode": {
+        "name": "Backlight mode",
+        "state": {
+          "always": "Always on",
+          "if_on": "When active",
+          "off": "Off"
+        }
+      },
+      "led_brightness": {
+        "name": "LED brightness",
+        "state": {
+          "max": "High",
+          "min": "Low"
+        }
+      },
       "light_source": {
         "name": "Light source type",
         "state": {
@@ -528,11 +517,39 @@
           "light_source_leading_edge": "Leading edge",
           "light_source_trailing_edge": "Trailing edge"
         }
+      },
+      "shock_sensitivity": {
+        "name": "Shock sensitivity",
+        "state": {
+          "high": "High",
+          "low": "Low",
+          "normal": "Normal"
+        }
+      },
+      "siren_volume": {
+        "name": "Siren volume",
+        "state": {
+          "disabled": "Disabled",
+          "loud": "Loud",
+          "quiet": "Quiet",
+          "very_loud": "Very loud"
+        }
+      },
+      "touch_mode": {
+        "name": "Touch mode",
+        "state": {
+          "touch_mode_blocked": "Blocked",
+          "touch_mode_toggle": "Toggle only",
+          "touch_mode_toggle_and_slider": "Toggle and slider"
+        }
       }
     },
     "sensor": {
       "active_connection": {
         "name": "Active connection"
+      },
+      "alarm_delay": {
+        "name": "Alarm delay"
       },
       "alarm_duration": {
         "name": "Alarm Duration",
@@ -546,6 +563,12 @@
           "continuous": "Continuous"
         }
       },
+      "alarm_mode": {
+        "name": "Alarm mode"
+      },
+      "alarm_type": {
+        "name": "Alarm type"
+      },
       "alarm_volume_level": {
         "name": "Alarm Volume",
         "state": {
@@ -557,6 +580,9 @@
           "quiet": "Quiet",
           "very_loud": "Very loud"
         }
+      },
+      "arm_delay": {
+        "name": "Arm delay"
       },
       "battery_state": {
         "name": "Battery state"
@@ -571,23 +597,53 @@
           "very_loud": "Very loud"
         }
       },
+      "brightness": {
+        "name": "Brightness"
+      },
+      "button_brightness": {
+        "name": "Button LED brightness",
+        "state": {
+          "high": "High",
+          "low": "Low",
+          "off": "Off"
+        }
+      },
+      "button_mode": {
+        "name": "Button mode",
+        "state": {
+          "interconnect_delay": "Interconnect delay",
+          "panic_button": "Panic button",
+          "smart_button": "Smart button"
+        }
+      },
       "bypassed_devices": {
         "name": "Bypassed devices"
+      },
+      "calibration_state": {
+        "name": "Calibration state"
+      },
+      "connection_type": {
+        "name": "Connection type"
+      },
+      "contact_mode": {
+        "name": "Contact mode"
+      },
+      "current": {
+        "name": "Current"
+      },
+      "current_brightness": {
+        "name": "Current brightness"
+      },
+      "data_channel_quality": {
+        "name": "Data channel quality"
       },
       "device_color": {
         "name": "Device color",
         "state": {
           "black": "Black",
-          "white": "White",
+          "blue": "Blue",
           "red": "Red",
-          "blue": "Blue"
-        }
-      },
-      "mcp_switch_state": {
-        "name": "Button state",
-        "state": {
-          "button_unpressed": "Normal",
-          "button_pressed": "Pressed"
+          "white": "White"
         }
       },
       "device_label": {
@@ -601,6 +657,17 @@
       },
       "devices_with_malfunctions": {
         "name": "Devices with malfunctions"
+      },
+      "energy": {
+        "name": "Energy"
+      },
+      "false_press_filter": {
+        "name": "False press filter",
+        "state": {
+          "disabled": "Disabled",
+          "double_click": "Double click",
+          "long_push": "Long push"
+        }
       },
       "firmware_version": {
         "name": "Firmware version"
@@ -875,30 +942,6 @@
           "single_press": "Single press"
         }
       },
-      "button_mode": {
-        "name": "Button mode",
-        "state": {
-          "panic_button": "Panic button",
-          "smart_button": "Smart button",
-          "interconnect_delay": "Interconnect delay"
-        }
-      },
-      "button_brightness": {
-        "name": "Button LED brightness",
-        "state": {
-          "off": "Off",
-          "low": "Low",
-          "high": "High"
-        }
-      },
-      "false_press_filter": {
-        "name": "False press filter",
-        "state": {
-          "long_push": "Long push",
-          "double_click": "Double click",
-          "disabled": "Disabled"
-        }
-      },
       "last_alert": {
         "name": "Last alert",
         "state_attributes": {
@@ -928,6 +971,13 @@
       "malfunctions": {
         "name": "Malfunctions"
       },
+      "mcp_switch_state": {
+        "name": "Button state",
+        "state": {
+          "button_pressed": "Pressed",
+          "button_unpressed": "Normal"
+        }
+      },
       "network_status": {
         "name": "Mobile network"
       },
@@ -951,11 +1001,20 @@
           }
         }
       },
+      "nvr_cameras": {
+        "name": "Cameras"
+      },
       "online_devices": {
         "name": "Online devices"
       },
       "photos_per_alarm": {
         "name": "Photos per alarm"
+      },
+      "power": {
+        "name": "Power"
+      },
+      "power_supply_mode": {
+        "name": "Power supply mode"
       },
       "recent_events": {
         "name": "Recent events",
@@ -1002,73 +1061,28 @@
           }
         }
       },
+      "smart_lock_last_changed_by": {
+        "name": "Last changed by"
+      },
       "total_devices": {
         "name": "Total devices"
       },
       "unread_notifications": {
         "name": "Unread notifications"
       },
-      "wifi_signal_level": {
-        "name": "Wi-Fi signal"
-      },
-      "video_edge_uptime": {
-        "name": "Uptime"
-      },
-      "video_edge_cpu_usage": {
-        "name": "CPU usage"
-      },
-      "video_edge_ram_usage": {
-        "name": "RAM usage"
-      },
-      "video_edge_storage_total": {
-        "name": "Total storage"
-      },
-      "video_edge_storage_temperature": {
-        "name": "Storage temperature"
-      },
-      "video_edge_wifi_signal": {
-        "name": "Camera WiFi signal"
-      },
-      "video_edge_record_mode": {
-        "name": "Local recording",
-        "state": {
-          "on_detection": "On detection",
-          "permanent": "Permanent",
-          "disabled": "Disabled",
-          "unknown": "Unknown"
-        }
-      },
-      "video_edge_storage_status": {
-        "name": "Storage status",
-        "state": {
-          "ready": "Ready",
-          "idle": "Idle",
-          "need_format": "Format required",
-          "formatting": "Formatting",
-          "none": "None"
-        }
+      "video_edge_archive_depth": {
+        "name": "Archive duration"
       },
       "video_edge_connection": {
         "name": "Connection",
         "state": {
-          "online": "Online",
           "offline": "Offline",
+          "online": "Online",
           "unknown": "Unknown"
         }
       },
-      "nvr_cameras": {
-        "name": "Cameras"
-      },
-      "video_edge_record_policy": {
-        "name": "NVR recording",
-        "state": {
-          "always": "Always",
-          "when_requested": "When requested",
-          "unknown": "Unknown"
-        }
-      },
-      "video_edge_archive_depth": {
-        "name": "Archive duration"
+      "video_edge_cpu_usage": {
+        "name": "CPU usage"
       },
       "video_edge_led_brightness": {
         "name": "LED brightness"
@@ -1076,99 +1090,95 @@
       "video_edge_max_preview_duration": {
         "name": "Max preview duration"
       },
-      "waterstop_motor_state": {
-        "name": "Motor state",
+      "video_edge_ram_usage": {
+        "name": "RAM usage"
+      },
+      "video_edge_record_mode": {
+        "name": "Local recording",
         "state": {
-          "on": "Running",
-          "off": "Stopped"
+          "disabled": "Disabled",
+          "on_detection": "On detection",
+          "permanent": "Permanent",
+          "unknown": "Unknown"
         }
+      },
+      "video_edge_record_policy": {
+        "name": "NVR recording",
+        "state": {
+          "always": "Always",
+          "unknown": "Unknown",
+          "when_requested": "When requested"
+        }
+      },
+      "video_edge_storage_status": {
+        "name": "Storage status",
+        "state": {
+          "formatting": "Formatting",
+          "idle": "Idle",
+          "need_format": "Format required",
+          "none": "None",
+          "ready": "Ready"
+        }
+      },
+      "video_edge_storage_temperature": {
+        "name": "Storage temperature"
+      },
+      "video_edge_storage_total": {
+        "name": "Total storage"
+      },
+      "video_edge_uptime": {
+        "name": "Uptime"
+      },
+      "video_edge_wifi_signal": {
+        "name": "Camera WiFi signal"
+      },
+      "voltage": {
+        "name": "Voltage"
       },
       "waterstop_external_power": {
         "name": "Power source",
         "state": {
-          "supply": "External power",
           "battery": "Battery",
+          "supply": "External power",
           "unknown": "Unknown"
         }
       },
-      "waterstop_prevention_status": {
-        "name": "Prevention",
+      "waterstop_motor_state": {
+        "name": "Motor state",
         "state": {
-          "enabled": "Enabled",
-          "disabled": "Disabled"
+          "off": "Stopped",
+          "on": "Running"
         }
       },
       "waterstop_prevention_period": {
         "name": "Prevention period"
       },
-      "connection_type": {
-        "name": "Connection type"
+      "waterstop_prevention_status": {
+        "name": "Prevention",
+        "state": {
+          "disabled": "Disabled",
+          "enabled": "Enabled"
+        }
       },
-      "contact_mode": {
-        "name": "Contact mode"
-      },
-      "alarm_type": {
-        "name": "Alarm type"
-      },
-      "alarm_mode": {
-        "name": "Alarm mode"
-      },
-      "power_supply_mode": {
-        "name": "Power supply mode"
-      },
-      "arm_delay": {
-        "name": "Arm delay"
-      },
-      "alarm_delay": {
-        "name": "Alarm delay"
-      },
-      "calibration_state": {
-        "name": "Calibration state"
-      },
-      "power": {
-        "name": "Power"
-      },
-      "energy": {
-        "name": "Energy"
-      },
-      "voltage": {
-        "name": "Voltage"
-      },
-      "current": {
-        "name": "Current"
-      },
-      "brightness": {
-        "name": "Brightness"
-      },
-      "current_brightness": {
-        "name": "Current brightness"
-      },
-      "data_channel_quality": {
-        "name": "Data channel quality"
-      },
-      "smart_lock_last_changed_by": {
-        "name": "Last changed by"
-      }
-    },
-    "lock": {
-      "smart_lock": {
-        "name": "Lock"
-      }
-    },
-    "valve": {
-      "waterstop_valve": {
-        "name": "Water valve"
-      }
-    },
-    "update": {
-      "video_edge_firmware": {
-        "name": "Firmware"
-      },
-      "hub_firmware": {
-        "name": "Firmware"
+      "wifi_signal_level": {
+        "name": "Wi-Fi signal"
       }
     },
     "switch": {
+      "accelerometer": {
+        "name": "Accelerometer",
+        "state": {
+          "off": "Disabled",
+          "on": "Enabled"
+        }
+      },
+      "alert_if_moved": {
+        "name": "Alert if moved",
+        "state": {
+          "off": "Disabled",
+          "on": "Enabled"
+        }
+      },
       "alerts_by_sirens": {
         "name": "Alerts by sirens",
         "state": {
@@ -1211,6 +1221,13 @@
           "on": "Enabled"
         }
       },
+      "child_lock": {
+        "name": "Child lock",
+        "state": {
+          "off": "Disabled",
+          "on": "Enabled"
+        }
+      },
       "chimes": {
         "name": "Chimes",
         "state": {
@@ -1218,8 +1235,8 @@
           "on": "Enabled"
         }
       },
-      "alert_if_moved": {
-        "name": "Alert if moved",
+      "chimes_enabled": {
+        "name": "Chime",
         "state": {
           "off": "Disabled",
           "on": "Enabled"
@@ -1232,8 +1249,22 @@
           "on": "Enabled"
         }
       },
-      "chimes_enabled": {
-        "name": "Chime",
+      "current_protection": {
+        "name": "Current protection",
+        "state": {
+          "off": "Disabled",
+          "on": "Enabled"
+        }
+      },
+      "current_threshold": {
+        "name": "Current threshold protection",
+        "state": {
+          "off": "Disabled",
+          "on": "Enabled"
+        }
+      },
+      "dimmer_calibration": {
+        "name": "Dimmer calibration",
         "state": {
           "off": "Disabled",
           "on": "Enabled"
@@ -1253,8 +1284,22 @@
           "on": "Enabled"
         }
       },
+      "indication_enabled": {
+        "name": "LED indication",
+        "state": {
+          "off": "Disabled",
+          "on": "Enabled"
+        }
+      },
       "indicator_light": {
         "name": "Indicator light",
+        "state": {
+          "off": "Disabled",
+          "on": "Enabled"
+        }
+      },
+      "led_indicator": {
+        "name": "LED indicator",
         "state": {
           "off": "Disabled",
           "on": "Enabled"
@@ -1303,8 +1348,43 @@
           "on": "Enabled"
         }
       },
+      "siren_on_leak": {
+        "name": "Siren on leak",
+        "state": {
+          "off": "Disabled",
+          "on": "Enabled"
+        }
+      },
+      "siren_trigger_acceleration": {
+        "name": "Siren on acceleration",
+        "state": {
+          "off": "Disabled",
+          "on": "Enabled"
+        }
+      },
+      "siren_trigger_co": {
+        "name": "Siren on CO",
+        "state": {
+          "off": "Disabled",
+          "on": "Enabled"
+        }
+      },
+      "siren_trigger_contact": {
+        "name": "Siren on contact",
+        "state": {
+          "off": "Disabled",
+          "on": "Enabled"
+        }
+      },
       "siren_trigger_glass": {
         "name": "Siren on glass break",
+        "state": {
+          "off": "Disabled",
+          "on": "Enabled"
+        }
+      },
+      "siren_trigger_motion": {
+        "name": "Siren on motion",
         "state": {
           "off": "Disabled",
           "on": "Enabled"
@@ -1324,50 +1404,29 @@
           "on": "Enabled"
         }
       },
+      "siren_trigger_smoke": {
+        "name": "Siren on smoke",
+        "state": {
+          "off": "Disabled",
+          "on": "Enabled"
+        }
+      },
+      "siren_trigger_temp_diff": {
+        "name": "Siren on rapid temperature rise",
+        "state": {
+          "off": "Disabled",
+          "on": "Enabled"
+        }
+      },
+      "siren_trigger_temperature": {
+        "name": "Siren on high temperature",
+        "state": {
+          "off": "Disabled",
+          "on": "Enabled"
+        }
+      },
       "siren_trigger_tilt": {
         "name": "Siren on tilt",
-        "state": {
-          "off": "Disabled",
-          "on": "Enabled"
-        }
-      },
-      "temp_alarm_enabled": {
-        "name": "High temperature alarm",
-        "state": {
-          "off": "Disabled",
-          "on": "Enabled"
-        }
-      },
-      "temp_diff_alarm_enabled": {
-        "name": "Rapid temperature rise alarm",
-        "state": {
-          "off": "Disabled",
-          "on": "Enabled"
-        }
-      },
-      "indication_enabled": {
-        "name": "LED indication",
-        "state": {
-          "off": "Disabled",
-          "on": "Enabled"
-        }
-      },
-      "current_protection": {
-        "name": "Current protection",
-        "state": {
-          "off": "Disabled",
-          "on": "Enabled"
-        }
-      },
-      "voltage_protection": {
-        "name": "Voltage protection",
-        "state": {
-          "off": "Disabled",
-          "on": "Enabled"
-        }
-      },
-      "siren_on_leak": {
-        "name": "Siren on leak",
         "state": {
           "off": "Disabled",
           "on": "Enabled"
@@ -1387,27 +1446,6 @@
           }
         }
       },
-      "tilt_sensor": {
-        "name": "Tilt sensor",
-        "state": {
-          "off": "Disabled",
-          "on": "Enabled"
-        }
-      },
-      "led_indicator": {
-        "name": "LED indicator",
-        "state": {
-          "off": "Disabled",
-          "on": "Enabled"
-        }
-      },
-      "child_lock": {
-        "name": "Child lock",
-        "state": {
-          "off": "Disabled",
-          "on": "Enabled"
-        }
-      },
       "state_memory": {
         "name": "State memory",
         "state": {
@@ -1415,79 +1453,53 @@
           "on": "Enabled"
         }
       },
-      "current_threshold": {
-        "name": "Current threshold protection",
+      "temp_alarm_enabled": {
+        "name": "High temperature alarm",
         "state": {
           "off": "Disabled",
           "on": "Enabled"
         }
       },
-      "dimmer_calibration": {
-        "name": "Dimmer calibration",
+      "temp_diff_alarm_enabled": {
+        "name": "Rapid temperature rise alarm",
         "state": {
           "off": "Disabled",
           "on": "Enabled"
         }
       },
-      "siren_trigger_motion": {
-        "name": "Siren on motion",
+      "tilt_sensor": {
+        "name": "Tilt sensor",
         "state": {
           "off": "Disabled",
           "on": "Enabled"
         }
       },
-      "siren_trigger_smoke": {
-        "name": "Siren on smoke",
-        "state": {
-          "off": "Disabled",
-          "on": "Enabled"
-        }
-      },
-      "siren_trigger_co": {
-        "name": "Siren on CO",
-        "state": {
-          "off": "Disabled",
-          "on": "Enabled"
-        }
-      },
-      "siren_trigger_temperature": {
-        "name": "Siren on high temperature",
-        "state": {
-          "off": "Disabled",
-          "on": "Enabled"
-        }
-      },
-      "siren_trigger_temp_diff": {
-        "name": "Siren on rapid temperature rise",
-        "state": {
-          "off": "Disabled",
-          "on": "Enabled"
-        }
-      },
-      "siren_trigger_contact": {
-        "name": "Siren on contact",
-        "state": {
-          "off": "Disabled",
-          "on": "Enabled"
-        }
-      },
-      "siren_trigger_acceleration": {
-        "name": "Siren on acceleration",
-        "state": {
-          "off": "Disabled",
-          "on": "Enabled"
-        }
-      },
-      "accelerometer": {
-        "name": "Accelerometer",
+      "voltage_protection": {
+        "name": "Voltage protection",
         "state": {
           "off": "Disabled",
           "on": "Enabled"
         }
       }
+    },
+    "update": {
+      "hub_firmware": {
+        "name": "Firmware"
+      },
+      "video_edge_firmware": {
+        "name": "Firmware"
+      }
+    },
+    "valve": {
+      "waterstop_valve": {
+        "name": "Water valve"
+      }
     }
   },
   "exceptions": {
+    "device_not_found": {
+      "message": "Device not found."
+    },
     "failed_to_change": {
       "message": "Failed to change {entity}: {error}"
     },
@@ -1497,8 +1509,17 @@
     "force_arm_night_failed": {
       "message": "Failed to force arm night mode hub {hub_id}: {error}"
     },
+    "hub_not_found": {
+      "message": "Hub not found."
+    },
     "invalid_target": {
       "message": "Invalid target for service."
+    },
+    "lock_not_supported": {
+      "message": "Remote lock/unlock is not supported by Ajax smart locks."
+    },
+    "no_api_key": {
+      "message": "No API key configured for this entity."
     },
     "no_hubs_found": {
       "message": "No hubs found."
@@ -1578,12 +1599,12 @@
       },
       "rtsp_credentials": {
         "data": {
-          "rtsp_username": "ONVIF Username",
-          "rtsp_password": "ONVIF Password"
+          "rtsp_password": "ONVIF Password",
+          "rtsp_username": "ONVIF Username"
         },
         "data_description": {
-          "rtsp_username": "Username created in Ajax app for ONVIF",
-          "rtsp_password": "Password associated with the ONVIF user"
+          "rtsp_password": "Password associated with the ONVIF user",
+          "rtsp_username": "Username created in Ajax app for ONVIF"
         },
         "description": "Configure ONVIF/RTSP credentials to access Video Edge camera streams.\n\n**Current configuration:**\n- Username: {current_username}\n- Password: {current_password}\n\n⚠️ These credentials must be created in the Ajax app (Camera → Settings → ONVIF).",
         "title": "RTSP/ONVIF Credentials"
@@ -1607,17 +1628,17 @@
     }
   },
   "issues": {
-    "firmware_update": {
-      "title": "Firmware update available for {device_name}",
-      "description": "A firmware update is available for **{device_name}**.\n\n- Current version: {current_version}\n- New version: {new_version}\n\nPlease update via the Ajax app."
-    },
     "critical_firmware_update": {
-      "title": "Critical firmware update for {device_name}",
-      "description": "A **critical security update** is available for **{device_name}**.\n\n- Current version: {current_version}\n- New version: {new_version}\n\nPlease update immediately via the Ajax app."
+      "description": "A **critical security update** is available for **{device_name}**.\n\n- Current version: {current_version}\n- New version: {new_version}\n\nPlease update immediately via the Ajax app.",
+      "title": "Critical firmware update for {device_name}"
     },
     "device_offline": {
-      "title": "{device_name} is offline",
-      "description": "The device **{device_name}** is currently offline and not responding. Please check the device and its connection."
+      "description": "The device **{device_name}** is currently offline and not responding. Please check the device and its connection.",
+      "title": "{device_name} is offline"
+    },
+    "firmware_update": {
+      "description": "A firmware update is available for **{device_name}**.\n\n- Current version: {current_version}\n- New version: {new_version}\n\nPlease update via the Ajax app.",
+      "title": "Firmware update available for {device_name}"
     }
   },
   "services": {
@@ -1629,21 +1650,21 @@
       "description": "Force activate night mode, ignoring open sensors and problems.",
       "name": "Force arm night mode"
     },
-    "get_raw_devices": {
-      "description": "Get raw API JSON data for all devices. Saves the complete API response to ajax_raw_devices.json.",
-      "name": "Get raw devices"
-    },
-    "refresh_metadata": {
-      "description": "Force a full refresh of rooms, users, and groups from Ajax.",
-      "name": "Refresh metadata"
-    },
     "get_nvr_recordings": {
       "description": "Get NVR recordings data from the API (last 24 hours). Saves the response to ajax_nvr_recordings.json for diagnostic purposes.",
       "name": "Get NVR recordings"
     },
+    "get_raw_devices": {
+      "description": "Get raw API JSON data for all devices. Saves the complete API response to ajax_raw_devices.json.",
+      "name": "Get raw devices"
+    },
     "get_smart_locks": {
       "description": "Get smart lock data from API and SSE/SQS-discovered locks. Saves the response to ajax_smart_locks.json for diagnostic purposes.",
       "name": "Get smart locks"
+    },
+    "refresh_metadata": {
+      "description": "Force a full refresh of rooms, users, and groups from Ajax.",
+      "name": "Refresh metadata"
     }
   }
 }

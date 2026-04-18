@@ -45,6 +45,30 @@
         "default": "mdi:map-marker-radius"
       }
     },
+    "event": {
+      "button_press": {
+        "default": "mdi:gesture-tap-button"
+      },
+      "camera_detection": {
+        "default": "mdi:cctv"
+      },
+      "doorbell_press": {
+        "default": "mdi:doorbell"
+      },
+      "smart_lock_event": {
+        "default": "mdi:lock-alert"
+      }
+    },
+    "light": {
+      "dimmer_light": {
+        "default": "mdi:lightbulb-on"
+      }
+    },
+    "lock": {
+      "smart_lock": {
+        "default": "mdi:lock"
+      }
+    },
     "number": {
       "tilt_degrees": {
         "default": "mdi:angle-acute"
@@ -229,6 +253,19 @@
       "tilt_sensor": {
         "default": "mdi:angle-acute"
       }
+    },
+    "update": {
+      "hub_firmware": {
+        "default": "mdi:chip"
+      },
+      "video_edge_firmware": {
+        "default": "mdi:cctv"
+      }
+    },
+    "valve": {
+      "waterstop_valve": {
+        "default": "mdi:valve"
+      }
     }
   },
   "services": {
@@ -238,8 +275,14 @@
     "force_arm_night": {
       "service": "mdi:shield-moon"
     },
+    "get_nvr_recordings": {
+      "service": "mdi:record-rec"
+    },
     "get_raw_devices": {
       "service": "mdi:tray-arrow-down"
+    },
+    "get_smart_locks": {
+      "service": "mdi:lock-outline"
     },
     "refresh_metadata": {
       "service": "mdi:refresh"

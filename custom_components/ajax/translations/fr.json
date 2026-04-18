@@ -34,7 +34,7 @@
         "data": {
           "action": "Action"
         },
-        "description": "Un hub Ajax ({hostname}) avec l'adresse MAC {mac} a été découvert sur votre réseau.\\n\\nSouhaitez-vous l'associer à une configuration existante ou créer une nouvelle configuration ?",
+        "description": "Un hub Ajax ({hostname}) avec l'adresse MAC {mac} a été découvert sur votre réseau.\n\nSouhaitez-vous l'associer à une configuration existante ou créer une nouvelle configuration ?",
         "title": "Hub Ajax découvert"
       },
       "direct": {
@@ -1497,6 +1497,9 @@
     }
   },
   "exceptions": {
+    "device_not_found": {
+      "message": "Appareil non trouvé."
+    },
     "failed_to_change": {
       "message": "Échec de la modification de {entity} : {error}"
     },
@@ -1506,8 +1509,17 @@
     "force_arm_night_failed": {
       "message": "Échec de l'armement forcé en mode nuit du hub {hub_id} : {error}"
     },
+    "hub_not_found": {
+      "message": "Hub non trouvé."
+    },
     "invalid_target": {
       "message": "Cible invalide pour le service."
+    },
+    "lock_not_supported": {
+      "message": "Le verrouillage/déverrouillage à distance n'est pas supporté par les smart locks Ajax."
+    },
+    "no_api_key": {
+      "message": "Aucune clé API configurée pour cette entité."
     },
     "no_hubs_found": {
       "message": "Aucun hub trouvé."
@@ -1645,6 +1657,10 @@
     "get_raw_devices": {
       "description": "Récupère les données JSON brutes de l'API pour tous les appareils. Enregistre la réponse complète dans ajax_raw_devices.json.",
       "name": "Récupérer les appareils bruts"
+    },
+    "get_smart_locks": {
+      "description": "Récupère les données des serrures intelligentes depuis l'API et les serrures détectées via SSE/SQS. Sauvegarde la réponse dans ajax_smart_locks.json pour diagnostic.",
+      "name": "Obtenir les serrures intelligentes"
     },
     "refresh_metadata": {
       "description": "Force un rafraîchissement complet des pièces, utilisateurs et groupes depuis Ajax.",

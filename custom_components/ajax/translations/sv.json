@@ -1061,6 +1061,9 @@
           }
         }
       },
+      "smart_lock_last_changed_by": {
+        "name": "Senast ändrad av"
+      },
       "total_devices": {
         "name": "Enheter"
       },
@@ -1494,6 +1497,9 @@
     }
   },
   "exceptions": {
+    "device_not_found": {
+      "message": "Enhet hittades inte."
+    },
     "failed_to_change": {
       "message": "Det gick inte att ändra {entity}: {error}"
     },
@@ -1503,8 +1509,17 @@
     "force_arm_night_failed": {
       "message": "Det gick inte att tvångstillkoppla nattläge för hub {hub_id}: {error}"
     },
+    "hub_not_found": {
+      "message": "Hub hittades inte."
+    },
     "invalid_target": {
       "message": "Ogiltigt mål för tjänsten."
+    },
+    "lock_not_supported": {
+      "message": "Fjärrlåsning/upplåsning stöds inte av Ajax smart locks."
+    },
+    "no_api_key": {
+      "message": "Ingen API-nyckel konfigurerad för denna entitet."
     },
     "no_hubs_found": {
       "message": "Inga hubbar hittades."
@@ -1545,13 +1560,6 @@
         },
         "description": "Konfigurera AWS-uppgifter för realtidsnotiser.\n\n**Nuvarande konfiguration:**\n- Access Key: {current_access_key}\n- Secret Key: {current_secret_key}\n- SQS Queue: {current_queue}\n\nLämna fältet tomt för att behålla nuvarande värde.",
         "title": "AWS SQS-uppgifter"
-      },
-      "dhcp_confirm": {
-        "data": {
-          "action": "Action"
-        },
-        "description": "An Ajax hub ({hostname}) with MAC address {mac} was discovered on your network.\n\nDo you want to associate it with an existing configuration or create a new one?",
-        "title": "Ajax Hub Discovered"
       },
       "enabled_spaces": {
         "data": {
@@ -1649,6 +1657,10 @@
     "get_raw_devices": {
       "description": "Hämta rådata för ella enheter i JSON-format. Resultatet sparas i  ajax_raw_devices.json.",
       "name": "Hämta rådata för enheter"
+    },
+    "get_smart_locks": {
+      "description": "Hämtar data från smart locks via API:t och lås upptäckta via SSE/SQS. Sparar svaret i ajax_smart_locks.json för diagnostik.",
+      "name": "Hämta smart locks"
     },
     "refresh_metadata": {
       "description": "Forcera fullständig omladdning av rum, användare och grupper från Ajax",

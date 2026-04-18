@@ -1061,6 +1061,9 @@
           }
         }
       },
+      "smart_lock_last_changed_by": {
+        "name": "Востаннє змінено"
+      },
       "total_devices": {
         "name": "Всього пристроїв"
       },
@@ -1494,6 +1497,9 @@
     }
   },
   "exceptions": {
+    "device_not_found": {
+      "message": "Пристрій не знайдено."
+    },
     "failed_to_change": {
       "message": "Не вдалося змінити {entity}: {error}"
     },
@@ -1503,8 +1509,17 @@
     "force_arm_night_failed": {
       "message": "Не вдалося примусово увімкнути нічний режим для хабу {hub_id}: {error}"
     },
+    "hub_not_found": {
+      "message": "Хаб не знайдено."
+    },
     "invalid_target": {
       "message": "Невірна ціль для сервісу."
+    },
+    "lock_not_supported": {
+      "message": "Дистанційне блокування/розблокування не підтримується смарт-замками Ajax."
+    },
+    "no_api_key": {
+      "message": "Для цієї сутності не налаштовано API-ключ."
     },
     "no_hubs_found": {
       "message": "Хабів не знайдено."
@@ -1545,13 +1560,6 @@
         },
         "description": "Налаштуйте облікові дані AWS для сповіщень про події в реальному часі.\n\n**Поточна конфігурація:**\n- Access Key: {current_access_key}\n- Secret Key: {current_secret_key}\n- Черга SQS: {current_queue}\n\nЗалиште поле порожнім, щоб зберегти поточне значення.",
         "title": "Облікові дані AWS SQS"
-      },
-      "dhcp_confirm": {
-        "data": {
-          "action": "Action"
-        },
-        "description": "An Ajax hub ({hostname}) with MAC address {mac} was discovered on your network.\n\nDo you want to associate it with an existing configuration or create a new one?",
-        "title": "Ajax Hub Discovered"
       },
       "enabled_spaces": {
         "data": {
@@ -1649,6 +1657,10 @@
     "get_raw_devices": {
       "description": "Отримати необроблені JSON-дані API для всіх пристроїв. Зберігає повну відповідь API у ajax_raw_devices.json.",
       "name": "Отримати необроблені дані"
+    },
+    "get_smart_locks": {
+      "description": "Отримує дані смарт-замків з API та замків, виявлених через SSE/SQS. Зберігає відповідь у ajax_smart_locks.json для діагностики.",
+      "name": "Отримати смарт-замки"
     },
     "refresh_metadata": {
       "description": "Примусове повне оновлення кімнат, користувачів та груп з Ajax.",

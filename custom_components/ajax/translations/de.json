@@ -1061,6 +1061,9 @@
           }
         }
       },
+      "smart_lock_last_changed_by": {
+        "name": "Zuletzt geändert von"
+      },
       "total_devices": {
         "name": "Gesamtzahl Geräte"
       },
@@ -1494,6 +1497,9 @@
     }
   },
   "exceptions": {
+    "device_not_found": {
+      "message": "Gerät nicht gefunden."
+    },
     "failed_to_change": {
       "message": "Fehler beim Ändern von {entity}: {error}"
     },
@@ -1503,8 +1509,17 @@
     "force_arm_night_failed": {
       "message": "Fehler beim Zwangsschärfen des Nachtmodus für Hub {hub_id}: {error}"
     },
+    "hub_not_found": {
+      "message": "Hub nicht gefunden."
+    },
     "invalid_target": {
       "message": "Ungültiges Ziel für den Dienst."
+    },
+    "lock_not_supported": {
+      "message": "Ferngesteuertes Ver-/Entriegeln wird von Ajax Smart Locks nicht unterstützt."
+    },
+    "no_api_key": {
+      "message": "Kein API-Schlüssel für diese Entität konfiguriert."
     },
     "no_hubs_found": {
       "message": "Keine Hubs gefunden."
@@ -1545,13 +1560,6 @@
         },
         "description": "AWS-Anmeldedaten für Echtzeit-Ereignisbenachrichtigungen konfigurieren.\n\n**Aktuelle Konfiguration:**\n- Access Key: {current_access_key}\n- Secret Key: {current_secret_key}\n- SQS-Warteschlange: {current_queue}\n\nLassen Sie ein Feld leer, um den aktuellen Wert beizubehalten.",
         "title": "AWS SQS-Anmeldedaten"
-      },
-      "dhcp_confirm": {
-        "data": {
-          "action": "Action"
-        },
-        "description": "An Ajax hub ({hostname}) with MAC address {mac} was discovered on your network.\n\nDo you want to associate it with an existing configuration or create a new one?",
-        "title": "Ajax Hub Discovered"
       },
       "enabled_spaces": {
         "data": {
@@ -1649,6 +1657,10 @@
     "get_raw_devices": {
       "description": "Rohe API-JSON-Daten für alle Geräte abrufen. Speichert die vollständige API-Antwort in ajax_raw_devices.json.",
       "name": "Rohdaten abrufen"
+    },
+    "get_smart_locks": {
+      "description": "Ruft Smart-Lock-Daten von der API und über SSE/SQS erkannten Schlössern ab. Speichert die Antwort zur Diagnose in ajax_smart_locks.json.",
+      "name": "Smart Locks abrufen"
     },
     "refresh_metadata": {
       "description": "Vollständige Aktualisierung von Räumen, Benutzern und Gruppen von Ajax erzwingen.",

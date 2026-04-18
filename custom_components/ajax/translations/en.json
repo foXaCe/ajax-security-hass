@@ -1497,6 +1497,9 @@
     }
   },
   "exceptions": {
+    "device_not_found": {
+      "message": "Device not found."
+    },
     "failed_to_change": {
       "message": "Failed to change {entity}: {error}"
     },
@@ -1506,8 +1509,17 @@
     "force_arm_night_failed": {
       "message": "Failed to force arm night mode hub {hub_id}: {error}"
     },
+    "hub_not_found": {
+      "message": "Hub not found."
+    },
     "invalid_target": {
       "message": "Invalid target for service."
+    },
+    "lock_not_supported": {
+      "message": "Remote lock/unlock is not supported by Ajax smart locks."
+    },
+    "no_api_key": {
+      "message": "No API key configured for this entity."
     },
     "no_hubs_found": {
       "message": "No hubs found."
@@ -1548,13 +1560,6 @@
         },
         "description": "Configure AWS credentials for real-time event notifications.\n\n**Current configuration:**\n- Access Key: {current_access_key}\n- Secret Key: {current_secret_key}\n- SQS Queue: {current_queue}\n\nLeave a field empty to keep current value.",
         "title": "AWS SQS Credentials"
-      },
-      "dhcp_confirm": {
-        "data": {
-          "action": "Action"
-        },
-        "description": "An Ajax hub ({hostname}) with MAC address {mac} was discovered on your network.\n\nDo you want to associate it with an existing configuration or create a new one?",
-        "title": "Ajax Hub Discovered"
       },
       "enabled_spaces": {
         "data": {
@@ -1652,6 +1657,10 @@
     "get_raw_devices": {
       "description": "Get raw API JSON data for all devices. Saves the complete API response to ajax_raw_devices.json.",
       "name": "Get raw devices"
+    },
+    "get_smart_locks": {
+      "description": "Get smart lock data from API and SSE/SQS-discovered locks. Saves the response to ajax_smart_locks.json for diagnostic purposes.",
+      "name": "Get smart locks"
     },
     "refresh_metadata": {
       "description": "Force a full refresh of rooms, users, and groups from Ajax.",

@@ -1061,6 +1061,9 @@
           }
         }
       },
+      "smart_lock_last_changed_by": {
+        "name": "Laatst gewijzigd door"
+      },
       "total_devices": {
         "name": "Totaal apparaten"
       },
@@ -1494,6 +1497,9 @@
     }
   },
   "exceptions": {
+    "device_not_found": {
+      "message": "Apparaat niet gevonden."
+    },
     "failed_to_change": {
       "message": "Wijzigen van {entity} mislukt: {error}"
     },
@@ -1503,8 +1509,17 @@
     "force_arm_night_failed": {
       "message": "Geforceerd inschakelen nachtmodus van hub {hub_id} mislukt: {error}"
     },
+    "hub_not_found": {
+      "message": "Hub niet gevonden."
+    },
     "invalid_target": {
       "message": "Ongeldig doel voor service."
+    },
+    "lock_not_supported": {
+      "message": "Op afstand vergrendelen/ontgrendelen wordt niet ondersteund door Ajax smart locks."
+    },
+    "no_api_key": {
+      "message": "Geen API-sleutel geconfigureerd voor deze entiteit."
     },
     "no_hubs_found": {
       "message": "Geen hubs gevonden."
@@ -1545,13 +1560,6 @@
         },
         "description": "Configureer AWS-referenties voor real-time gebeurtenismeldingen.\n\n**Huidige configuratie:**\n- Access Key: {current_access_key}\n- Secret Key: {current_secret_key}\n- SQS-wachtrij: {current_queue}\n\nLaat een veld leeg om de huidige waarde te behouden.",
         "title": "AWS SQS-referenties"
-      },
-      "dhcp_confirm": {
-        "data": {
-          "action": "Action"
-        },
-        "description": "An Ajax hub ({hostname}) with MAC address {mac} was discovered on your network.\n\nDo you want to associate it with an existing configuration or create a new one?",
-        "title": "Ajax Hub Discovered"
       },
       "enabled_spaces": {
         "data": {
@@ -1649,6 +1657,10 @@
     "get_raw_devices": {
       "description": "Haal ruwe API JSON-data op voor alle apparaten. Slaat de volledige API-respons op in ajax_raw_devices.json.",
       "name": "Haal ruwe apparaten op"
+    },
+    "get_smart_locks": {
+      "description": "Haalt smart lock-gegevens op uit de API en SSE/SQS-ontdekte sloten. Slaat het antwoord op in ajax_smart_locks.json voor diagnostiek.",
+      "name": "Smart locks ophalen"
     },
     "refresh_metadata": {
       "description": "Forceer een volledige verversing van kamers, gebruikers en groepen van Ajax.",

@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import logging
+import time
 
 from homeassistant.components.button import ButtonEntity
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -17,6 +19,11 @@ from .coordinator import AjaxDataCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 PARALLEL_UPDATES = 1
+
+# Anti-rebound: a panic press relays to the monitoring company and can
+# generate a billable false dispatch. Reject repeats within this window
+# so a stuck automation or accidental double-tap costs nothing.
+PANIC_COOLDOWN_SECONDS = 5.0
 
 
 async def async_setup_entry(
@@ -48,7 +55,7 @@ class AjaxPanicButton(CoordinatorEntity[AjaxDataCoordinator], ButtonEntity):
     real alarm. Users must explicitly enable the entity.
     """
 
-    __slots__ = ("_entry", "_space_id")
+    __slots__ = ("_entry", "_space_id", "_last_press_ts")
 
     # No device_class: IDENTIFY is semantically "flash the device to find it",
     # which does not match the destructive nature of a panic trigger.
@@ -60,6 +67,7 @@ class AjaxPanicButton(CoordinatorEntity[AjaxDataCoordinator], ButtonEntity):
         super().__init__(coordinator)
         self._entry = entry
         self._space_id = space_id
+        self._last_press_ts: float = 0.0
 
         self._attr_unique_id = f"{entry.entry_id}_panic_{space_id}"
         self._attr_translation_key = "panic"
@@ -67,7 +75,17 @@ class AjaxPanicButton(CoordinatorEntity[AjaxDataCoordinator], ButtonEntity):
 
     async def async_press(self) -> None:
         """Handle the button press."""
-        _LOGGER.info("Panic button pressed for space %s", self._space_id)
+        now = time.monotonic()
+        if now - self._last_press_ts < PANIC_COOLDOWN_SECONDS:
+            _LOGGER.warning("Panic button rejected (cooldown active) for space %s", self._space_id)
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="panic_cooldown",
+                translation_placeholders={"seconds": str(int(PANIC_COOLDOWN_SECONDS))},
+            )
+        self._last_press_ts = now
+
+        _LOGGER.warning("Panic button pressed for space %s", self._space_id)
 
         try:
             await self.coordinator.async_press_panic_button(self._space_id)

@@ -9,6 +9,7 @@ import json
 import logging
 import time
 from typing import Any
+from urllib.parse import urlsplit
 
 import aiohttp
 
@@ -157,6 +158,14 @@ class AjaxRestApi:
         # Track consecutive refresh failures to skip refresh in proxy mode
         self._refresh_failures: int = 0
 
+        # Short-lived in-memory cache of GET /spaces/{id} responses.
+        # The same payload is consumed by ``async_get_video_edges`` and
+        # ``async_get_smart_locks`` within a single coordinator tick, so
+        # without coalescing we double the spaces fetch for every cycle
+        # that has both a camera and a smart lock.
+        self._space_cache: dict[str, tuple[float, dict[str, Any]]] = {}
+        self._space_cache_ttl: float = 5.0
+
         # Base headers with API key (may be empty for proxy modes initially)
         self._base_headers = {
             "Content-Type": "application/json",
@@ -195,12 +204,13 @@ class AjaxRestApi:
     async def _get_session(self) -> aiohttp.ClientSession:
         """Get or create aiohttp session."""
         if self.session is None or self.session.closed:
-            # Create session with SSL verification setting and bounded connection pool.
-            # limit_per_host prevents connector exhaustion if the Ajax API stalls.
+            # Tight connection pool: a single coordinator never needs more
+            # than a few concurrent in-flight requests, and the proxy is
+            # single-tenant so flooding it hurts other users sharing it.
             if self.verify_ssl:
-                connector = aiohttp.TCPConnector(limit=20, limit_per_host=10)
+                connector = aiohttp.TCPConnector(limit=5, limit_per_host=5)
             else:
-                connector = aiohttp.TCPConnector(ssl=False, limit=20, limit_per_host=10)
+                connector = aiohttp.TCPConnector(ssl=False, limit=5, limit_per_host=5)
                 _LOGGER.warning("SSL certificate verification disabled - use only with trusted self-signed certs")
             self.session = aiohttp.ClientSession(connector=connector)
             self._owns_session = True
@@ -377,7 +387,7 @@ class AjaxRestApi:
                         self.sse_url = f"{self.proxy_url}/events?userId={self.user_id}"
                     if self.sse_url:
                         _LOGGER.info("SSE endpoint configured")
-                        _LOGGER.debug("SSE endpoint: %s", self.sse_url)
+                        _LOGGER.debug("SSE endpoint host: %s", urlsplit(self.sse_url).netloc)
 
                 if not self.session_token:
                     raise AjaxRestApiError("No sessionToken in login response")
@@ -387,8 +397,8 @@ class AjaxRestApi:
                 self._token_obtained_at = time.monotonic()
                 self._refresh_failures = 0  # Reset on successful login
                 _LOGGER.info(
-                    "Login successful, session token obtained (userId: %s, effective TTL: %.0fs)",
-                    self.user_id,
+                    "Login successful, session token obtained (user: %s, effective TTL: %.0fs)",
+                    (self.user_id or "")[:8] or "?",
                     self._effective_ttl,
                 )
                 return self.session_token
@@ -518,7 +528,10 @@ class AjaxRestApi:
 
                 self._token_version += 1
                 self._token_obtained_at = time.monotonic()
-                _LOGGER.info("Session token refreshed successfully (userId: %s)", self.user_id)
+                _LOGGER.info(
+                    "Session token refreshed successfully (user: %s)",
+                    (self.user_id or "")[:8] or "?",
+                )
                 return self.session_token
 
         except aiohttp.ClientError as err:
@@ -1189,7 +1202,12 @@ class AjaxRestApi:
         Returns:
             Space dictionary with devices array
         """
-        return await self._request("GET", f"user/{self.user_id}/spaces/{space_id}")
+        cached = self._space_cache.get(space_id)
+        if cached and (time.time() - cached[0]) < self._space_cache_ttl:
+            return cached[1]
+        data = await self._request("GET", f"user/{self.user_id}/spaces/{space_id}")
+        self._space_cache[space_id] = (time.time(), data)
+        return data
 
     async def async_get_video_edges(self, space_id: str) -> list[dict[str, Any]]:
         """Get all video edge devices for a space.

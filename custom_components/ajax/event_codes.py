@@ -15,6 +15,7 @@ Supported languages: fr, en, es
 
 from __future__ import annotations
 
+import functools
 from typing import Any
 
 # Event types (eventTypeV2 field in SQS events)
@@ -1719,6 +1720,7 @@ def get_event_type_description(event_type: str, language: str = DEFAULT_LANGUAGE
     return next(iter(descriptions.values()), event_type)
 
 
+@functools.lru_cache(maxsize=4096)
 def parse_event_code(event_code: str, language: str = DEFAULT_LANGUAGE) -> dict[str, Any] | None:
     """Parse an event code and return event details.
 
@@ -1737,6 +1739,11 @@ def parse_event_code(event_code: str, language: str = DEFAULT_LANGUAGE) -> dict[
     Transition is determined by the last digit of the event signal:
     - Even (0, 2, 4, 6, 8, A, C, E) = TRIGGERED (alarm/open state)
     - Odd (1, 3, 5, 7, 9, B, D, F) = RECOVERED (restored/closed state)
+
+    The lru_cache keeps repeat lookups O(1): finite key space (~200 codes ×
+    7 languages) so no eviction ever fires under normal load. Callers MUST
+    treat the returned dict as read-only — mutating it would corrupt the
+    cached entry seen by every subsequent call.
     """
     if not event_code:
         return None

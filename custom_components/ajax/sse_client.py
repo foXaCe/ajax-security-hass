@@ -18,12 +18,22 @@ import json
 import logging
 from collections.abc import Awaitable, Callable
 from typing import Any
+from urllib.parse import urlsplit
 
 import aiohttp
 
 from .const import INTEGRATION_VERSION
 
 _LOGGER = logging.getLogger(__name__)
+
+
+def _safe_url(url: str) -> str:
+    """Return a log-safe URL stripped of query/fragment (avoids leaking userId)."""
+    try:
+        parts = urlsplit(url)
+        return f"{parts.scheme}://{parts.netloc}{parts.path}"
+    except ValueError:
+        return "<invalid-url>"
 
 
 class AjaxSSEClient:
@@ -86,7 +96,7 @@ class AjaxSSEClient:
 
         self._running = True
         self._task = asyncio.create_task(self._receive_loop())
-        _LOGGER.info("SSE client started for %s", self.sse_url)
+        _LOGGER.info("SSE client started for %s", _safe_url(self.sse_url))
         return True
 
     async def stop(self) -> None:
@@ -99,6 +109,15 @@ class AjaxSSEClient:
             with contextlib.suppress(asyncio.CancelledError):
                 await self._task
             self._task = None
+
+        # Drain in-flight callback tasks before tearing the session down so
+        # they cannot keep writing to the coordinator (or hit a closed
+        # session) after async_shutdown.
+        if self._pending_callback_tasks:
+            pending = list(self._pending_callback_tasks)
+            self._pending_callback_tasks.clear()
+            with contextlib.suppress(asyncio.CancelledError, Exception):
+                await asyncio.gather(*pending, return_exceptions=True)
 
         if self._session and not self._session.closed:
             await self._session.close()
@@ -149,7 +168,7 @@ class AjaxSSEClient:
         if self.user_id:
             headers["X-User-Id"] = self.user_id
 
-        _LOGGER.debug("Connecting to SSE: %s", self.sse_url)
+        _LOGGER.debug("Connecting to SSE: %s", _safe_url(self.sse_url))
 
         async with self._session.get(
             self.sse_url,

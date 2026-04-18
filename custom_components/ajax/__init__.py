@@ -6,6 +6,7 @@ import json
 import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
+from urllib.parse import urlsplit
 
 import voluptuous as vol
 from homeassistant.components.persistent_notification import async_create
@@ -161,7 +162,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: AjaxConfigEntry) -> bool
             sse_url = api.sse_url
             if sse_url:
                 _LOGGER.info("SSE URL obtained from proxy")
-                _LOGGER.debug("SSE URL: %s", sse_url)
+                _LOGGER.debug("SSE URL host: %s", urlsplit(sse_url).netloc)
             else:
                 _LOGGER.warning("No SSE URL received from proxy")
 

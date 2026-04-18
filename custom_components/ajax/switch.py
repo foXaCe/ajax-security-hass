@@ -384,6 +384,8 @@ class AjaxSwitch(CoordinatorEntity[AjaxDataCoordinator], SwitchEntity):
         attr_key = attr_key_map.get(api_key, api_key)
         old_value = device.attributes.get(attr_key)
         device.attributes[attr_key] = api_value
+        # Reserve against polling overwrite while the API call is in-flight
+        device.mark_optimistic(attr_key, 15.0)
         self.async_write_ha_state()
 
         # Build the payload
@@ -432,6 +434,7 @@ class AjaxSwitch(CoordinatorEntity[AjaxDataCoordinator], SwitchEntity):
 
         # Optimistic update
         device.attributes["siren_triggers"] = current_triggers
+        device.mark_optimistic("siren_triggers", 15.0)
         self.async_write_ha_state()
 
         try:
@@ -463,6 +466,7 @@ class AjaxSwitch(CoordinatorEntity[AjaxDataCoordinator], SwitchEntity):
 
         # Optimistic update
         device.attributes["settingsSwitch"] = current_settings
+        device.mark_optimistic("settingsSwitch", 15.0)
         self.async_write_ha_state()
 
         try:

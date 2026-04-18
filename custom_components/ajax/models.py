@@ -177,6 +177,40 @@ class AjaxDevice:
     def __str__(self) -> str:
         return f"Device({self.name}, type={self.type.value}, online={self.online})"
 
+    # ------------------------------------------------------------------
+    # Optimistic-update protection
+    #
+    # Switches mutate ``attributes[key]`` immediately for instant UI
+    # feedback, then call the API. Without protection, a coordinator
+    # refresh in the next ~1s would overwrite the local mutation with
+    # the still-stale API value. ``mark_optimistic`` records a per-attr
+    # expiry; the coordinator must call ``is_optimistic`` before
+    # overwriting an attribute that lives in this set.
+    # ------------------------------------------------------------------
+
+    def mark_optimistic(self, attr_key: str, ttl_seconds: float = 15.0) -> None:
+        """Reserve ``attr_key`` against polling overwrite for ``ttl_seconds``."""
+        from time import time as _now  # local import to keep top-level untouched
+
+        guard = self.attributes.setdefault("_optimistic_attrs", {})
+        guard[attr_key] = _now() + ttl_seconds
+
+    def is_optimistic(self, attr_key: str) -> bool:
+        """Return True if ``attr_key`` still has a pending optimistic update."""
+        from time import time as _now
+
+        guard = self.attributes.get("_optimistic_attrs")
+        if not guard:
+            return False
+        expiry = guard.get(attr_key)
+        if expiry is None:
+            return False
+        if _now() < expiry:
+            return True
+        # Expired entry — clean it up so the dict cannot grow forever.
+        del guard[attr_key]
+        return False
+
     @property
     def has_battery(self) -> bool:
         """Check if device has battery info."""

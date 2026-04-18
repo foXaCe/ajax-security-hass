@@ -2,6 +2,43 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.26.1] - 2026-04-18
+
+### Security
+- Mask `userId`/`sseUrl` and RTSP credentials in INFO logs (DEBUG only)
+- Scrub RTSP URL from FFmpeg error messages in snapshot path
+- Expand diagnostics `TO_REDACT` (hub_id, mac, ip, camelCase keys, auth headers)
+- Drop response body from 401 refresh-token log
+
+### Fixed
+- WallSwitch Jeweller relay state (#120) — keep prior SQS fix
+- SSE: persistent 401/403 now surfaces as auth failure with exponential backoff
+- SQS: reuse a single `aiobotocore` client per thread, fail-fast on IAM errors, callback timeout kept below visibility to prevent redelivery loops
+- Video Edge: strict ISO 8601 regex for uptime, defensive divisions on storage/temperature
+- Optimistic light/valve rollback preserves the absence of a previous value
+- `life_quality`: fix °C vs 0.1°C unit mismatch in temperature comfort check
+- `alarm_control_panel`: return `None` on unknown security state (no longer silently maps to DISARMED)
+- `MULTI_TRANSMITTER` / `KEYPAD` mapped to correct handlers
+- `event_codes.py`: explicit transition overrides + added KeyPad variant `6A`; `M_22_24` reclassified as `arm_failed`
+- `force_arm` / `force_arm_night` services now honor the `entity_id` target (previously fanned out to all hubs)
+- `event` platform: unregister entities cleanly on reload to avoid stale dispatch targets
+- `sensor` / `binary_sensor`: consult `device.online` attribute (not `attributes` dict) for availability
+- Panic button: disabled by default and no longer advertised as `IDENTIFY`
+- Doorbell: drop misleading `OCCUPANCY` binary sensor (press handled via event platform)
+- ONVIF: `asyncio.Lock` on client map; subscription loss now triggers recreation on the next poll
+
+### Changed
+- Raise `ConfigEntryAuthFailed` on authentication errors to trigger the Home Assistant reauth flow
+- `HomeAssistantError` across `number`, `select`, `switch`, `lock` now use `translation_domain` + `translation_key`
+- Replace hardcoded unit strings with Home Assistant constants (`PERCENTAGE`, `UnitOfTime`, `UnitOfTemperature`, `CONCENTRATION_PARTS_PER_MILLION`, `DEGREE`, `UnitOfInformation`)
+- Pass `config_entry` to the `DataUpdateCoordinator` constructor
+- `manifest.json`: add `quality_scale: bronze`, remove `aiohttp` (provided by core)
+- Extract `_parse_door_state_from_wiring` helper in the coordinator (4× duplication removed)
+- Add shared helpers in `devices/base.py` (`_battery_sensor`, `_tamper_binary_sensor`, `_temperature_sensor`, `_signal_strength_percent_sensor`, `_problem_binary_sensor`, `_firmware_version_sensor`)
+- Track `call_later` handles and background tasks in SSE / SQS managers for clean teardown
+- Translations audit across 7 languages: add missing exceptions (`hub_not_found`, `device_not_found`, `no_api_key`, `lock_not_supported`), `services.get_smart_locks`, `config.step.dhcp_confirm`; remove orphan `options.step.dhcp_confirm`; fix double-escaped newlines in French; expand `icons.json` (event, lock, light, update, valve)
+- SQS (relay): write state to `is_on` attribute rather than `state` (#120)
+
 ## [0.26.0] - 2026-04-13
 
 ### Added

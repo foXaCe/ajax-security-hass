@@ -2954,6 +2954,8 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
             "socket_outlet_type_f": DeviceType.SOCKET,
             "relay": DeviceType.RELAY,
             "wallswitch": DeviceType.WALLSWITCH,
+            "wall_switch": DeviceType.WALLSWITCH,
+            "wall_switch_jeweller": DeviceType.WALLSWITCH,
             "lightswitch": DeviceType.WALLSWITCH,
             "lightswitchonegang": DeviceType.WALLSWITCH,
             "lightswitchtwogang": DeviceType.WALLSWITCH,

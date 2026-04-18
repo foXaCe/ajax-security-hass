@@ -2,6 +2,40 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.26.4] - 2026-04-18
+
+### Fixed
+- **Camera detection events now fire reliably** (resolves #33). `_handle_video_event` in both SSE and SQS managers used to update channel state but never trigger `event.<camera>_detection` — the entity stayed in `unknown` for users without ONVIF. Added `_fire_video_detection_event` helper in `EventHandlerMixin` so SSE and SQS reach parity with the doorbell handler.
+- **ONVIF NVR routing no longer mis-attributes events** (likely fixes #114). NVR `sourceAliases.sources[0]` could point to the doorbell, so motion on the front camera was triggering `event.sonnette_2` instead of `event.camera_devant`. The integration now skips the NVR for ONVIF events entirely and connects directly to each camera + doorbell — every Ajax camera runs its own AI and exposes ONVIF events directly, so the NVR added nothing for the events path.
+- **SSE proxy users no longer miss button presses or wire-input alarms.** SSE dispatch was missing `BUTTON_EVENTS` and `WIRE_INPUT_EVENTS` (only SQS had them). Imported the mappings and added `_handle_button_event` / `_handle_wire_input_event` to `sse_manager`.
+- **SSE doorbell now fires the event entity** like SQS already did.
+- **Firmware sensors are now correctly categorised `DIAGNOSTIC`.** `AjaxDeviceSensor` and `AjaxBinarySensor` ignored the `entity_category` key (43 occurrences across `devices/`), so smoke, flood, socket, dimmer, lightswitch and waterstop firmware sensors landed in the main entity list. Added `resolve_entity_category()` helper in `devices/base.py` consumed by both sensor classes plus the existing video-edge sensor (replaces its inline str→enum mapping).
+- **Concurrent arm/disarm calls can no longer reach the API out-of-order.** Added per-`space_id` `asyncio.Lock` for `async_arm_space`, `async_disarm_space`, `async_arm_night_mode`, `async_arm_group`, `async_disarm_group`.
+- **Optimistic switch updates are no longer overwritten by the next poll.** `night_mode_arm`, `always_active`, `chimes_enabled`, `siren_triggers`, `settingsSwitch` were silently rolled back. Added `mark_optimistic` / `is_optimistic` helpers on `AjaxDevice` reserving an attribute against polling overwrite for 15 s.
+- **Panic button now rejects double-taps within 5 s** with a translated `HomeAssistantError` (anti false police dispatch). Translation `panic_cooldown` available in 7 languages.
+- **`_security_event_lock` previously declared but unused** is now actually held around the `_skip_state_change_event` flag flips in both SSE and SQS managers — concurrent security events can no longer race the cache-bypass / skip flag.
+- **SSE deduplication key now includes `event_code`** (parity with SQS timestamp-based key) so back-to-back events of the same tag with different codes are no longer silently dropped.
+- **`userId` no longer leaks into INFO logs**: `sse_url` is masked via `urlsplit` in `sse_client.py`, `api.py` and `__init__.py`; login and refresh logs print only the first 8 characters of `user_id`.
+- **SSE callback tasks are drained at stop**: `AjaxSSEClient.stop()` now `gather()`s `_pending_callback_tasks` before closing the session, so they cannot keep writing to the coordinator after `async_shutdown`.
+- **Alarm persistent-notification id is now stable** (`f"ajax_alarm_{space.id}_{event_code}"`) instead of `time.time()` per millisecond — a burst of alarms updates the same notification instead of spamming the dashboard.
+
+### Performance
+- **~40-50% fewer API calls in proxy/SSE mode.**
+  - Cache `async_get_space` (5 s TTL) — coalesces `video_edges` + `smart_locks` fetches inside the same coordinator tick (was hitting `/spaces/{id}` twice per cycle).
+  - Skip `video_edges` and `smart_locks` light fetch on 2 cycles out of 3 when SSE/SQS is active (state is event-driven anyway).
+  - Skip `groups` fetch on light cycles when SSE/SQS is active (group arm/disarm is pushed in real time and forces a metadata refresh).
+- `TCPConnector` limit reduced 20 → 5 (single-tenant proxy; 5 in-flight is plenty for one coordinator and avoids bursting Julien's shared proxy).
+- `@functools.lru_cache(maxsize=4096)` on `parse_event_code` — finite key space (~200 codes × 7 languages), called on every SSE/SQS event.
+
+### Changed
+- **ONVIF strategy: connect directly to every camera and doorbell, never via the NVR.** Comment in `onvif_manager.async_start()` explains why (channel-mapping unreliability).
+- **10 of 11 `tamper` declarations migrated to `self._tamper_binary_sensor()`** in `devices/{transmitter,smoke_detector,life_quality,manual_call_point,motion_detector,waterstop,flood_detector,hub,door_contact}.py`. `siren.py` kept inline because it needs the `is not None` guard on `attributes['tampered']` (helper unconditionally adds the sensor with default `False`).
+- **6 `problem` declarations migrated to `self._problem_binary_sensor()`** in `devices/{hub,light,socket,waterstop,lightswitch,dimmer}.py`.
+- **Remove dead `LightHandler`** (`devices/light.py` deleted, import + export cleaned from `devices/__init__.py`). The HA light platform instantiates `AjaxDimmerLight` directly — the handler had been unused since 0.25.x.
+- **`services.yaml`: integration-level services now expose `fields.config_entry_id`** (Quality Scale Silver requirement) for `get_raw_devices`, `refresh_metadata`, `get_nvr_recordings`, `get_smart_locks`. Translations added in 7 languages.
+- **`event.py`: `via_device` set on event sub-entities** so they appear under their parent space in the device hierarchy (Gold).
+- **Logbook: new `ajax_camera_detection` bus event** fired by both ONVIF and SSE/SQS managers, with a localised describer that prints `<Camera> a détecté un mouvement / une personne / un véhicule / un animal / un franchissement de ligne` (7 languages) instead of HA's generic `a détecté un événement` fallback.
+
 ## [0.26.3] - 2026-04-18
 
 ### Changed

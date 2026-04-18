@@ -162,6 +162,16 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
         self._initial_load_done: bool = False  # Track if initial data load is complete
         self._force_metadata_refresh: bool = False  # Flag to force full metadata refresh
         self._pending_ha_actions: dict[str, float] = {}  # hub_id -> timestamp of HA action
+        # Per-space lock so concurrent arm/disarm calls cannot reach the API
+        # out-of-order. Without this, two automations firing arm() then
+        # disarm() within ms can land in the wrong order on Ajax's side.
+        self._arm_locks: dict[str, asyncio.Lock] = {}
+        # Cycle counter for adaptive polling — when SSE/SQS is delivering
+        # real-time events, video_edges and smart_locks state is already
+        # event-driven, so we only need a periodic REST sync (every Nth tick)
+        # rather than every cycle. Keeps the proxy load low for many users.
+        self._cycle_counter: int = 0
+        self._realtime_skip_factor: int = 3
 
         # SQS real-time events (optional, for direct mode)
         self.sqs_manager: SQSManager | None = None
@@ -605,17 +615,31 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
                 # Light or full update based on metadata refresh need
                 await self._async_update_spaces_from_hubs(full_refresh=need_metadata_refresh)
 
+                self._cycle_counter += 1
+                # When real-time events are flowing in, video edges and smart
+                # locks are kept fresh by SSE/SQS. Throttle the REST sync so
+                # we only poll their full state every Nth cycle (or always on
+                # forced metadata refresh). Direct mode without realtime keeps
+                # the previous behaviour.
+                realtime_active = (self.sse_manager is not None) or (self.sqs_manager is not None)
+                refresh_video_smart = (
+                    need_metadata_refresh
+                    or not realtime_active
+                    or (self._cycle_counter % self._realtime_skip_factor == 0)
+                )
+
                 for space_id in self.account.spaces:
                     space_obj: AjaxSpace | None = self.account.spaces.get(space_id)
                     if space_obj:
                         self._reset_expired_motion_detections(space_obj)
                         await self._async_update_devices(space_id)
-                        # Refresh video edges to get AI detection states
-                        if space_obj.video_edges:
-                            await self._async_update_video_edges(space_id)
-                        # Refresh smart locks (API data is minimal, state is event-driven)
-                        if space_obj.smart_locks:
-                            await self._async_update_smart_locks(space_id)
+                        if refresh_video_smart:
+                            # Refresh video edges to get AI detection states
+                            if space_obj.video_edges:
+                                await self._async_update_video_edges(space_id)
+                            # Refresh smart locks (API data is minimal, state is event-driven)
+                            if space_obj.smart_locks:
+                                await self._async_update_smart_locks(space_id)
 
             # Reset auth error counter on success
             self._consecutive_auth_errors = 0
@@ -1094,6 +1118,18 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
                         attrs = {"rule": event.rule} if event.rule else None
                         event_entity.fire(event_type, attrs)
 
+                    bus_data = {
+                        "device_id": target_ve.id,
+                        "device_name": target_ve.name,
+                        "event_type": event_type,
+                        "source": "onvif",
+                    }
+                    if event_entity is not None and event_entity.entity_id:
+                        # HA logbook needs entity_id to attach the describer
+                        # to the right device row instead of dropping the line.
+                        bus_data["entity_id"] = event_entity.entity_id
+                    self.hass.bus.async_fire("ajax_camera_detection", bus_data)
+
             # Trigger coordinator update to refresh entities
             self.async_set_updated_data(self.account)
             return
@@ -1347,10 +1383,16 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
                 except (AjaxRestApiError, AjaxRestAuthError):
                     space.users = []
 
-            # Always fetch groups on every poll (group state changes frequently)
+            # Fetch groups on every poll by default. When SSE/SQS is active,
+            # group arm/disarm transitions are pushed in real time and a full
+            # metadata refresh is forced via _force_metadata_refresh after
+            # each security event — so we can skip the per-tick groups fetch
+            # on light cycles, which was a significant share of API calls.
             groups_enabled = hub_details.get("groupsEnabled", False)
             space.group_mode_enabled = groups_enabled
-            if groups_enabled:
+            realtime_active = (self.sse_manager is not None) or (self.sqs_manager is not None)
+            should_fetch_groups = groups_enabled and (full_refresh or not realtime_active)
+            if should_fetch_groups:
                 # Check if HA recently triggered an action (protect optimistic updates)
                 ha_action_pending = self.has_pending_ha_action(hub_id)
                 try:
@@ -1645,23 +1687,25 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
             # For MultiTransmitterWireInput, settings are in wiredDeviceSettings
             wired_settings = device_data.get("wiredDeviceSettings") or {}
 
-            if "alwaysActive" in device_data:
-                device.attributes["always_active"] = device_data.get("alwaysActive", False)
-            elif "alwaysActive" in wired_settings:
-                device.attributes["always_active"] = wired_settings.get("alwaysActive", False)
+            if not device.is_optimistic("always_active"):
+                if "alwaysActive" in device_data:
+                    device.attributes["always_active"] = device_data.get("alwaysActive", False)
+                elif "alwaysActive" in wired_settings:
+                    device.attributes["always_active"] = wired_settings.get("alwaysActive", False)
 
-            if "nightModeArm" in device_data or "armedInNightMode" in device_data:
-                night_mode_value = device_data.get(
-                    "nightModeArm",
-                    device_data.get("armedInNightMode", False),
-                )
-                device.attributes["armed_in_night_mode"] = night_mode_value
-                device.attributes["night_mode_arm"] = night_mode_value  # Alias for handlers
-            elif "nightModeArm" in wired_settings:
-                # MultiTransmitterWireInput: nightModeArm is in wiredDeviceSettings
-                night_mode_value = wired_settings.get("nightModeArm", False)
-                device.attributes["armed_in_night_mode"] = night_mode_value
-                device.attributes["night_mode_arm"] = night_mode_value
+            if not device.is_optimistic("night_mode_arm"):
+                if "nightModeArm" in device_data or "armedInNightMode" in device_data:
+                    night_mode_value = device_data.get(
+                        "nightModeArm",
+                        device_data.get("armedInNightMode", False),
+                    )
+                    device.attributes["armed_in_night_mode"] = night_mode_value
+                    device.attributes["night_mode_arm"] = night_mode_value  # Alias for handlers
+                elif "nightModeArm" in wired_settings:
+                    # MultiTransmitterWireInput: nightModeArm is in wiredDeviceSettings
+                    night_mode_value = wired_settings.get("nightModeArm", False)
+                    device.attributes["armed_in_night_mode"] = night_mode_value
+                    device.attributes["night_mode_arm"] = night_mode_value
 
             # DoorProtect Plus specific attributes
             if "extraContactAware" in device_data:
@@ -1676,7 +1720,7 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
                 device.attributes["accelerometer_tilt_degrees"] = device_data.get("accelerometerTiltDegrees", 5)
             if "ignoreSimpleImpact" in device_data:
                 device.attributes["ignore_simple_impact"] = device_data.get("ignoreSimpleImpact", False)
-            if "sirenTriggers" in device_data:
+            if "sirenTriggers" in device_data and not device.is_optimistic("siren_triggers"):
                 device.attributes["siren_triggers"] = device_data.get("sirenTriggers", [])
 
             # Door contact state (reedClosed -> door_opened)
@@ -1759,7 +1803,7 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
                 device.attributes["beep_on_arm_disarm"] = device_data.get("beepOnArmDisarm")
             if "beepOnDelay" in device_data:
                 device.attributes["beep_on_delay"] = device_data.get("beepOnDelay")
-            if "chimesEnabled" in device_data:
+            if "chimesEnabled" in device_data and not device.is_optimistic("chimes_enabled"):
                 device.attributes["chimes_enabled"] = device_data.get("chimesEnabled")
             if "buzzerState" in device_data:
                 device.attributes["buzzer_state"] = device_data.get("buzzerState")
@@ -1968,7 +2012,7 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
                 device.attributes["brightnessChangeSpeed"] = device_data.get("brightnessChangeSpeed")
 
             # LightSwitch settings and protection statuses
-            if "settingsSwitch" in device_data:
+            if "settingsSwitch" in device_data and not device.is_optimistic("settingsSwitch"):
                 device.attributes["settingsSwitch"] = device_data.get("settingsSwitch", [])
             if "protectStatuses" in device_data:
                 device.attributes["protectStatuses"] = device_data.get("protectStatuses", [])
@@ -3047,6 +3091,14 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
             return True
         return False
 
+    def _arm_lock_for(self, space_id: str) -> asyncio.Lock:
+        """Return (and lazily create) the asyncio.Lock for ``space_id``."""
+        lock = self._arm_locks.get(space_id)
+        if lock is None:
+            lock = asyncio.Lock()
+            self._arm_locks[space_id] = lock
+        return lock
+
     async def async_arm_space(self, space_id: str, force: bool = True) -> None:
         """Arm a space.
 
@@ -3056,27 +3108,29 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
         """
         _LOGGER.info("Arming space %s (force=%s)", space_id, force)
 
-        try:
-            self._register_ha_action(space_id)
-            await self.api.async_arm(space_id, ignore_problems=force)
-            # State will be updated via SQS with "Home Assistant" as source
+        async with self._arm_lock_for(space_id):
+            try:
+                self._register_ha_action(space_id)
+                await self.api.async_arm(space_id, ignore_problems=force)
+                # State will be updated via SQS with "Home Assistant" as source
 
-        except AjaxRestApiError as err:
-            _LOGGER.error("Failed to arm space %s: %s", space_id, err)
-            raise
+            except AjaxRestApiError as err:
+                _LOGGER.error("Failed to arm space %s: %s", space_id, err)
+                raise
 
     async def async_disarm_space(self, space_id: str) -> None:
         """Disarm a space."""
         _LOGGER.info("Disarming space %s", space_id)
 
-        try:
-            self._register_ha_action(space_id)
-            await self.api.async_disarm(space_id)
-            # State will be updated via SQS with "Home Assistant" as source
+        async with self._arm_lock_for(space_id):
+            try:
+                self._register_ha_action(space_id)
+                await self.api.async_disarm(space_id)
+                # State will be updated via SQS with "Home Assistant" as source
 
-        except AjaxRestApiError as err:
-            _LOGGER.error("Failed to disarm space %s: %s", space_id, err)
-            raise
+            except AjaxRestApiError as err:
+                _LOGGER.error("Failed to disarm space %s: %s", space_id, err)
+                raise
 
     async def async_arm_night_mode(self, space_id: str, force: bool = False) -> None:
         """Activate night mode for a space.
@@ -3087,14 +3141,15 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
         """
         _LOGGER.info("Activating night mode for space %s (force=%s)", space_id, force)
 
-        try:
-            self._register_ha_action(space_id)
-            await self.api.async_night_mode(space_id, enabled=True)
-            # State will be updated via SQS with "Home Assistant" as source
+        async with self._arm_lock_for(space_id):
+            try:
+                self._register_ha_action(space_id)
+                await self.api.async_night_mode(space_id, enabled=True)
+                # State will be updated via SQS with "Home Assistant" as source
 
-        except AjaxRestApiError as err:
-            _LOGGER.error("Failed to activate night mode for space %s: %s", space_id, err)
-            raise
+            except AjaxRestApiError as err:
+                _LOGGER.error("Failed to activate night mode for space %s: %s", space_id, err)
+                raise
 
     async def async_press_panic_button(self, space_id: str) -> None:
         """Press panic button (trigger panic alarm) for a space."""
@@ -3118,19 +3173,20 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
         """
         _LOGGER.info("Arming group %s in space %s (force=%s)", group_id, space_id, force)
 
-        try:
-            self._register_ha_action(space_id)
-            await self.api.async_arm_group(space_id, group_id, ignore_problems=force)
-            # Update local state
-            space = self.get_space(space_id)
-            if space and group_id in space.groups:
-                space.groups[group_id].state = GroupState.ARMED
-            # Trigger refresh to sync state
-            await self.async_request_refresh()
+        async with self._arm_lock_for(space_id):
+            try:
+                self._register_ha_action(space_id)
+                await self.api.async_arm_group(space_id, group_id, ignore_problems=force)
+                # Update local state
+                space = self.get_space(space_id)
+                if space and group_id in space.groups:
+                    space.groups[group_id].state = GroupState.ARMED
+                # Trigger refresh to sync state
+                await self.async_request_refresh()
 
-        except AjaxRestApiError as err:
-            _LOGGER.error("Failed to arm group %s in space %s: %s", group_id, space_id, err)
-            raise
+            except AjaxRestApiError as err:
+                _LOGGER.error("Failed to arm group %s in space %s: %s", group_id, space_id, err)
+                raise
 
     async def async_disarm_group(self, space_id: str, group_id: str) -> None:
         """Disarm a specific group.
@@ -3141,19 +3197,20 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
         """
         _LOGGER.info("Disarming group %s in space %s", group_id, space_id)
 
-        try:
-            self._register_ha_action(space_id)
-            await self.api.async_disarm_group(space_id, group_id)
-            # Update local state
-            space = self.get_space(space_id)
-            if space and group_id in space.groups:
-                space.groups[group_id].state = GroupState.DISARMED
-            # Trigger refresh to sync state
-            await self.async_request_refresh()
+        async with self._arm_lock_for(space_id):
+            try:
+                self._register_ha_action(space_id)
+                await self.api.async_disarm_group(space_id, group_id)
+                # Update local state
+                space = self.get_space(space_id)
+                if space and group_id in space.groups:
+                    space.groups[group_id].state = GroupState.DISARMED
+                # Trigger refresh to sync state
+                await self.async_request_refresh()
 
-        except AjaxRestApiError as err:
-            _LOGGER.error("Failed to disarm group %s in space %s: %s", group_id, space_id, err)
-            raise
+            except AjaxRestApiError as err:
+                _LOGGER.error("Failed to disarm group %s in space %s: %s", group_id, space_id, err)
+                raise
 
     # ============================================================================
     # Helper methods

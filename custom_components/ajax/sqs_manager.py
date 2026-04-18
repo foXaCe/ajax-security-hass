@@ -589,16 +589,21 @@ class SQSManager(EventHandlerMixin):
             # Wait for Ajax backend to process the change before refreshing
             # Without this delay, the API may return stale state
             await asyncio.sleep(1.0)
-            try:
-                # Set flag to skip event creation during refresh (SQS already created it)
-                self.coordinator._skip_state_change_event = True
-                await self.coordinator.async_force_metadata_refresh()
-                _LOGGER.info("SQS: Metadata refresh completed after security event")
-            except Exception as err:
-                _LOGGER.error("SQS: Metadata refresh failed after security event: %s", err)
-            finally:
-                # Always reset the flag
-                self.coordinator._skip_state_change_event = False
+            # Serialise concurrent security events: without this lock a
+            # second event landing in the middle of the first refresh would
+            # flip _skip_state_change_event back to False and let the
+            # in-flight refresh emit a duplicate state change.
+            async with self._security_event_lock:
+                try:
+                    # Set flag to skip event creation during refresh (SQS already created it)
+                    self.coordinator._skip_state_change_event = True
+                    await self.coordinator.async_force_metadata_refresh()
+                    _LOGGER.info("SQS: Metadata refresh completed after security event")
+                except Exception as err:
+                    _LOGGER.error("SQS: Metadata refresh failed after security event: %s", err)
+                finally:
+                    # Always reset the flag
+                    self.coordinator._skip_state_change_event = False
 
         # Skip state update if HA action is pending (protect optimistic update)
         # But still record the event in history and create notification
@@ -1033,11 +1038,16 @@ class SQSManager(EventHandlerMixin):
 
         notification_message = "\n".join(parts)
 
+        # Stable notification_id keyed on (space, event_code or action) so a
+        # burst of identical alarm events updates the same persistent
+        # notification instead of spamming the dashboard. Time-based ids
+        # (time.time()) created a new notification per ms.
+        notif_key = event_record.get("event_code") or event_record.get("action") or "alarm"
         async_create(
             self.coordinator.hass,
             notification_message,
             title=f"🚨 Ajax - {space.name}",
-            notification_id=f"ajax_alarm_{space.id}_{time.time()}",
+            notification_id=f"ajax_alarm_{space.id}_{notif_key}",
         )
 
     async def _handle_video_event(
@@ -1080,6 +1090,9 @@ class SQSManager(EventHandlerMixin):
 
         # Update the channel state with the detection
         self._update_video_detection(video_edge, channel_id, detection_type, True)
+
+        # Fire event entity (modern HA event platform) — parity with doorbell
+        self._fire_video_detection_event(video_edge, detection_type)
 
         _LOGGER.info(
             "SQS instant: %s -> %s detected (channel=%s)",

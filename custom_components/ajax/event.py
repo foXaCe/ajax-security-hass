@@ -208,6 +208,7 @@ class AjaxEventEntity(CoordinatorEntity[AjaxDataCoordinator], EventEntity):
                     name=device.name,
                     manufacturer=MANUFACTURER,
                     model=device.type.value,
+                    via_device=(DOMAIN, space.id),
                 )
             # Check video_edges (for doorbell)
             video_edge = space.video_edges.get(self._device_id)
@@ -218,6 +219,7 @@ class AjaxEventEntity(CoordinatorEntity[AjaxDataCoordinator], EventEntity):
                     name=video_edge.name,
                     manufacturer=MANUFACTURER,
                     model=model_name,
+                    via_device=(DOMAIN, space.id),
                 )
             # Check smart_locks
             smart_lock = space.smart_locks.get(self._device_id)
@@ -227,6 +229,7 @@ class AjaxEventEntity(CoordinatorEntity[AjaxDataCoordinator], EventEntity):
                     name=smart_lock.name,
                     manufacturer=MANUFACTURER,
                     model="LockBridge Jeweller",
+                    via_device=(DOMAIN, space.id),
                 )
         return None
 

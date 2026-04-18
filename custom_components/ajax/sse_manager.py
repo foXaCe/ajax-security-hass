@@ -24,6 +24,7 @@ from .const import SIGNAL_NEW_SMART_LOCK
 from .event_codes import DEFAULT_LANGUAGE, parse_event_code
 from .models import AjaxSmartLock
 from .sqs_manager import (  # Import event mappings from SQS manager to avoid duplication
+    BUTTON_EVENTS,
     DEVICE_STATUS_EVENTS,
     DOOR_EVENTS,
     DOORBELL_EVENTS,
@@ -42,6 +43,7 @@ from .sqs_manager import (  # Import event mappings from SQS manager to avoid du
     TAMPER_EVENTS,
     VIDEO_EVENT_TYPES,
     VIDEO_EVENTS,
+    WIRE_INPUT_EVENTS,
 )
 
 if TYPE_CHECKING:
@@ -242,11 +244,15 @@ class SSEManager(EventHandlerMixin):
                 if related_groups:
                     group_id = related_groups[0].get("id")
 
-            # Build deduplication key - include group_id for group events
+            # Build deduplication key - include group_id for group events.
+            # ``event_code`` is the precise per-event Ajax identifier; including
+            # it gives parity with SQS dedup (which uses timestamp) so that two
+            # back-to-back events of the same tag with different codes are
+            # both processed instead of the second being silently dropped.
             if group_id:
-                event_key = f"{source_id}:{event_tag}:{group_id}:{transition}"
+                event_key = f"{source_id}:{event_tag}:{group_id}:{transition}:{event_code}"
             else:
-                event_key = f"{source_id}:{event_tag}:{transition}"
+                event_key = f"{source_id}:{event_tag}:{transition}:{event_code}"
 
             now = time.time()
             last_time = self._recent_events.get(event_key, 0)
@@ -297,6 +303,10 @@ class SSEManager(EventHandlerMixin):
                 self._handle_device_status_event(space, event_tag, source_name, source_id)
             elif event_tag in RELAY_EVENTS:
                 self._handle_relay_event(space, event_tag, source_name, source_id)
+            elif event_tag in BUTTON_EVENTS:
+                self._handle_button_event(space, event_tag, source_name, source_id)
+            elif event_tag in WIRE_INPUT_EVENTS:
+                self._handle_wire_input_event(space, event_tag, source_name, source_id, transition)
             elif event_tag in SCENARIO_EVENTS:
                 self._handle_scenario_event(space, event, event_tag)
             elif event_tag in VIDEO_EVENTS or event_type_v2 in VIDEO_EVENT_TYPES:
@@ -364,26 +374,30 @@ class SSEManager(EventHandlerMixin):
             # Reduced from 1.0s to 0.3s for faster real-time updates
             await asyncio.sleep(0.3)
             _LOGGER.debug("SSE: Sleep completed at t=%dms", int((time.time() - start_time) * 1000))
-            try:
-                # Set flag to skip event creation during refresh (SSE already created it)
-                self.coordinator._skip_state_change_event = True
-                # CRITICAL: Bypass proxy cache to get fresh group states from Ajax API
-                self.coordinator._bypass_cache_next_refresh = True
-                # Use async_force_metadata_refresh to ensure full_refresh=True
-                # This updates groups, not just hub state
-                await self.coordinator.async_force_metadata_refresh()
-                elapsed = int((time.time() - start_time) * 1000)
-                _LOGGER.info("SSE: Group refresh completed at t=%dms", elapsed)
-            except Exception as err:
-                _LOGGER.error("SSE: Metadata refresh failed after security event: %s", err)
-                # Fallback: apply SSE state directly since refresh failed
-                if state_changed:
-                    space.security_state = new_state
-                    self._last_state_update[space.hub_id] = time.time()
-                    _LOGGER.info("SSE: Fallback state update applied after refresh failure")
-            finally:
-                # Always reset the flag
-                self.coordinator._skip_state_change_event = False
+            # Serialise concurrent security events so the skip-flag and
+            # cache-bypass flag cannot be flipped back to False while another
+            # security refresh is still running.
+            async with self._security_event_lock:
+                try:
+                    # Set flag to skip event creation during refresh (SSE already created it)
+                    self.coordinator._skip_state_change_event = True
+                    # CRITICAL: Bypass proxy cache to get fresh group states from Ajax API
+                    self.coordinator._bypass_cache_next_refresh = True
+                    # Use async_force_metadata_refresh to ensure full_refresh=True
+                    # This updates groups, not just hub state
+                    await self.coordinator.async_force_metadata_refresh()
+                    elapsed = int((time.time() - start_time) * 1000)
+                    _LOGGER.info("SSE: Group refresh completed at t=%dms", elapsed)
+                except Exception as err:
+                    _LOGGER.error("SSE: Metadata refresh failed after security event: %s", err)
+                    # Fallback: apply SSE state directly since refresh failed
+                    if state_changed:
+                        space.security_state = new_state
+                        self._last_state_update[space.hub_id] = time.time()
+                        _LOGGER.info("SSE: Fallback state update applied after refresh failure")
+                finally:
+                    # Always reset the flag
+                    self.coordinator._skip_state_change_event = False
 
         # Update state immediately only for events that don't trigger a refresh
         # For group and full arm/disarm events, the metadata refresh will update the state
@@ -603,35 +617,110 @@ class SSEManager(EventHandlerMixin):
             _LOGGER.warning("SSE: Relay device not found: name=%s, id=%s", source_name, source_id)
 
     def _handle_doorbell_event(self, space, source_name: str, source_id: str) -> None:
-        """Handle doorbell ring events."""
+        """Handle doorbell ring events.
+
+        The Ajax Doorbell can be either a regular device or a Video Edge.
+        """
         dev = self._find_device(space, source_name, source_id)
+        device_id: str | None = None
+        device_name: str | None = None
+
         if dev:
-            # Store the last ring time in device attributes
+            device_id = dev.id
+            device_name = dev.name
             dev.attributes["last_ring"] = datetime.now(UTC).isoformat()
             dev.last_trigger_time = datetime.now(UTC)
-
-            # Set the doorbell_ring state to True (will auto-reset)
             dev.attributes["doorbell_ring"] = True
 
-            # Fire a Home Assistant event for automations
-            self.coordinator.hass.bus.async_fire(
-                "ajax_doorbell_ring",
-                {
-                    "device_id": dev.id,
-                    "device_name": dev.name,
-                    "space_name": space.name,
-                },
-            )
-
-            _LOGGER.info("SSE instant: %s -> doorbell ring", dev.name)
-
-            # Schedule auto-reset of doorbell_ring state after 10 seconds
             self._schedule_later(
                 10.0,
                 lambda: self._reset_doorbell_ring(space.id, dev.id),
             )
         else:
+            for ve in space.video_edges.values():
+                if (source_id and ve.id == source_id) or (source_name and ve.name == source_name):
+                    device_id = ve.id
+                    device_name = ve.name
+                    ve.detections["doorbell_ring"] = True
+                    break
+
+        if device_id:
+            self.coordinator.hass.bus.async_fire(
+                "ajax_doorbell_ring",
+                {
+                    "device_id": device_id,
+                    "device_name": device_name,
+                    "space_name": space.name,
+                },
+            )
+
+            event_entity = self.coordinator._event_entities.get(f"{device_id}_doorbell_press")
+            if event_entity is not None:
+                event_entity.fire("ring")
+
+            _LOGGER.info("SSE instant: %s -> doorbell ring", source_name)
+        else:
             _LOGGER.warning("SSE: Doorbell device not found: name=%s, id=%s", source_name, source_id)
+
+    def _handle_button_event(self, space, event_tag: str, source_name: str, source_id: str) -> None:
+        """Handle button press events (single/double/long/panic/emergency)."""
+        event_data = BUTTON_EVENTS.get(event_tag)
+        if event_data is None:
+            return
+        action, _ = event_data
+
+        dev = self._find_device(space, source_name, source_id)
+        if not dev:
+            _LOGGER.warning("SSE: Button device not found: %s (id=%s)", source_name, source_id)
+            return
+
+        dev.attributes["last_action"] = action
+        dev.last_trigger_time = datetime.now(UTC)
+
+        self.coordinator.hass.bus.async_fire(
+            "ajax_button_pressed",
+            {
+                "device_id": dev.id,
+                "device_name": dev.name,
+                "action": action,
+                "space_name": space.name,
+            },
+        )
+
+        event_entity = self.coordinator._event_entities.get(f"{dev.id}_button_press")
+        if event_entity is not None:
+            event_entity.fire(action)
+
+        _LOGGER.info("SSE instant: %s -> %s (button)", source_name, action)
+
+    def _handle_wire_input_event(
+        self,
+        space,
+        event_tag: str,
+        source_name: str,
+        source_id: str,
+        transition: str,
+    ) -> None:
+        """Handle WireInput alarm events (intrusion, S1/S2/S3, roller shutter)."""
+        event_data = WIRE_INPUT_EVENTS.get(event_tag)
+        if event_data is None:
+            return
+        action, is_triggered = event_data
+
+        if transition == "RECOVERED":
+            is_triggered = False
+        elif transition == "TRIGGERED":
+            is_triggered = True
+
+        dev = self._find_device(space, source_name, source_id)
+        if not dev:
+            _LOGGER.warning("SSE: WireInput device not found: %s (id=%s)", source_name, source_id)
+            return
+
+        dev.attributes["door_opened"] = is_triggered
+        dev.last_trigger_time = datetime.now(UTC) if is_triggered else None
+
+        _LOGGER.info("SSE instant: %s -> %s (wire input)", source_name, action)
 
     def _handle_lock_event(
         self,
@@ -815,6 +904,9 @@ class SSEManager(EventHandlerMixin):
 
         # Update the channel state with the detection
         self._update_video_detection(video_edge, channel_id, detection_type, True)
+
+        # Fire event entity (modern HA event platform) — parity with doorbell
+        self._fire_video_detection_event(video_edge, detection_type)
 
         _LOGGER.info(
             "SSE instant: %s -> %s detected (channel=%s)",

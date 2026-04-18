@@ -30,6 +30,7 @@ from . import AjaxConfigEntry
 from .const import DOMAIN, MANUFACTURER
 from .coordinator import AjaxDataCoordinator
 from .devices import VideoEdgeHandler, get_device_handler
+from .devices.base import resolve_entity_category
 from .models import (
     VIDEO_EDGE_MODEL_NAMES,
     AjaxDevice,
@@ -687,6 +688,9 @@ class AjaxDeviceSensor(CoordinatorEntity[AjaxDataCoordinator], SensorEntity):
         if "enabled_by_default" in sensor_desc:
             self._attr_entity_registry_enabled_default = sensor_desc["enabled_by_default"]
 
+        if "entity_category" in sensor_desc:
+            self._attr_entity_category = resolve_entity_category(sensor_desc["entity_category"])
+
     @property
     def native_value(self) -> Any:
         """Return the state of the sensor."""
@@ -776,11 +780,7 @@ class AjaxVideoEdgeSensor(CoordinatorEntity[AjaxDataCoordinator], SensorEntity):
 
         # Set entity category if provided (diagnostic, config, etc.)
         if "entity_category" in sensor_desc:
-            cat = sensor_desc["entity_category"]
-            if cat == "diagnostic":
-                self._attr_entity_category = EntityCategory.DIAGNOSTIC
-            elif cat == "config":
-                self._attr_entity_category = EntityCategory.CONFIG
+            self._attr_entity_category = resolve_entity_category(sensor_desc["entity_category"])
 
         # Set enabled by default
         if "enabled_by_default" in sensor_desc:

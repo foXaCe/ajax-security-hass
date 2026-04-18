@@ -122,8 +122,13 @@ class AjaxOnvifManager:
     async def async_start(self, video_edges: list[AjaxVideoEdge]) -> None:
         """Start ONVIF connections for video edges.
 
-        Strategy: If NVR is present, connect only to NVR (it centralizes all cameras).
-        Otherwise, connect to individual cameras.
+        Strategy: connect ONVIF directly to every individual camera and
+        doorbell. The NVR is intentionally skipped — its PullPoint events
+        require a sourceAliases channel→camera mapping that is unreliable
+        (channel 0 has been observed misrouting motion events to the
+        doorbell instead of the actual camera). Each Ajax camera runs its
+        own AI detection and exposes ONVIF events directly, so the NVR
+        adds nothing for the events path.
 
         Args:
             video_edges: List of video edge devices to connect
@@ -134,25 +139,17 @@ class AjaxOnvifManager:
 
         _LOGGER.info("ONVIF: Starting with credentials (user=%s)", self._username)
 
-        # Check if NVR is present - if so, use only NVR for ONVIF
         nvrs = [ve for ve in video_edges if ve.video_edge_type == VideoEdgeType.NVR]
         cameras = [ve for ve in video_edges if ve.video_edge_type != VideoEdgeType.NVR]
+        targets = cameras
 
         if nvrs:
-            # NVR present - connect to NVR(s) + doorbells directly
-            # Doorbells need direct connection because NVR PullPoint
-            # may miss the short RingDetector/Detection events
-            doorbells = [ve for ve in cameras if ve.video_edge_type == VideoEdgeType.DOORBELL]
-            targets = nvrs + doorbells
-            skipped = len(cameras) - len(doorbells)
             _LOGGER.info(
-                "ONVIF: NVR detected - using NVR for events (skipping %d individual cameras, %d doorbell(s) direct)",
-                skipped,
-                len(doorbells),
+                "ONVIF: %d NVR(s) detected and skipped for events; connecting directly to %d camera(s)/doorbell(s)",
+                len(nvrs),
+                len(cameras),
             )
         else:
-            # No NVR - connect to individual cameras
-            targets = cameras
             _LOGGER.info(
                 "ONVIF: No NVR - connecting to %d individual camera(s)",
                 len(cameras),
@@ -189,19 +186,13 @@ class AjaxOnvifManager:
     async def async_update_video_edges(self, video_edges: list[AjaxVideoEdge]) -> None:
         """Update video edges list (add new, remove old).
 
-        Strategy: If NVR is present, use only NVR. Otherwise, use cameras.
+        Same strategy as async_start: connect directly to cameras and
+        doorbells, never via the NVR (channel mapping is unreliable).
 
         Args:
             video_edges: Current list of video edge devices
         """
-        # Apply same NVR priority logic (NVR + doorbells direct)
-        nvrs = [ve for ve in video_edges if ve.video_edge_type == VideoEdgeType.NVR]
-        cameras = [ve for ve in video_edges if ve.video_edge_type != VideoEdgeType.NVR]
-        if nvrs:
-            doorbells = [ve for ve in cameras if ve.video_edge_type == VideoEdgeType.DOORBELL]
-            targets = nvrs + doorbells
-        else:
-            targets = cameras
+        targets = [ve for ve in video_edges if ve.video_edge_type != VideoEdgeType.NVR]
 
         current_ids = {ve.id for ve in targets}
         existing_ids = set(self._clients.keys())

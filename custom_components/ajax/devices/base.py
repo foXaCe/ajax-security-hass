@@ -18,9 +18,32 @@ from typing import TYPE_CHECKING
 from homeassistant.components.binary_sensor import BinarySensorDeviceClass
 from homeassistant.components.sensor import SensorDeviceClass, SensorStateClass
 from homeassistant.const import PERCENTAGE, UnitOfTemperature
+from homeassistant.helpers.entity import EntityCategory
 
 if TYPE_CHECKING:
     from ..models import AjaxDevice
+
+
+_ENTITY_CATEGORY_MAP: dict[str, EntityCategory] = {
+    "diagnostic": EntityCategory.DIAGNOSTIC,
+    "config": EntityCategory.CONFIG,
+}
+
+
+def resolve_entity_category(value: object) -> EntityCategory | None:
+    """Coerce a descriptor's ``entity_category`` field to the HA enum.
+
+    Accepts the enum directly, the legacy string form (``"diagnostic"``,
+    ``"config"``) used throughout the device descriptors, or ``None`` to
+    explicitly mean "default category" (no badge in HA).
+    """
+    if value is None:
+        return None
+    if isinstance(value, EntityCategory):
+        return value
+    if isinstance(value, str):
+        return _ENTITY_CATEGORY_MAP.get(value.lower())
+    return None
 
 
 class AjaxDeviceHandler(ABC):

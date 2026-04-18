@@ -26,6 +26,7 @@ from . import AjaxConfigEntry
 from .const import DOMAIN, MANUFACTURER, SIGNAL_NEW_SMART_LOCK
 from .coordinator import AjaxDataCoordinator
 from .devices import VideoEdgeHandler, get_device_handler
+from .devices.base import resolve_entity_category
 from .models import (
     VIDEO_EDGE_MODEL_NAMES,
     AjaxDevice,
@@ -230,6 +231,9 @@ class AjaxBinarySensor(CoordinatorEntity[AjaxDataCoordinator], BinarySensorEntit
         # Set enabled by default
         if "enabled_by_default" in sensor_desc:
             self._attr_entity_registry_enabled_default = sensor_desc["enabled_by_default"]
+
+        if "entity_category" in sensor_desc:
+            self._attr_entity_category = resolve_entity_category(sensor_desc["entity_category"])
 
         # Force name on entity. Mainly used to assign None (=device name)
         if "name" in sensor_desc:

@@ -20,6 +20,14 @@ if TYPE_CHECKING:
 
 _LOGGER = logging.getLogger(__name__)
 
+VIDEO_DETECTION_EVENT_TYPES: dict[str, str] = {
+    "VIDEO_MOTION": "motion",
+    "VIDEO_HUMAN": "human",
+    "VIDEO_VEHICLE": "vehicle",
+    "VIDEO_PET": "pet",
+    "VIDEO_LINE_CROSSING": "line_crossing",
+}
+
 
 class EventHandlerMixin:
     """Shared device/video-edge lookup and state-update helpers.
@@ -94,6 +102,34 @@ class EventHandlerMixin:
                 entry["active"] = active
                 return
         state_list.append({"type": detection_type, "active": active})
+
+    def _fire_video_detection_event(self, video_edge: AjaxVideoEdge, detection_type: str) -> None:
+        """Fire HA event entity for a video AI detection.
+
+        Mirrors what doorbell ring does (`_handle_doorbell_event`) so that
+        the `event.<camera>_detection` entity actually triggers when the
+        cloud reports motion/human/vehicle/pet via SSE or SQS — without
+        this the entity stays mute outside of ONVIF.
+
+        Also fires the ``ajax_camera_detection`` bus event so the logbook
+        can show a meaningful "<camera> a détecté <type>" line instead of
+        HA's generic "a détecté un événement" fallback.
+        """
+        event_type = VIDEO_DETECTION_EVENT_TYPES.get(detection_type)
+        if not event_type:
+            return
+        event_entity = self.coordinator._event_entities.get(f"{video_edge.id}_detection")
+        if event_entity is not None:
+            event_entity.fire(event_type)
+
+        bus_data: dict[str, str] = {
+            "device_id": video_edge.id,
+            "device_name": video_edge.name,
+            "event_type": event_type,
+        }
+        if event_entity is not None and event_entity.entity_id:
+            bus_data["entity_id"] = event_entity.entity_id
+        self.coordinator.hass.bus.async_fire("ajax_camera_detection", bus_data)
 
     def _reset_doorbell_ring(self, space_id: str, device_id: str) -> None:
         """Clear the transient ``doorbell_ring`` flag for a device."""

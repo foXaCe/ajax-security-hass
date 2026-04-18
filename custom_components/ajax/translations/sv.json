@@ -375,6 +375,12 @@
     "camera": {
       "camera_sub_stream": {
         "name": "Sub-stream"
+      },
+      "nvr_channel": {
+        "name": "Kanal {number}"
+      },
+      "nvr_channel_sub": {
+        "name": "Kanal {number} Sub"
       }
     },
     "device_tracker": {

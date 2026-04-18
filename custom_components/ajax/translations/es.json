@@ -375,6 +375,12 @@
     "camera": {
       "camera_sub_stream": {
         "name": "Flujo secundario"
+      },
+      "nvr_channel": {
+        "name": "Canal {number}"
+      },
+      "nvr_channel_sub": {
+        "name": "Canal {number} Secundario"
       }
     },
     "device_tracker": {

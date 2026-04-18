@@ -375,6 +375,12 @@
     "camera": {
       "camera_sub_stream": {
         "name": "Flux secondaire"
+      },
+      "nvr_channel": {
+        "name": "Canal {number}"
+      },
+      "nvr_channel_sub": {
+        "name": "Canal {number} Secondaire"
       }
     },
     "device_tracker": {
@@ -1521,7 +1527,7 @@
       "message": "Cible invalide pour le service."
     },
     "lock_not_supported": {
-      "message": "Le verrouillage/déverrouillage à distance n'est pas supporté par les smart locks Ajax."
+      "message": "Le verrouillage/déverrouillage à distance n'est pas supporté par les serrures intelligentes Ajax."
     },
     "no_api_key": {
       "message": "Aucune clé API configurée pour cette entité."

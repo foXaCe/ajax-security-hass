@@ -713,7 +713,7 @@ class SQSManager:
 
         device = self._find_device(space, source_name, source_id)
         if device:
-            device.attributes["state"] = is_on
+            device.attributes["is_on"] = is_on
             message = get_event_message(action, self._language)
             _LOGGER.info("SQS instant: %s -> %s", source_name, message)
             return True

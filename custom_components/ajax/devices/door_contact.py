@@ -14,7 +14,6 @@ from homeassistant.components.sensor import (
     SensorStateClass,
 )
 from homeassistant.const import (
-    PERCENTAGE,
     UnitOfTemperature,
 )
 
@@ -101,46 +100,12 @@ class DoorContactHandler(AjaxDeviceHandler):
 
     def get_sensors(self) -> list[dict]:
         """Return sensor entities for door contacts."""
-        sensors = []
-
-        # Battery level - always create even if None, will be updated by notifications
-        # Note: No translation_key needed - HA provides automatic translation for BATTERY device_class
-        sensors.append(
-            {
-                "key": "battery",
-                "device_class": SensorDeviceClass.BATTERY,
-                "native_unit_of_measurement": PERCENTAGE,
-                "state_class": SensorStateClass.MEASUREMENT,
-                "value_fn": lambda: self.device.battery_level if self.device.battery_level is not None else None,
-                "enabled_by_default": True,
-            }
-        )
-
-        # Signal strength - always create even if None, will be updated by notifications
-        sensors.append(
-            {
-                "key": "signal_strength",
-                "translation_key": "signal_strength",
-                "native_unit_of_measurement": PERCENTAGE,
-                "state_class": SensorStateClass.MEASUREMENT,
-                "value_fn": lambda: self.device.signal_strength if self.device.signal_strength is not None else None,
-                "enabled_by_default": True,
-            }
-        )
-
-        # Temperature (DoorProtect Plus)
-        # Note: No translation_key needed - HA provides automatic translation for TEMPERATURE device_class
+        sensors: list[dict] = [
+            self._battery_sensor(),
+            self._signal_strength_percent_sensor(),
+        ]
         if "temperature" in self.device.attributes:
-            sensors.append(
-                {
-                    "key": "temperature",
-                    "device_class": SensorDeviceClass.TEMPERATURE,
-                    "native_unit_of_measurement": UnitOfTemperature.CELSIUS,
-                    "state_class": SensorStateClass.MEASUREMENT,
-                    "value_fn": lambda: self.device.attributes.get("temperature"),
-                    "enabled_by_default": True,
-                }
-            )
+            sensors.append(self._temperature_sensor())
 
         # Note: firmware_version and hardware_version are available on device_info
         # so we don't need separate sensors for them

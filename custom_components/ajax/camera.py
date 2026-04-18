@@ -157,17 +157,27 @@ class AjaxVideoEdgeCamera(CoordinatorEntity[AjaxDataCoordinator], Camera):
             self._attr_unique_id = f"{video_edge.id}_camera_{stream_type}"
 
         # Camera name and default enabled state.
-        # We use translation_key for the generic sub-stream entity so the
+        # For sub-streams without an NVR we use translation_key so the
         # displayed name follows the user's HA language. NVR channel labels
-        # come from the API itself (channel_name) and stay as raw strings.
+        # come from the API itself (channel_name); when absent we fall back
+        # to a translated "Channel N" via translation_placeholders.
         if channel_index is not None:
-            # NVR with multiple channels — rely on the channel label from the API.
-            ch_label = channel_name or f"Channel {channel_index + 1}"
-            if stream_type == "main":
-                self._attr_name = ch_label
+            # NVR channel: prefer API-provided channel_name; otherwise use a
+            # translated "Channel {number}" / "Channel {number} — Sub".
+            if channel_name:
+                if stream_type == "main":
+                    self._attr_name = channel_name
+                else:
+                    self._attr_name = f"{channel_name} Sub"
+                    self._attr_entity_registry_enabled_default = False
             else:
-                self._attr_name = f"{ch_label} Sub"
-                self._attr_entity_registry_enabled_default = False
+                self._attr_has_entity_name = True
+                tr_key = "nvr_channel" if stream_type == "main" else "nvr_channel_sub"
+                self._attr_translation_key = tr_key
+                self._attr_translation_placeholders = {"number": str(channel_index + 1)}
+                self._attr_name = None
+                if stream_type != "main":
+                    self._attr_entity_registry_enabled_default = False
         elif stream_type == "main":
             self._attr_name = None  # Use device name
         else:

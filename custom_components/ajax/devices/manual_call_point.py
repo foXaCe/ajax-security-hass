@@ -13,9 +13,7 @@ from __future__ import annotations
 from homeassistant.components.binary_sensor import BinarySensorDeviceClass
 from homeassistant.components.sensor import (
     SensorDeviceClass,
-    SensorStateClass,
 )
-from homeassistant.const import PERCENTAGE, UnitOfTemperature
 
 from .base import AjaxDeviceHandler
 
@@ -47,44 +45,12 @@ class ManualCallPointHandler(AjaxDeviceHandler):
 
     def get_sensors(self) -> list[dict]:
         """Return sensor entities for MCP."""
-        sensors = []
-
-        # Battery level
-        sensors.append(
-            {
-                "key": "battery",
-                "device_class": SensorDeviceClass.BATTERY,
-                "native_unit_of_measurement": PERCENTAGE,
-                "state_class": SensorStateClass.MEASUREMENT,
-                "value_fn": lambda: self.device.battery_level if self.device.battery_level is not None else None,
-                "enabled_by_default": True,
-            }
-        )
-
-        # Signal strength
-        sensors.append(
-            {
-                "key": "signal_strength",
-                "translation_key": "signal_strength",
-                "native_unit_of_measurement": PERCENTAGE,
-                "state_class": SensorStateClass.MEASUREMENT,
-                "value_fn": lambda: self.device.signal_strength if self.device.signal_strength is not None else None,
-                "enabled_by_default": True,
-            }
-        )
-
-        # Temperature (MCP has built-in temperature sensor)
+        sensors: list[dict] = [
+            self._battery_sensor(),
+            self._signal_strength_percent_sensor(),
+        ]
         if self.device.attributes.get("temperature") is not None:
-            sensors.append(
-                {
-                    "key": "temperature",
-                    "device_class": SensorDeviceClass.TEMPERATURE,
-                    "native_unit_of_measurement": UnitOfTemperature.CELSIUS,
-                    "state_class": SensorStateClass.MEASUREMENT,
-                    "value_fn": lambda: self.device.attributes.get("temperature"),
-                    "enabled_by_default": True,
-                }
-            )
+            sensors.append(self._temperature_sensor())
 
         # Button state as text sensor
         sensors.append(

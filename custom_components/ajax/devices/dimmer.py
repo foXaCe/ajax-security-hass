@@ -15,12 +15,10 @@ from __future__ import annotations
 
 from homeassistant.components.binary_sensor import BinarySensorDeviceClass
 from homeassistant.components.sensor import (
-    SensorDeviceClass,
     SensorStateClass,
 )
 from homeassistant.const import (
     PERCENTAGE,
-    UnitOfTemperature,
 )
 
 from .base import AjaxDeviceHandler
@@ -80,32 +78,9 @@ class DimmerHandler(AjaxDeviceHandler):
 
     def get_sensors(self) -> list[dict]:
         """Return sensor entities for dimmer."""
-        sensors = []
-
-        # Signal strength
-        sensors.append(
-            {
-                "key": "signal_strength",
-                "translation_key": "signal_strength",
-                "native_unit_of_measurement": PERCENTAGE,
-                "state_class": SensorStateClass.MEASUREMENT,
-                "value_fn": lambda: self.device.signal_strength,
-                "enabled_by_default": True,
-            }
-        )
-
-        # Temperature (internal)
+        sensors: list[dict] = [self._signal_strength_percent_sensor()]
         if "temperature" in self.device.attributes:
-            sensors.append(
-                {
-                    "key": "temperature",
-                    "device_class": SensorDeviceClass.TEMPERATURE,
-                    "native_unit_of_measurement": UnitOfTemperature.CELSIUS,
-                    "state_class": SensorStateClass.MEASUREMENT,
-                    "value_fn": lambda: self.device.attributes.get("temperature"),
-                    "enabled_by_default": True,
-                }
-            )
+            sensors.append(self._temperature_sensor())
 
         # Current brightness level (read-only sensor for display)
         sensors.append(
@@ -134,17 +109,8 @@ class DimmerHandler(AjaxDeviceHandler):
                 }
             )
 
-        # Firmware version
         if self.device.firmware_version:
-            sensors.append(
-                {
-                    "key": "firmware_version",
-                    "translation_key": "firmware_version",
-                    "value_fn": lambda: self.device.firmware_version,
-                    "enabled_by_default": False,
-                    "entity_category": "diagnostic",
-                }
-            )
+            sensors.append(self._firmware_version_sensor())
 
         return sensors
 

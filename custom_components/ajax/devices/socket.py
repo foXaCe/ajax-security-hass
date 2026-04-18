@@ -14,12 +14,10 @@ from homeassistant.components.sensor import (
     SensorStateClass,
 )
 from homeassistant.const import (
-    PERCENTAGE,
     UnitOfElectricCurrent,
     UnitOfElectricPotential,
     UnitOfEnergy,
     UnitOfPower,
-    UnitOfTemperature,
 )
 
 from .base import AjaxDeviceHandler
@@ -58,30 +56,9 @@ class SocketHandler(AjaxDeviceHandler):
         """Return sensor entities for sockets/relays."""
         sensors = []
 
-        # Signal strength (percentage based on signalLevel)
-        sensors.append(
-            {
-                "key": "signal_strength",
-                "translation_key": "signal_strength",
-                "native_unit_of_measurement": PERCENTAGE,
-                "state_class": SensorStateClass.MEASUREMENT,
-                "value_fn": lambda: self.device.signal_strength if self.device.signal_strength is not None else None,
-                "enabled_by_default": True,
-            }
-        )
-
-        # Temperature (Socket has internal temperature sensor)
+        sensors.append(self._signal_strength_percent_sensor())
         if "temperature" in self.device.attributes:
-            sensors.append(
-                {
-                    "key": "temperature",
-                    "device_class": SensorDeviceClass.TEMPERATURE,
-                    "native_unit_of_measurement": UnitOfTemperature.CELSIUS,
-                    "state_class": SensorStateClass.MEASUREMENT,
-                    "value_fn": lambda: self.device.attributes.get("temperature"),
-                    "enabled_by_default": True,
-                }
-            )
+            sensors.append(self._temperature_sensor())
 
         # Power consumption (Socket with power monitoring)
         # Check both normalized and raw attribute names
@@ -175,17 +152,9 @@ class SocketHandler(AjaxDeviceHandler):
                 }
             )
 
-        # Firmware version (uses device.firmware_version, populated by coordinator)
+        # Firmware version helper avoids duplicating the diagnostic sensor descriptor.
         if self.device.firmware_version:
-            sensors.append(
-                {
-                    "key": "firmware_version",
-                    "translation_key": "firmware_version",
-                    "value_fn": lambda: self.device.firmware_version,
-                    "enabled_by_default": False,
-                    "entity_category": "diagnostic",
-                }
-            )
+            sensors.append(self._firmware_version_sensor())
 
         return sensors
 

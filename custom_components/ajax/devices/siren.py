@@ -9,14 +9,6 @@ Handles:
 from __future__ import annotations
 
 from homeassistant.components.binary_sensor import BinarySensorDeviceClass
-from homeassistant.components.sensor import (
-    SensorDeviceClass,
-    SensorStateClass,
-)
-from homeassistant.const import (
-    PERCENTAGE,
-    UnitOfTemperature,
-)
 
 from .base import AjaxDeviceHandler
 
@@ -59,48 +51,13 @@ class SirenHandler(AjaxDeviceHandler):
 
     def get_sensors(self) -> list[dict]:
         """Return sensor entities for sirens."""
-        sensors = []
-
-        # Battery level - only create if device has battery
-        # Note: No translation_key needed - HA provides automatic translation for BATTERY device_class
+        sensors: list[dict] = []
         if self.device.battery_level is not None:
-            sensors.append(
-                {
-                    "key": "battery",
-                    "device_class": SensorDeviceClass.BATTERY,
-                    "native_unit_of_measurement": PERCENTAGE,
-                    "state_class": SensorStateClass.MEASUREMENT,
-                    "value_fn": lambda: self.device.battery_level,
-                    "enabled_by_default": True,
-                }
-            )
-
-        # Signal strength - only create if device has signal
+            sensors.append(self._battery_sensor())
         if self.device.signal_strength is not None:
-            sensors.append(
-                {
-                    "key": "signal_strength",
-                    "translation_key": "signal_strength",
-                    "native_unit_of_measurement": PERCENTAGE,
-                    "state_class": SensorStateClass.MEASUREMENT,
-                    "value_fn": lambda: self.device.signal_strength,
-                    "enabled_by_default": True,
-                }
-            )
-
-        # Temperature
-        # Note: No translation_key needed - HA provides automatic translation for TEMPERATURE device_class
+            sensors.append(self._signal_strength_percent_sensor())
         if "temperature" in self.device.attributes:
-            sensors.append(
-                {
-                    "key": "temperature",
-                    "device_class": SensorDeviceClass.TEMPERATURE,
-                    "native_unit_of_measurement": UnitOfTemperature.CELSIUS,
-                    "state_class": SensorStateClass.MEASUREMENT,
-                    "value_fn": lambda: self.device.attributes.get("temperature"),
-                    "enabled_by_default": True,
-                }
-            )
+            sensors.append(self._temperature_sensor())
 
         # Note: Volume and duration are now selects (controllable)
 

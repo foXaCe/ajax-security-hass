@@ -26,6 +26,7 @@ from typing import TYPE_CHECKING, Any
 
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 
+from ._event_helpers import EventHandlerMixin
 from .const import SIGNAL_NEW_SMART_LOCK
 from .event_codes import (
     DEFAULT_LANGUAGE,
@@ -239,7 +240,7 @@ SECURITY_EVENT_ACTIONS = {
 }
 
 
-class SQSManager:
+class SQSManager(EventHandlerMixin):
     """Manager for AWS SQS real-time event integration."""
 
     # Don't let REST overwrite SQS state for this many seconds
@@ -868,24 +869,6 @@ class SQSManager:
         _LOGGER.warning("SQS: Doorbell device %s not found", source_name)
         return False
 
-    def _reset_doorbell_ring(self, space_id: str, device_id: str) -> None:
-        """Reset doorbell ring state after timeout."""
-        try:
-            if not self.coordinator.account:
-                return
-
-            space = self.coordinator.account.spaces.get(space_id)
-            if not space:
-                return
-
-            device = space.devices.get(device_id)
-            if device:
-                device.attributes["doorbell_ring"] = False
-                _LOGGER.debug("Doorbell ring auto-reset: %s", device.name)
-                self.coordinator.async_set_updated_data(self.coordinator.account)
-        except Exception as err:
-            _LOGGER.debug("Error resetting doorbell ring: %s", err)
-
     async def _handle_scenario_event(self, space, event_tag: str, source_name: str, additional_data_v2: list) -> bool:
         """Handle scenario events that might be triggered by a Button.
 
@@ -1221,85 +1204,6 @@ class SQSManager:
         smart_lock.last_sse_event_time = datetime.now(UTC)
 
         return True
-
-    def _find_video_edge(self, space, source_name: str, source_id: str):
-        """Find video edge device by name or ID.
-
-        Returns a tuple of (video_edge, channel_id).
-        For NVR devices, source_id might be the channel ID.
-        """
-        # Try by exact ID match first
-        if source_id:
-            if source_id in space.video_edges:
-                return space.video_edges[source_id], None
-
-            # For NVR: the source_id might be a channel ID
-            # Try to find the video edge that has this channel
-            for video_edge in space.video_edges.values():
-                for channel in video_edge.channels:
-                    if isinstance(channel, dict) and channel.get("id") == source_id:
-                        return video_edge, source_id
-
-        # Fall back to name match
-        if source_name:
-            for video_edge in space.video_edges.values():
-                if video_edge.name == source_name:
-                    return video_edge, None
-
-                # For NVR: check channel names
-                for channel in video_edge.channels:
-                    if isinstance(channel, dict) and channel.get("name") == source_name:
-                        return video_edge, channel.get("id")
-
-        return None, None
-
-    def _update_video_detection(
-        self,
-        video_edge,
-        channel_id: str | None,
-        detection_type: str,
-        active: bool,
-    ) -> None:
-        """Update video edge channel state with detection.
-
-        The detection is stored in the channel's state array as:
-        {"type": "VIDEO_MOTION", "active": True}
-        """
-        channels = video_edge.channels
-        if not isinstance(channels, list):
-            return
-
-        # Find target channel (first one if no channel_id specified)
-        target_channel = None
-        for channel in channels:
-            if isinstance(channel, dict) and (channel_id is None or channel.get("id") == channel_id):
-                target_channel = channel
-                break
-
-        if not target_channel:
-            # Create a default channel if none exists
-            if channel_id is None and not channels:
-                target_channel = {"id": "0", "state": []}
-                channels.append(target_channel)
-            else:
-                return
-
-        # Ensure state is a list
-        if not isinstance(target_channel.get("state"), list):
-            target_channel["state"] = []
-
-        # Find existing detection entry or create new one
-        state_list = target_channel["state"]
-        detection_entry = None
-        for entry in state_list:
-            if isinstance(entry, dict) and entry.get("type") == detection_type:
-                detection_entry = entry
-                break
-
-        if detection_entry:
-            detection_entry["active"] = active
-        else:
-            state_list.append({"type": detection_type, "active": active})
 
     def _reset_video_detection(
         self,

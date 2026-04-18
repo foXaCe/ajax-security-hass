@@ -841,3 +841,31 @@ async def async_migrate_entry(hass: HomeAssistant, entry: AjaxConfigEntry) -> bo
         entry.minor_version,
     )
     return True
+
+
+async def async_remove_config_entry_device(
+    hass: HomeAssistant,
+    config_entry: AjaxConfigEntry,
+    device_entry: dr.DeviceEntry,
+) -> bool:
+    """Allow the user to delete an Ajax device from Home Assistant.
+
+    Returns True when the device is no longer known by the coordinator
+    (either because the hardware was removed on the Ajax side or because
+    a prior integration release no longer exposes it). Returning True
+    lets Home Assistant clear the orphaned entries from the registry.
+    """
+    coordinator = config_entry.runtime_data
+    if coordinator is None or coordinator.account is None:
+        return True
+
+    known_ids: set[str] = set()
+    for space in coordinator.account.spaces.values():
+        known_ids.add(space.id)
+        if space.hub_id:
+            known_ids.add(space.hub_id)
+        known_ids.update(space.devices.keys())
+        known_ids.update(space.video_edges.keys())
+        known_ids.update(space.smart_locks.keys())
+
+    return all(not (domain == DOMAIN and identifier in known_ids) for domain, identifier in device_entry.identifiers)

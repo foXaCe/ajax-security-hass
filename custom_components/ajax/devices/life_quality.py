@@ -112,29 +112,9 @@ class LifeQualityHandler(AjaxDeviceHandler):
             }
         )
 
-        # Battery level
-        sensors.append(
-            {
-                "key": "battery",
-                "device_class": SensorDeviceClass.BATTERY,
-                "native_unit_of_measurement": PERCENTAGE,
-                "state_class": SensorStateClass.MEASUREMENT,
-                "value_fn": lambda: self.device.battery_level if self.device.battery_level is not None else None,
-                "enabled_by_default": True,
-            }
-        )
-
-        # Signal strength
-        sensors.append(
-            {
-                "key": "signal_strength",
-                "translation_key": "signal_strength",
-                "native_unit_of_measurement": PERCENTAGE,
-                "state_class": SensorStateClass.MEASUREMENT,
-                "value_fn": lambda: self.device.signal_strength if self.device.signal_strength is not None else None,
-                "enabled_by_default": True,
-            }
-        )
+        # Battery + signal via shared helpers.
+        sensors.append(self._battery_sensor())
+        sensors.append(self._signal_strength_percent_sensor())
 
         # Calibration state
         if "calibrationState" in self.device.attributes:

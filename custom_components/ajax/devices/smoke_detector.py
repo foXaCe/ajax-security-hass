@@ -18,8 +18,6 @@ from homeassistant.components.sensor import (
 )
 from homeassistant.const import (
     CONCENTRATION_PARTS_PER_MILLION,
-    PERCENTAGE,
-    UnitOfTemperature,
 )
 
 from .base import AjaxDeviceHandler
@@ -120,46 +118,12 @@ class SmokeDetectorHandler(AjaxDeviceHandler):
 
     def get_sensors(self) -> list[dict]:
         """Return sensor entities for smoke detectors."""
-        sensors = []
-
-        # Battery level - always create (all FireProtect are battery powered)
-        # Note: No translation_key needed - HA provides automatic translation for BATTERY device_class
-        sensors.append(
-            {
-                "key": "battery",
-                "device_class": SensorDeviceClass.BATTERY,
-                "native_unit_of_measurement": PERCENTAGE,
-                "state_class": SensorStateClass.MEASUREMENT,
-                "value_fn": lambda: self.device.battery_level if self.device.battery_level is not None else None,
-                "enabled_by_default": True,
-            }
-        )
-
-        # Signal strength - always create
-        sensors.append(
-            {
-                "key": "signal_strength",
-                "translation_key": "signal_strength",
-                "native_unit_of_measurement": PERCENTAGE,
-                "state_class": SensorStateClass.MEASUREMENT,
-                "value_fn": lambda: self.device.signal_strength if self.device.signal_strength is not None else None,
-                "enabled_by_default": True,
-            }
-        )
-
-        # Temperature (FireProtect Plus, FireProtect 2)
-        # Note: No translation_key needed - HA provides automatic translation for TEMPERATURE device_class
+        sensors: list[dict] = [
+            self._battery_sensor(),
+            self._signal_strength_percent_sensor(),
+        ]
         if "temperature" in self.device.attributes:
-            sensors.append(
-                {
-                    "key": "temperature",
-                    "device_class": SensorDeviceClass.TEMPERATURE,
-                    "native_unit_of_measurement": UnitOfTemperature.CELSIUS,
-                    "state_class": SensorStateClass.MEASUREMENT,
-                    "value_fn": lambda: self.device.attributes.get("temperature"),
-                    "enabled_by_default": True,
-                }
-            )
+            sensors.append(self._temperature_sensor())
 
         # CO level (FireProtect Plus, FireProtect 2)
         # Note: No translation_key needed - HA provides automatic translation for CO device_class
@@ -194,15 +158,7 @@ class SmokeDetectorHandler(AjaxDeviceHandler):
 
         # Firmware version (uses device.firmware_version, populated by coordinator)
         if self.device.firmware_version:
-            sensors.append(
-                {
-                    "key": "firmware_version",
-                    "translation_key": "firmware_version",
-                    "value_fn": lambda: self.device.firmware_version,
-                    "enabled_by_default": False,
-                    "entity_category": "diagnostic",
-                }
-            )
+            sensors.append(self._firmware_version_sensor())
 
         return sensors
 

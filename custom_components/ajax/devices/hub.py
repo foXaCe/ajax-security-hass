@@ -17,7 +17,6 @@ from homeassistant.components.sensor import (
     SensorStateClass,
 )
 from homeassistant.const import (
-    PERCENTAGE,
     SIGNAL_STRENGTH_DECIBELS_MILLIWATT,
 )
 
@@ -117,20 +116,7 @@ class HubHandler(AjaxDeviceHandler):
 
     def get_sensors(self) -> list[dict]:
         """Return sensor entities for hub."""
-        sensors = []
-
-        # Hub battery level - always create (uses device.battery_level, populated by coordinator)
-        # Note: No translation_key needed - HA provides automatic translation for BATTERY device_class
-        sensors.append(
-            {
-                "key": "battery",
-                "device_class": SensorDeviceClass.BATTERY,
-                "native_unit_of_measurement": PERCENTAGE,
-                "state_class": SensorStateClass.MEASUREMENT,
-                "value_fn": lambda: self.device.battery_level if self.device.battery_level is not None else None,
-                "enabled_by_default": True,
-            }
-        )
+        sensors: list[dict] = [self._battery_sensor()]
 
         # GSM signal level
         if "gsm_signal_level" in self.device.attributes:

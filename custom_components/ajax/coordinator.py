@@ -2245,8 +2245,12 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
                 if (now - last_detected).total_seconds() > expiry_seconds:
                     device.attributes["motion_detected"] = False
             except (ValueError, TypeError) as err:
-                _LOGGER.warning(
-                    "Failed to parse motion_detected_at timestamp for %s: %s",
+                # Drop the bad value so we stop re-trying (and re-logging)
+                # every tick. The next motion event will repopulate it.
+                device.attributes.pop("motion_detected_at", None)
+                device.attributes["motion_detected"] = False
+                _LOGGER.debug(
+                    "Discarded unparsable motion_detected_at for %s: %s",
                     device.name,
                     err,
                 )

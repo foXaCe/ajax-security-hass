@@ -11,7 +11,7 @@ from __future__ import annotations
 import logging
 
 from homeassistant.components.number import NumberEntity, NumberMode
-from homeassistant.const import PERCENTAGE, UnitOfElectricCurrent
+from homeassistant.const import DEGREE, PERCENTAGE, UnitOfElectricCurrent
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers.device_registry import DeviceInfo
@@ -236,7 +236,7 @@ class AjaxTiltDegreesNumber(AjaxDoorPlusBaseNumber):
     _attr_native_min_value = 5
     _attr_native_max_value = 25
     _attr_native_step = 5
-    _attr_native_unit_of_measurement = "°"
+    _attr_native_unit_of_measurement = DEGREE
 
     def __init__(self, coordinator: AjaxDataCoordinator, space_id: str, device_id: str) -> None:
         super().__init__(coordinator, space_id, device_id)
@@ -267,7 +267,7 @@ class AjaxTiltDegreesNumber(AjaxDoorPlusBaseNumber):
             )
 
         if not space.hub_id:
-            raise HomeAssistantError("hub_not_found")
+            raise HomeAssistantError(translation_domain=DOMAIN, translation_key="hub_not_found")
 
         try:
             await self.coordinator.api.async_update_device(
@@ -344,7 +344,7 @@ class AjaxCurrentThresholdNumber(CoordinatorEntity[AjaxDataCoordinator], NumberE
             )
 
         if not space.hub_id:
-            raise HomeAssistantError("hub_not_found")
+            raise HomeAssistantError(translation_domain=DOMAIN, translation_key="hub_not_found")
 
         try:
             await self.coordinator.api.async_update_device(
@@ -423,7 +423,7 @@ class AjaxLedBrightnessV2Number(CoordinatorEntity[AjaxDataCoordinator], NumberEn
             )
 
         if not space.hub_id:
-            raise HomeAssistantError("hub_not_found")
+            raise HomeAssistantError(translation_domain=DOMAIN, translation_key="hub_not_found")
 
         try:
             await self.coordinator.api.async_update_device(
@@ -513,10 +513,10 @@ class AjaxDimmerNumber(CoordinatorEntity[AjaxDataCoordinator], NumberEntity):
         space = self.coordinator.get_space(self._space_id)
         device = self._get_device()
         if not space or not device:
-            raise HomeAssistantError("Device not found")
+            raise HomeAssistantError(translation_domain=DOMAIN, translation_key="device_not_found")
 
         if not space.hub_id:
-            raise HomeAssistantError("Hub not found")
+            raise HomeAssistantError(translation_domain=DOMAIN, translation_key="hub_not_found")
 
         api_key = self._number_def["api_key"]
 

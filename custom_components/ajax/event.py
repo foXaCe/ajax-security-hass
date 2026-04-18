@@ -60,8 +60,6 @@ async def async_setup_entry(
                         event_desc=event_desc,
                     )
                     entities.append(entity)
-                    # Register in coordinator for SQS/SSE event firing
-                    coordinator._event_entities[f"{device_id}_{event_desc['key']}"] = entity
                     _LOGGER.debug(
                         "Created event entity '%s' for device: %s",
                         event_desc["key"],
@@ -118,7 +116,6 @@ async def async_setup_entry(
                     event_desc=event_desc,
                 )
                 entities.append(entity)
-                coordinator._event_entities[unique_id] = entity
                 _LOGGER.debug(
                     "Created event entity '%s' for video edge: %s",
                     event_desc["key"],
@@ -147,7 +144,6 @@ async def async_setup_entry(
                 event_desc=event_desc,
             )
             entities.append(entity)
-            coordinator._event_entities[unique_id] = entity
             _LOGGER.debug(
                 "Created event entity 'smart_lock_event' for smart lock: %s",
                 smart_lock.name,
@@ -187,6 +183,16 @@ class AjaxEventEntity(CoordinatorEntity[AjaxDataCoordinator], EventEntity):
         # Fallback name if translation_key is not resolved
         self._attr_name = event_desc.get("name")
         self._attr_entity_registry_enabled_default = event_desc.get("enabled_by_default", True)
+
+    async def async_added_to_hass(self) -> None:
+        """Register entity in coordinator dispatch map."""
+        await super().async_added_to_hass()
+        self.coordinator._event_entities[self._attr_unique_id] = self
+
+    async def async_will_remove_from_hass(self) -> None:
+        """Remove entity from coordinator dispatch map to avoid stale refs."""
+        self.coordinator._event_entities.pop(self._attr_unique_id, None)
+        await super().async_will_remove_from_hass()
 
     @property
     def device_info(self) -> DeviceInfo | None:
@@ -229,7 +235,8 @@ class AjaxEventEntity(CoordinatorEntity[AjaxDataCoordinator], EventEntity):
         """Fire an event."""
         if event_type in self._attr_event_types:
             self._trigger_event(event_type, event_attributes)
-            self.async_write_ha_state()
+            if self.hass is not None:
+                self.async_write_ha_state()
             _LOGGER.debug(
                 "Event fired: %s -> %s",
                 self._device_id,

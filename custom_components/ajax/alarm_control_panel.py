@@ -151,7 +151,9 @@ class AjaxAlarmControlPanel(CoordinatorEntity[AjaxDataCoordinator], AlarmControl
             SecurityState.TRIGGERED: AlarmControlPanelState.TRIGGERED,
         }
 
-        return state_map.get(space.security_state, AlarmControlPanelState.DISARMED)
+        # Unknown states return None (HA displays "unknown") rather than
+        # a misleading DISARMED default for an alarm panel.
+        return state_map.get(space.security_state)
 
     async def async_alarm_disarm(self, code: str | None = None) -> None:
         """Send disarm command."""
@@ -348,7 +350,7 @@ class AjaxGroupAlarmControlPanel(CoordinatorEntity[AjaxDataCoordinator], AlarmCo
             GroupState.NONE: AlarmControlPanelState.DISARMED,
         }
 
-        return state_map.get(group.state, AlarmControlPanelState.DISARMED)
+        return state_map.get(group.state)
 
     async def async_alarm_disarm(self, code: str | None = None) -> None:
         """Send disarm command for this group."""

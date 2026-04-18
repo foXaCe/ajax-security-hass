@@ -3,12 +3,21 @@
 This module defines the base class that all device-specific handlers inherit from.
 Each handler knows which Home Assistant entities (sensors, binary sensors, switches, etc.)
 should be created for that specific device type.
+
+It also exposes small helpers (`_battery_sensor`, `_tamper_binary_sensor`,
+`_temperature_sensor`, `_signal_strength_percent_sensor`,
+`_firmware_version_sensor`) so device handlers can declare common entities
+consistently instead of copy-pasting dict literals in every subclass.
 """
 
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
+
+from homeassistant.components.binary_sensor import BinarySensorDeviceClass
+from homeassistant.components.sensor import SensorDeviceClass, SensorStateClass
+from homeassistant.const import PERCENTAGE, UnitOfTemperature
 
 if TYPE_CHECKING:
     from ..models import AjaxDevice
@@ -127,3 +136,75 @@ class AjaxDeviceHandler(ABC):
             List of dicts with alarm panel configuration
         """
         return []
+
+    # ---------------------------------------------------------------------
+    # Helpers: common entity descriptors shared by most handlers.
+    # Returning a dict (not appending) lets each handler control ordering
+    # and optional customisation (enabled_by_default, extra flags).
+    # ---------------------------------------------------------------------
+
+    def _battery_sensor(self, enabled_by_default: bool = True) -> dict:
+        """Build a common battery percentage sensor descriptor."""
+        return {
+            "key": "battery",
+            "device_class": SensorDeviceClass.BATTERY,
+            "native_unit_of_measurement": PERCENTAGE,
+            "state_class": SensorStateClass.MEASUREMENT,
+            "value_fn": lambda: self.device.battery_level,
+            "enabled_by_default": enabled_by_default,
+        }
+
+    def _tamper_binary_sensor(self, enabled_by_default: bool = True) -> dict:
+        """Build a common tamper binary-sensor descriptor."""
+        return {
+            "key": "tamper",
+            "device_class": BinarySensorDeviceClass.TAMPER,
+            "value_fn": lambda: self.device.attributes.get("tampered", False),
+            "enabled_by_default": enabled_by_default,
+        }
+
+    def _temperature_sensor(
+        self,
+        attr: str = "temperature",
+        enabled_by_default: bool = True,
+    ) -> dict:
+        """Build a common temperature sensor descriptor (in °C)."""
+        return {
+            "key": "temperature",
+            "device_class": SensorDeviceClass.TEMPERATURE,
+            "native_unit_of_measurement": UnitOfTemperature.CELSIUS,
+            "state_class": SensorStateClass.MEASUREMENT,
+            "value_fn": lambda: self.device.attributes.get(attr),
+            "enabled_by_default": enabled_by_default,
+        }
+
+    def _signal_strength_percent_sensor(self, enabled_by_default: bool = True) -> dict:
+        """Build a common Jeweller signal-strength sensor (percentage scale)."""
+        return {
+            "key": "signal_strength",
+            "translation_key": "signal_strength",
+            "native_unit_of_measurement": PERCENTAGE,
+            "state_class": SensorStateClass.MEASUREMENT,
+            "value_fn": lambda: self.device.signal_strength,
+            "enabled_by_default": enabled_by_default,
+        }
+
+    def _firmware_version_sensor(self, enabled_by_default: bool = False) -> dict:
+        """Build a firmware-version diagnostic sensor descriptor."""
+        return {
+            "key": "firmware_version",
+            "translation_key": "firmware_version",
+            "value_fn": lambda: self.device.firmware_version,
+            "enabled_by_default": enabled_by_default,
+            "entity_category": "diagnostic",
+        }
+
+    def _problem_binary_sensor(self, enabled_by_default: bool = True) -> dict:
+        """Build a PROBLEM binary-sensor based on device.malfunctions."""
+        return {
+            "key": "problem",
+            "translation_key": "problem",
+            "device_class": BinarySensorDeviceClass.PROBLEM,
+            "value_fn": lambda: bool(self.device.malfunctions),
+            "enabled_by_default": enabled_by_default,
+        }

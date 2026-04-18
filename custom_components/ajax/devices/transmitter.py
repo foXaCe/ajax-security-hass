@@ -14,6 +14,7 @@ from homeassistant.components.sensor import (
 from homeassistant.const import (
     PERCENTAGE,
     UnitOfTemperature,
+    UnitOfTime,
 )
 
 from .base import AjaxDeviceHandler
@@ -118,7 +119,7 @@ class TransmitterHandler(AjaxDeviceHandler):
             {
                 "key": "contact_mode",
                 "translation_key": "contact_mode",
-                "value_fn": lambda: self.device.attributes.get("externalContactStateMode", "").upper(),
+                "value_fn": lambda: (self.device.attributes.get("externalContactStateMode") or "").upper(),
                 "enabled_by_default": False,
             }
         )
@@ -129,7 +130,7 @@ class TransmitterHandler(AjaxDeviceHandler):
                 {
                     "key": "alarm_type",
                     "translation_key": "alarm_type",
-                    "value_fn": lambda: self.device.attributes.get("customAlarmType", "").lower().replace("_", " "),
+                    "value_fn": lambda: (self.device.attributes.get("customAlarmType") or "").lower().replace("_", " "),
                     "enabled_by_default": False,
                 }
             )
@@ -140,7 +141,7 @@ class TransmitterHandler(AjaxDeviceHandler):
                 {
                     "key": "alarm_mode",
                     "translation_key": "alarm_mode",
-                    "value_fn": lambda: self.device.attributes.get("externalContactAlarmMode", "").lower(),
+                    "value_fn": lambda: (self.device.attributes.get("externalContactAlarmMode") or "").lower(),
                     "enabled_by_default": False,
                 }
             )
@@ -152,7 +153,7 @@ class TransmitterHandler(AjaxDeviceHandler):
                     "key": "power_supply_mode",
                     "translation_key": "power_supply_mode",
                     "value_fn": lambda: (
-                        self.device.attributes.get("externalDevicePowerSupplyMode", "").lower().replace("_", " ")
+                        (self.device.attributes.get("externalDevicePowerSupplyMode") or "").lower().replace("_", " ")
                     ),
                     "enabled_by_default": False,
                 }
@@ -164,7 +165,7 @@ class TransmitterHandler(AjaxDeviceHandler):
                 {
                     "key": "arm_delay",
                     "translation_key": "arm_delay",
-                    "native_unit_of_measurement": "s",
+                    "native_unit_of_measurement": UnitOfTime.SECONDS,
                     "value_fn": lambda: self.device.attributes.get("armDelaySeconds", 0),
                     "enabled_by_default": False,
                 }
@@ -176,7 +177,7 @@ class TransmitterHandler(AjaxDeviceHandler):
                 {
                     "key": "alarm_delay",
                     "translation_key": "alarm_delay",
-                    "native_unit_of_measurement": "s",
+                    "native_unit_of_measurement": UnitOfTime.SECONDS,
                     "value_fn": lambda: self.device.attributes.get("alarmDelaySeconds", 0),
                     "enabled_by_default": False,
                 }

@@ -147,7 +147,7 @@ class SirenHandler(AjaxDeviceHandler):
                     "options": ["1", "2", "3", "5", "10", "15"],
                     "value_fn": lambda: str(self.device.attributes.get("alarm_duration", 3)),
                     "api_key": "alarmDuration",
-                    "api_transform": lambda x: int(x),
+                    "api_transform": lambda x: int(x) if str(x).isdigit() else 3,
                     "enabled_by_default": True,
                 }
             )

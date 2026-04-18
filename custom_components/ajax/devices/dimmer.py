@@ -114,7 +114,7 @@ class DimmerHandler(AjaxDeviceHandler):
                 "translation_key": "current_brightness",
                 "native_unit_of_measurement": PERCENTAGE,
                 "state_class": SensorStateClass.MEASUREMENT,
-                "value_fn": lambda: self.device.attributes.get("actualBrightnessCh1", 0),
+                "value_fn": lambda: self.device.attributes.get("actualBrightnessCh1"),
                 "enabled_by_default": False,
                 "entity_category": "diagnostic",
             }
@@ -127,7 +127,7 @@ class DimmerHandler(AjaxDeviceHandler):
                     "key": "data_channel_quality",
                     "translation_key": "data_channel_quality",
                     "value_fn": lambda: (
-                        self.device.attributes.get("dataChannelSignalQuality", "").lower().replace("_", " ")
+                        (self.device.attributes.get("dataChannelSignalQuality") or "").lower().replace("_", " ") or None
                     ),
                     "enabled_by_default": False,
                     "entity_category": "diagnostic",
@@ -362,7 +362,7 @@ class DimmerHandler(AjaxDeviceHandler):
                         "touch_mode_toggle",
                         "touch_mode_blocked",
                     ],
-                    "value_fn": lambda: self.device.attributes.get("touchMode", "").lower(),
+                    "value_fn": lambda: (self.device.attributes.get("touchMode") or "").lower(),
                     "api_key": "touchMode",
                     "api_options": {
                         "touch_mode_toggle_and_slider": "TOUCH_MODE_TOGGLE_AND_SLIDER",
@@ -386,7 +386,9 @@ class DimmerHandler(AjaxDeviceHandler):
                         "curve_type_linear",
                         "curve_type_logarithmic",
                     ],
-                    "value_fn": lambda: self.device.attributes.get("dimmerSettings", {}).get("curveType", "").lower(),
+                    "value_fn": lambda: (
+                        self.device.attributes.get("dimmerSettings", {}).get("curveType") or ""
+                    ).lower(),
                     "api_nested_key": "dimmerSettings",
                     "api_key": "curveType",
                     "api_options": {
@@ -410,7 +412,9 @@ class DimmerHandler(AjaxDeviceHandler):
                         "light_source_leading_edge",
                         "light_source_trailing_edge",
                     ],
-                    "value_fn": lambda: self.device.attributes.get("dimmerSettings", {}).get("lightSource", "").lower(),
+                    "value_fn": lambda: (
+                        self.device.attributes.get("dimmerSettings", {}).get("lightSource") or ""
+                    ).lower(),
                     "api_nested_key": "dimmerSettings",
                     "api_key": "lightSource",
                     "api_options": {

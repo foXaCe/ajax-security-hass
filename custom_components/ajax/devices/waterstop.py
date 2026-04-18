@@ -14,6 +14,7 @@ from homeassistant.components.sensor import (
 from homeassistant.const import (
     PERCENTAGE,
     UnitOfTemperature,
+    UnitOfTime,
 )
 
 from .base import AjaxDeviceHandler
@@ -150,7 +151,7 @@ class WaterStopHandler(AjaxDeviceHandler):
                 {
                     "key": "prevention_period",
                     "translation_key": "waterstop_prevention_period",
-                    "native_unit_of_measurement": "days",
+                    "native_unit_of_measurement": UnitOfTime.DAYS,
                     "value_fn": lambda: self.device.attributes.get("preventionDaysPeriod"),
                     "enabled_by_default": False,
                     "entity_category": "diagnostic",

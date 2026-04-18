@@ -253,14 +253,16 @@ class AjaxShockSensitivitySelect(AjaxDoorPlusBaseSelect):
         device = self._get_device()
         if not device:
             return None
-        value = device.attributes.get("shock_sensor_sensitivity", 0)
-        return SHOCK_SENSITIVITY_OPTIONS.get(value, "low")
+        value = device.attributes.get("shock_sensor_sensitivity")
+        # Return None for unmapped values so HA displays "unknown" rather
+        # than forcing a wrong option.
+        return SHOCK_SENSITIVITY_OPTIONS.get(value)
 
     async def async_select_option(self, option: str) -> None:
         """Change the shock sensor sensitivity."""
         space = self.coordinator.get_space(self._space_id)
         if not space:
-            raise HomeAssistantError("space_not_found")
+            raise HomeAssistantError(translation_domain=DOMAIN, translation_key="space_not_found")
 
         value = SHOCK_SENSITIVITY_VALUES.get(option, 0)
 
@@ -271,7 +273,7 @@ class AjaxShockSensitivitySelect(AjaxDoorPlusBaseSelect):
             )
 
         if not space.hub_id:
-            raise HomeAssistantError("hub_not_found")
+            raise HomeAssistantError(translation_domain=DOMAIN, translation_key="hub_not_found")
 
         try:
             await self.coordinator.api.async_update_device(
@@ -333,17 +335,20 @@ class AjaxLedBrightnessSelect(CoordinatorEntity[AjaxDataCoordinator], SelectEnti
         if not device:
             return None
         # API returns uppercase (MIN/MAX), convert to lowercase for HA
-        value = device.attributes.get("indicationBrightness", "MAX")
-        return value.lower() if value else "max"
+        value = device.attributes.get("indicationBrightness")
+        if not isinstance(value, str):
+            return None
+        lowered = value.lower()
+        return lowered if lowered in LED_BRIGHTNESS_OPTIONS else None
 
     async def async_select_option(self, option: str) -> None:
         """Change the LED brightness."""
         space = self.coordinator.get_space(self._space_id)
         if not space:
-            raise HomeAssistantError("space_not_found")
+            raise HomeAssistantError(translation_domain=DOMAIN, translation_key="space_not_found")
 
         if not space.hub_id:
-            raise HomeAssistantError("hub_not_found")
+            raise HomeAssistantError(translation_domain=DOMAIN, translation_key="hub_not_found")
 
         # Convert lowercase HA option to uppercase for API
         api_value = option.upper()
@@ -407,17 +412,17 @@ class AjaxIndicationModeSelect(CoordinatorEntity[AjaxDataCoordinator], SelectEnt
         device = self._get_device()
         if not device:
             return None
-        api_value = device.attributes.get("indicationMode", "ENABLED")
-        return INDICATION_MODE_OPTIONS.get(api_value, "always")
+        api_value = device.attributes.get("indicationMode")
+        return INDICATION_MODE_OPTIONS.get(api_value)
 
     async def async_select_option(self, option: str) -> None:
         """Change the indication mode."""
         space = self.coordinator.get_space(self._space_id)
         if not space:
-            raise HomeAssistantError("space_not_found")
+            raise HomeAssistantError(translation_domain=DOMAIN, translation_key="space_not_found")
 
         if not space.hub_id:
-            raise HomeAssistantError("hub_not_found")
+            raise HomeAssistantError(translation_domain=DOMAIN, translation_key="hub_not_found")
 
         api_value = INDICATION_MODE_VALUES.get(option, "ENABLED")
 
@@ -510,10 +515,10 @@ class AjaxDimmerSelect(CoordinatorEntity[AjaxDataCoordinator], SelectEntity):
         """Set the select option."""
         space = self.coordinator.get_space(self._space_id)
         if not space:
-            raise HomeAssistantError("space_not_found")
+            raise HomeAssistantError(translation_domain=DOMAIN, translation_key="space_not_found")
 
         if not space.hub_id:
-            raise HomeAssistantError("hub_not_found")
+            raise HomeAssistantError(translation_domain=DOMAIN, translation_key="hub_not_found")
 
         # Get API value from option
         api_options = self._select_def.get("api_options", {})
@@ -598,14 +603,14 @@ class AjaxHandlerSelect(CoordinatorEntity[AjaxDataCoordinator], SelectEntity):
         """Change the select option."""
         space = self.coordinator.get_space(self._space_id)
         if not space:
-            raise HomeAssistantError("space_not_found")
+            raise HomeAssistantError(translation_domain=DOMAIN, translation_key="space_not_found")
 
         if not space.hub_id:
-            raise HomeAssistantError("hub_not_found")
+            raise HomeAssistantError(translation_domain=DOMAIN, translation_key="hub_not_found")
 
         api_key = self._select_desc.get("api_key")
         if not api_key:
-            raise HomeAssistantError("No API key configured for this select")
+            raise HomeAssistantError(translation_domain=DOMAIN, translation_key="no_api_key")
 
         # Transform the option value if needed
         api_options = self._select_desc.get("api_options")

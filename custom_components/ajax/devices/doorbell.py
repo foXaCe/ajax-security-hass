@@ -20,17 +20,12 @@ class DoorbellHandler(AjaxDeviceHandler):
     """Handler for Ajax Doorbell devices."""
 
     def get_binary_sensors(self) -> list[dict]:
-        """Return binary sensor entities for doorbell."""
-        sensors = [
-            # Doorbell ring sensor - indicates when someone pressed the doorbell
-            {
-                "key": "doorbell_ring",
-                "translation_key": "doorbell_ring",
-                "device_class": BinarySensorDeviceClass.OCCUPANCY,
-                "value_fn": lambda: self.device.attributes.get("doorbell_ring", False),
-                "enabled_by_default": True,
-            },
-            # Tamper sensor
+        """Return binary sensor entities for doorbell.
+
+        The doorbell press itself is exposed via the event platform
+        (see get_events); we only expose tamper here.
+        """
+        return [
             {
                 "key": "tamper",
                 "device_class": BinarySensorDeviceClass.TAMPER,
@@ -38,8 +33,6 @@ class DoorbellHandler(AjaxDeviceHandler):
                 "enabled_by_default": True,
             },
         ]
-
-        return sensors
 
     def get_sensors(self) -> list[dict]:
         """Return sensor entities for doorbell."""

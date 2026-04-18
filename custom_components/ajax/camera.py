@@ -397,7 +397,9 @@ class AjaxVideoEdgeCamera(CoordinatorEntity[AjaxDataCoordinator], Camera):
         except TimeoutError:
             _LOGGER.debug("Timeout getting snapshot from %s", self._video_edge.name if self._video_edge else "camera")
         except Exception as err:
-            _LOGGER.debug("Error getting snapshot: %s", err)
+            # Scrub RTSP URL from error messages to avoid leaking credentials
+            err_msg = str(err).replace(rtsp_url, "rtsp://***:***@...") if rtsp_url else str(err)
+            _LOGGER.debug("Error getting snapshot: %s", err_msg)
         finally:
             # Kill orphaned FFmpeg process to prevent zombie/resource leak
             if process is not None and process.returncode is None:

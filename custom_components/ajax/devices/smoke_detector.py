@@ -17,6 +17,7 @@ from homeassistant.components.sensor import (
     SensorStateClass,
 )
 from homeassistant.const import (
+    CONCENTRATION_PARTS_PER_MILLION,
     PERCENTAGE,
     UnitOfTemperature,
 )
@@ -167,7 +168,7 @@ class SmokeDetectorHandler(AjaxDeviceHandler):
                 {
                     "key": "co_level",
                     "device_class": SensorDeviceClass.CO,
-                    "native_unit_of_measurement": "ppm",
+                    "native_unit_of_measurement": CONCENTRATION_PARTS_PER_MILLION,
                     "state_class": SensorStateClass.MEASUREMENT,
                     "value_fn": lambda: self.device.attributes.get("co_level"),
                     "enabled_by_default": True,
@@ -185,7 +186,7 @@ class SmokeDetectorHandler(AjaxDeviceHandler):
                         if isinstance(self.device.malfunctions, list)
                         else str(self.device.malfunctions)
                         if self.device.malfunctions
-                        else "None"
+                        else None
                     ),
                     "enabled_by_default": True,
                 }

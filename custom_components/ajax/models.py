@@ -437,12 +437,10 @@ class AjaxSpace:
         """Get all devices with malfunctions."""
         result = []
         for d in self.devices.values():
-            # malfunctions can be a list or an int
-            if (
-                isinstance(d.malfunctions, list)
-                and len(d.malfunctions) > 0
-                or isinstance(d.malfunctions, int)
-                and d.malfunctions > 0
+            # malfunctions can be a list or an int; parenthesise the two branches
+            # so `or` does not bind more loosely than the `and`s inside.
+            if (isinstance(d.malfunctions, list) and len(d.malfunctions) > 0) or (
+                isinstance(d.malfunctions, int) and d.malfunctions > 0
             ):
                 result.append(d)
         return result

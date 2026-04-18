@@ -71,6 +71,13 @@ class SSEManager:
         self._last_state_update: dict[str, float] = {}  # hub_id -> timestamp
         self._recent_events: dict[str, float] = {}  # event_key -> timestamp
         self._dedup_window = 5  # seconds to ignore duplicate events
+        # Track scheduled call_later handles so we can cancel them on stop()
+        # and strong-ref background tasks so they are not GC'd mid-flight.
+        self._pending_timers: set[asyncio.TimerHandle] = set()
+        self._background_tasks: set[asyncio.Task] = set()
+        # Serialise security_event handlers so overlapping events cannot
+        # flip the coordinator skip-flag in a racy way.
+        self._security_event_lock = asyncio.Lock()
 
     def set_language(self, language: str) -> None:
         """Set language for event messages."""
@@ -97,10 +104,28 @@ class SSEManager:
 
         return success
 
+    def _schedule_later(self, delay: float, callback: callable) -> None:
+        """Wrap hass.loop.call_later to track the handle for cancellation."""
+        handle = self.coordinator.hass.loop.call_later(delay, callback)
+        self._pending_timers.add(handle)
+
+    def _spawn_background(self, coro) -> None:
+        """Create a tracked background task so it cannot be GC'd mid-flight."""
+        task = self.coordinator.hass.async_create_task(coro)
+        self._background_tasks.add(task)
+        task.add_done_callback(self._background_tasks.discard)
+
     async def stop(self) -> None:
         """Stop receiving SSE events."""
         _LOGGER.info("Stopping SSE Manager...")
+        # Cancel all scheduled timers
+        for handle in list(self._pending_timers):
+            handle.cancel()
+        self._pending_timers.clear()
         await self.sse_client.stop()
+        # Let any spawned background tasks finish gracefully
+        if self._background_tasks:
+            await asyncio.gather(*self._background_tasks, return_exceptions=True)
         _LOGGER.info("SSE Manager stopped")
 
     def is_state_protected(self, hub_id: str) -> bool:
@@ -599,7 +624,7 @@ class SSEManager:
             _LOGGER.info("SSE instant: %s -> doorbell ring", dev.name)
 
             # Schedule auto-reset of doorbell_ring state after 10 seconds
-            self.coordinator.hass.loop.call_later(
+            self._schedule_later(
                 10.0,
                 lambda: self._reset_doorbell_ring(space.id, dev.id),
             )
@@ -665,7 +690,7 @@ class SSEManager:
                 # Signal platforms to create entities for the new smart lock
                 async_dispatcher_send(self.coordinator.hass, SIGNAL_NEW_SMART_LOCK, space.id, source_id)
                 # Persist to storage so it survives reboots
-                self.coordinator.hass.async_create_task(self.coordinator._async_save_smart_locks())
+                self._spawn_background(self.coordinator._async_save_smart_locks())
             else:
                 _LOGGER.warning(
                     "SSE: Smart lock event without source_id: tag=%s, name=%s",
@@ -815,7 +840,7 @@ class SSEManager:
         )
 
         # Schedule auto-reset after detection timeout (30 seconds)
-        self.coordinator.hass.loop.call_later(
+        self._schedule_later(
             30.0,
             lambda: self._reset_video_detection(space.id, video_edge.id, channel_id, detection_type),
         )

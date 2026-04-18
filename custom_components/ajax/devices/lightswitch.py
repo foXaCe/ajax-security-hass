@@ -116,7 +116,7 @@ class LightSwitchHandler(AjaxDeviceHandler):
                     "key": "data_channel_quality",
                     "translation_key": "data_channel_quality",
                     "value_fn": lambda: (
-                        self.device.attributes.get("dataChannelSignalQuality", "").lower().replace("_", " ")
+                        (self.device.attributes.get("dataChannelSignalQuality") or "").lower().replace("_", " ")
                     ),
                     "enabled_by_default": False,
                     "entity_category": "diagnostic",
@@ -251,7 +251,7 @@ class LightSwitchHandler(AjaxDeviceHandler):
                         "touch_mode_toggle",
                         "touch_mode_blocked",
                     ],
-                    "value_fn": lambda: self.device.attributes.get("touchMode", "").lower(),
+                    "value_fn": lambda: (self.device.attributes.get("touchMode") or "").lower(),
                     "api_key": "touchMode",
                     "api_options": {
                         "touch_mode_toggle_and_slider": "TOUCH_MODE_TOGGLE_AND_SLIDER",

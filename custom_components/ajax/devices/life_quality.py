@@ -142,7 +142,9 @@ class LifeQualityHandler(AjaxDeviceHandler):
                 {
                     "key": "calibration_state",
                     "translation_key": "calibration_state",
-                    "value_fn": lambda: self.device.attributes.get("calibrationState", "").lower().replace("_", " "),
+                    "value_fn": lambda: (
+                        (self.device.attributes.get("calibrationState") or "").lower().replace("_", " ")
+                    ),
                     "enabled_by_default": False,
                 }
             )
@@ -172,15 +174,16 @@ class LifeQualityHandler(AjaxDeviceHandler):
     def _get_temperature(self) -> float | None:
         """Get temperature in Celsius (API returns 0.1°C units)."""
         actual_temp = self.device.attributes.get("actualTemperature")
-        if actual_temp is not None:
+        if isinstance(actual_temp, (int, float)):
             return round(actual_temp / 10.0, 1)
         # Fallback to integer temperature if available
-        return self.device.attributes.get("temperature")
+        fallback = self.device.attributes.get("temperature")
+        return fallback if isinstance(fallback, (int, float)) else None
 
     def _get_humidity(self) -> float | None:
         """Get humidity in % (API returns 0.1% units)."""
         actual_humidity = self.device.attributes.get("actualHumidity")
-        if actual_humidity is not None:
+        if isinstance(actual_humidity, (int, float)):
             return round(actual_humidity / 10.0, 1)
         return None
 
@@ -193,12 +196,16 @@ class LifeQualityHandler(AjaxDeviceHandler):
         return False
 
     def _is_temperature_problem(self) -> bool:
-        """Check if temperature is outside comfort range."""
-        temp = self.device.attributes.get("actualTemperature")
+        """Check if temperature is outside comfort range.
+
+        actualTemperature is in 0.1°C (e.g. 215 = 21.5°C) while
+        min/maxComfortTemperature are in whole °C — convert before compare.
+        """
+        temp_c = self._get_temperature()
         min_comfort = self.device.attributes.get("minComfortTemperature")
         max_comfort = self.device.attributes.get("maxComfortTemperature")
-        if temp is not None and min_comfort is not None and max_comfort is not None:
-            return temp < min_comfort or temp > max_comfort
+        if temp_c is not None and isinstance(min_comfort, (int, float)) and isinstance(max_comfort, (int, float)):
+            return temp_c < min_comfort or temp_c > max_comfort
         return False
 
     def _is_humidity_problem(self) -> bool:

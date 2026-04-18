@@ -194,7 +194,7 @@ class HubHandler(AjaxDeviceHandler):
                     "key": "gsm_type",
                     "translation_key": "gsm_type",
                     "value_fn": lambda: (
-                        self.device.attributes.get("gsm_type", "").lower()
+                        (self.device.attributes.get("gsm_type") or "").lower()
                         if self.device.attributes.get("gsm_type")
                         else None
                     ),
@@ -272,7 +272,7 @@ class HubHandler(AjaxDeviceHandler):
                         if isinstance(self.device.malfunctions, list)
                         else str(self.device.malfunctions)
                         if self.device.malfunctions
-                        else "None"
+                        else None
                     ),
                     "enabled_by_default": True,
                 }

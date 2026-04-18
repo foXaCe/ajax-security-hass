@@ -259,12 +259,12 @@ class AjaxBinarySensor(CoordinatorEntity[AjaxDataCoordinator], BinarySensorEntit
     @property
     def available(self) -> bool:
         """Return True if entity is available."""
+        if not self.coordinator.last_update_success:
+            return False
         device = self._get_device()
         if not device:
             return False
-
-        # Most sensors require device to be online
-        return device.attributes.get("online", True)
+        return bool(device.online)
 
     async def async_added_to_hass(self) -> None:
         """When entity is added to hass, update device info in registry."""

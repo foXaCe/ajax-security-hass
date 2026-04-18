@@ -31,7 +31,7 @@ class ManualCallPointHandler(AjaxDeviceHandler):
                 "key": "fire_alarm",
                 "translation_key": "mcp_fire_alarm",
                 "device_class": BinarySensorDeviceClass.SAFETY,
-                "value_fn": lambda: self.device.attributes.get("switchState", "").upper() == "BUTTON_PRESSED",
+                "value_fn": lambda: (self.device.attributes.get("switchState") or "").upper() == "BUTTON_PRESSED",
                 "enabled_by_default": True,
             },
             # Tamper sensor
@@ -106,7 +106,7 @@ class ManualCallPointHandler(AjaxDeviceHandler):
                     "translation_key": "device_color",
                     "device_class": SensorDeviceClass.ENUM,
                     "options": ["red", "blue", "white", "black"],
-                    "value_fn": lambda: self.device.attributes.get("color", "").lower(),
+                    "value_fn": lambda: (self.device.attributes.get("color") or "").lower(),
                     "enabled_by_default": False,
                 }
             )

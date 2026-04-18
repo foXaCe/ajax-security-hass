@@ -33,6 +33,7 @@ class AjaxSSEClient:
     RECONNECT_DELAY = 5  # seconds between reconnection attempts
     MAX_RECONNECT_DELAY = 60  # max delay between attempts
     CONNECTION_TIMEOUT = 30  # timeout for initial connection
+    AUTH_FAILURE_THRESHOLD = 3  # persistent 401/403 count before escalating
 
     def __init__(
         self,
@@ -43,6 +44,7 @@ class AjaxSSEClient:
         user_id: str | None = None,
         verify_ssl: bool = True,
         token_provider: Callable[[], str | None] | None = None,
+        on_auth_failure: Callable[[], None] | None = None,
     ):
         """Initialize the SSE client.
 
@@ -67,6 +69,10 @@ class AjaxSSEClient:
         self._task: asyncio.Task | None = None
         self._session: aiohttp.ClientSession | None = None
         self._reconnect_delay = self.RECONNECT_DELAY
+        self._auth_failures = 0
+        self._on_auth_failure = on_auth_failure
+        # Hold strong refs on callback tasks so they are not GC'd mid-flight
+        self._pending_callback_tasks: set[asyncio.Task] = set()
 
     async def start(self) -> bool:
         """Start receiving SSE events.
@@ -156,10 +162,28 @@ class AjaxSSEClient:
         ) as response:
             if response.status != 200:
                 _LOGGER.error("SSE connection failed: HTTP %d", response.status)
+                # Escalate backoff on failure so we don't hammer the server.
+                self._reconnect_delay = min(self._reconnect_delay * 2, self.MAX_RECONNECT_DELAY)
+                if response.status in (401, 403):
+                    self._auth_failures += 1
+                    if self._auth_failures >= self.AUTH_FAILURE_THRESHOLD and self._on_auth_failure:
+                        _LOGGER.error(
+                            "SSE auth failed %d times, signalling reauth",
+                            self._auth_failures,
+                        )
+                        try:
+                            self._on_auth_failure()
+                        except Exception as err:  # noqa: BLE001
+                            _LOGGER.error("on_auth_failure callback error: %s", err)
+                        self._running = False
                 return
 
             _LOGGER.info("SSE connected successfully")
             self._reconnect_delay = self.RECONNECT_DELAY  # Reset on successful connect
+            self._auth_failures = 0  # Reset on successful connect
+
+            # Cap per-line size to prevent memory blow-up on malformed streams
+            MAX_LINE_BYTES = 1 * 1024 * 1024  # 1 MiB
 
             # Read SSE stream
             event_type: str | None = None
@@ -169,7 +193,11 @@ class AjaxSSEClient:
                 if not self._running:
                     break
 
-                line = line_bytes.decode("utf-8").rstrip("\n\r")
+                if len(line_bytes) > MAX_LINE_BYTES:
+                    _LOGGER.warning("SSE line exceeded %d bytes, skipping", MAX_LINE_BYTES)
+                    continue
+
+                line = line_bytes.decode("utf-8", errors="replace").rstrip("\n\r")
 
                 if not line:
                     # Empty line = end of event
@@ -205,8 +233,14 @@ class AjaxSSEClient:
 
             # Call callback
             if self._hass_loop:
-                # Thread-safe callback to HA event loop
-                self._hass_loop.call_soon_threadsafe(lambda: asyncio.create_task(self._async_callback(event_data)))
+                # Thread-safe callback to HA event loop — keep a strong ref so
+                # the task is not garbage-collected before it completes.
+                def _spawn() -> None:
+                    task = asyncio.create_task(self._async_callback(event_data))
+                    self._pending_callback_tasks.add(task)
+                    task.add_done_callback(self._pending_callback_tasks.discard)
+
+                self._hass_loop.call_soon_threadsafe(_spawn)
             else:
                 result = self._callback(event_data)
                 if asyncio.iscoroutine(result):

@@ -119,8 +119,27 @@ class AjaxSQSClient:
         await self.stop_receiving()
         self._queue_url = None
 
+    # Callback timeout must stay well below VISIBILITY_TIMEOUT so redelivered
+    # messages never overlap with an in-flight callback.
+    CALLBACK_TIMEOUT = 10
+
+    # Non-recoverable SQS errors that should stop the loop instead of retrying.
+    _FATAL_CLIENT_ERRORS = frozenset(
+        {
+            "InvalidClientTokenId",
+            "SignatureDoesNotMatch",
+            "AccessDenied",
+            "UnrecognizedClientException",
+            "AWS.SimpleQueueService.NonExistentQueue",
+        }
+    )
+
     def _receive_loop(self) -> None:
-        """Main receive loop (runs in dedicated thread)."""
+        """Main receive loop (runs in dedicated thread).
+
+        Reuses a single aiobotocore client for the lifetime of the thread,
+        avoiding per-message TCP/TLS handshakes and socket leaks.
+        """
         _LOGGER.info("SQS thread started")
 
         # Create event loop for this thread
@@ -128,90 +147,103 @@ class AjaxSQSClient:
         asyncio.set_event_loop(loop)
 
         poll_count = 0
-        consecutive_errors = 0
         try:
+            loop.run_until_complete(self._run_loop_async(lambda: poll_count))
+        finally:
+            try:
+                # Cancel pending tasks before closing the loop.
+                pending = asyncio.all_tasks(loop)
+                for task in pending:
+                    task.cancel()
+                if pending:
+                    loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+            finally:
+                loop.close()
+                _LOGGER.info("SQS thread ended")
+
+    async def _run_loop_async(self, _poll_count_fn) -> None:
+        """Run the poll/handle cycle with a persistent SQS client."""
+        consecutive_errors = 0
+        async with self._make_client() as client:
             while not self._stop_event.is_set():
                 try:
-                    poll_count += 1
-                    messages = loop.run_until_complete(self._poll_messages())
+                    messages = await self._poll_messages(client)
                     consecutive_errors = 0  # Reset on success
                     for msg in messages:
-                        loop.run_until_complete(self._handle_message(msg))
-
-                    # If we got messages, immediately poll again to catch rapid events
-                    # (FIFO queues may have more messages in the same group)
+                        if self._stop_event.is_set():
+                            break
+                        await self._handle_message(client, msg)
                     if messages:
-                        continue  # Skip any wait, poll immediately
-
-                except Exception as err:
-                    _LOGGER.error("SQS poll error: %s", err, exc_info=True)
-                    # Exponential backoff: 5s → 10s → 20s → 30s max
+                        continue  # Poll immediately for rapid FIFO bursts
+                except ClientError as err:
+                    code = err.response.get("Error", {}).get("Code", "")
+                    if code in self._FATAL_CLIENT_ERRORS:
+                        _LOGGER.error("SQS fatal error %s — stopping receive loop", code)
+                        self._stop_event.set()
+                        break
+                    _LOGGER.error("SQS poll error: %s", code or err)
                     backoff = min(5 * (2**consecutive_errors), 30)
                     consecutive_errors += 1
-                    # Wait with stop_event so we can exit quickly on shutdown
-                    self._stop_event.wait(timeout=backoff)
-        finally:
-            loop.close()
-            _LOGGER.info("SQS thread ended after %d polls", poll_count)
+                    await asyncio.get_running_loop().run_in_executor(None, self._stop_event.wait, backoff)
+                except Exception as err:
+                    _LOGGER.error("SQS poll error: %s", err)
+                    backoff = min(5 * (2**consecutive_errors), 30)
+                    consecutive_errors += 1
+                    await asyncio.get_running_loop().run_in_executor(None, self._stop_event.wait, backoff)
 
-    async def _poll_messages(self) -> list[dict]:
-        """Poll SQS for messages."""
+    async def _poll_messages(self, client) -> list[dict]:
+        """Poll SQS for messages using an existing client."""
+        response = await client.receive_message(
+            QueueUrl=self._queue_url,
+            MaxNumberOfMessages=self.MAX_MESSAGES,
+            WaitTimeSeconds=self.WAIT_TIME,
+            VisibilityTimeout=self.VISIBILITY_TIMEOUT,
+        )
+        return response.get("Messages", [])
+
+    async def _delete(self, client, receipt: str, msg_id: str) -> None:
+        """Delete a message, logging failures."""
         try:
-            async with self._make_client() as client:
-                response = await client.receive_message(
-                    QueueUrl=self._queue_url,
-                    MaxNumberOfMessages=self.MAX_MESSAGES,
-                    WaitTimeSeconds=self.WAIT_TIME,
-                    VisibilityTimeout=self.VISIBILITY_TIMEOUT,
-                )
-                return response.get("Messages", [])
-        except ClientError as err:
-            _LOGGER.error("SQS error: %s", err.response["Error"]["Code"])
-            raise
+            await client.delete_message(QueueUrl=self._queue_url, ReceiptHandle=receipt)
+            _LOGGER.debug("SQS: deleted message %s", msg_id)
+        except Exception as del_err:  # noqa: BLE001
+            _LOGGER.error("SQS: failed to delete message %s: %s", msg_id, del_err)
 
-    async def _handle_message(self, message: dict) -> None:
-        """Process a single SQS message."""
+    async def _handle_message(self, client, message: dict) -> None:
+        """Process a single SQS message using the shared client."""
         receipt = message.get("ReceiptHandle")
         msg_id = message.get("MessageId", "")[:8]
 
         try:
-            # Parse the message
             body = json.loads(message.get("Body", "{}"))
 
             # Unwrap SNS envelope if present
             if "Message" in body and isinstance(body["Message"], str):
                 body = json.loads(body["Message"])
 
-            # Extract event info for logging
             event = body.get("event", {})
             event_tag = event.get("eventTag", "?")
             hub_id = event.get("hubId", "?")
             timestamp = event.get("timestamp")
 
             if isinstance(timestamp, (int, float)) and time.time() - timestamp / 1000 > 300:
-                async with self._make_client() as client:
-                    await client.delete_message(
-                        QueueUrl=self._queue_url,
-                        ReceiptHandle=receipt,
-                    )
-                    _LOGGER.debug("SQS: deleted message because too old %s", msg_id)
+                await self._delete(client, receipt, msg_id)
+                _LOGGER.debug("SQS: dropped stale message %s", msg_id)
                 return
 
-            _LOGGER.info("SQS: %s from hub %s (msg=%s)", event_tag, hub_id, msg_id)
+            _LOGGER.debug("SQS: %s from hub %s (msg=%s)", event_tag, hub_id, msg_id)
 
             # Call the callback in Home Assistant's event loop
             if self._callback and self._hass_loop:
                 future = asyncio.run_coroutine_threadsafe(self._callback(body), self._hass_loop)
-                # Wait for callback to complete (with timeout)
                 try:
-                    if not future.result(timeout=15):
+                    if not future.result(timeout=self.CALLBACK_TIMEOUT):
                         try:
-                            async with self._make_client() as client:
-                                await client.change_message_visibility(
-                                    QueueUrl=self._queue_url,
-                                    ReceiptHandle=receipt,
-                                    VisibilityTimeout=0,
-                                )
+                            await client.change_message_visibility(
+                                QueueUrl=self._queue_url,
+                                ReceiptHandle=receipt,
+                                VisibilityTimeout=0,
+                            )
                             _LOGGER.debug("SQS: message made visible again %s", msg_id)
                         except Exception as requeue_err:
                             _LOGGER.error(
@@ -223,34 +255,12 @@ class AjaxSQSClient:
                 except Exception as err:
                     _LOGGER.error("Callback error: %s", err)
 
-            # Delete message from queue
-            async with self._make_client() as client:
-                await client.delete_message(
-                    QueueUrl=self._queue_url,
-                    ReceiptHandle=receipt,
-                )
-                _LOGGER.debug("SQS: deleted message %s", msg_id)
+            await self._delete(client, receipt, msg_id)
 
         except json.JSONDecodeError:
             _LOGGER.error("Invalid JSON in message %s", msg_id)
-            # Still try to delete bad messages
-            try:
-                async with self._make_client() as client:
-                    await client.delete_message(
-                        QueueUrl=self._queue_url,
-                        ReceiptHandle=receipt,
-                    )
-            except Exception:
-                pass
+            await self._delete(client, receipt, msg_id)
         except Exception as err:
             _LOGGER.error("Message %s failed: %s", msg_id, err)
-            # Still try to delete failed messages to unblock FIFO queue
-            try:
-                async with self._make_client() as client:
-                    await client.delete_message(
-                        QueueUrl=self._queue_url,
-                        ReceiptHandle=receipt,
-                    )
-                    _LOGGER.debug("SQS: deleted failed message %s", msg_id)
-            except Exception as del_err:
-                _LOGGER.error("SQS: failed to delete message %s: %s", msg_id, del_err)
+            # Delete failed messages to unblock FIFO queue
+            await self._delete(client, receipt, msg_id)

@@ -42,12 +42,12 @@ from .const import (
     UPDATE_INTERVAL,
     UPDATE_INTERVAL_ARMED,
     UPDATE_INTERVAL_DOOR_SENSORS,
+    AjaxConfigEntry,
 )
 from .models import (
     AjaxAccount,
     AjaxDevice,
     AjaxGroup,
-    AjaxNotification,
     AjaxRoom,
     AjaxSmartLock,
     AjaxSpace,
@@ -122,6 +122,7 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
     def __init__(
         self,
         hass: HomeAssistant,
+        entry: AjaxConfigEntry,
         api: AjaxRestApi,
         aws_access_key_id: str | None = None,
         aws_secret_access_key: str | None = None,
@@ -133,6 +134,7 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
 
         Args:
             hass: Home Assistant instance
+            entry: ConfigEntry this coordinator is bound to
             api: Ajax REST API instance
             aws_access_key_id: AWS access key ID (optional, for SQS in direct mode)
             aws_secret_access_key: AWS secret access key (optional, for SQS in direct mode)
@@ -141,6 +143,7 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
             enabled_spaces: List of space IDs to enable (None = all spaces)
         """
         self.api = api
+        self.config_entry = entry
         self.account: AjaxAccount | None = None
         self._enabled_spaces: list[str] | None = enabled_spaces
         self.all_discovered_spaces: dict[str, str] = {}  # space_id -> name (for options flow)
@@ -168,7 +171,6 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
         # ONVIF local AI detections (optional, for video edge cameras)
         self.onvif_manager: AjaxOnvifManager | None = None
         self._onvif_initialized = False
-        self.config_entry = None  # Set by __init__.py after coordinator creation
 
         # Device details refresh optimization
         # Battery/signal don't change often, so refresh every 5 minutes instead of every poll
@@ -201,6 +203,7 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
         super().__init__(
             hass,
             _LOGGER,
+            config_entry=entry,
             name=DOMAIN,
             update_interval=timedelta(seconds=UPDATE_INTERVAL),
             # Debouncer: Wait 0.5s of silence before triggering refresh
@@ -213,6 +216,34 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
                 immediate=False,
             ),
         )
+
+    @staticmethod
+    def _parse_door_state_from_wiring(external_state: str | None, wiring_details: dict | None) -> bool:
+        """Derive door-opened state from externalContactState + wiring scheme.
+
+        Handles TWO_EOL / ONE_EOL / NO_EOL wiring schemas with the OR logic
+        historically duplicated across update paths. Returns True when the
+        door/contact is considered OPEN.
+        """
+        # Default based on top-level contact state
+        new_state = external_state != "OK" if external_state is not None else False
+        if not isinstance(wiring_details, dict):
+            return new_state
+
+        wiring_type = wiring_details.get("wiringSchemeType")
+        if wiring_type == "TWO_EOL":
+            contact_state = wiring_details.get("contactTwoDetails", {}).get("contactState")
+            if contact_state:
+                new_state = contact_state != "OK"
+        elif wiring_type == "ONE_EOL":
+            contact_state = wiring_details.get("contactDetails", {}).get("contactState")
+            if contact_state and contact_state != "OK":
+                new_state = True
+        elif wiring_type == "NO_EOL":
+            contact_state = wiring_details.get("contactState")
+            if contact_state and contact_state != "OK":
+                new_state = True
+        return new_state
 
     def _update_polling_interval(self, security_state: SecurityState) -> None:
         """Update polling interval based on security state and proxy suggestion.
@@ -366,27 +397,10 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
                                     if reed_closed is not None:
                                         new_door_state = not reed_closed
                                     elif external_state is not None:
-                                        # Default to externalContactState
-                                        new_door_state = external_state != "OK"
-                                        # Check wiringSchemeSpecificDetails for more accurate state
                                         wiring_details = device_data.get("wiringSchemeSpecificDetails", {})
-                                        wiring_type = wiring_details.get("wiringSchemeType")
-                                        if wiring_type == "TWO_EOL":
-                                            contact_two = wiring_details.get("contactTwoDetails", {})
-                                            contact_state = contact_two.get("contactState")
-                                            if contact_state:
-                                                new_door_state = contact_state != "OK"
-                                        elif wiring_type == "ONE_EOL":
-                                            # OR logic: open if externalContactState OR contactDetails says TRIGGERED
-                                            contact_details = wiring_details.get("contactDetails", {})
-                                            contact_state = contact_details.get("contactState")
-                                            if contact_state and contact_state != "OK":
-                                                new_door_state = True
-                                        elif wiring_type == "NO_EOL":
-                                            # OR logic: open if externalContactState OR contactState says TRIGGERED
-                                            contact_state = wiring_details.get("contactState")
-                                            if contact_state and contact_state != "OK":
-                                                new_door_state = True
+                                        new_door_state = self._parse_door_state_from_wiring(
+                                            external_state, wiring_details
+                                        )
                                     else:
                                         # Try attributes as fallback
                                         api_attrs = device_data.get("attributes", {})
@@ -424,25 +438,10 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
                                     external_state = device_data.get("externalContactState")
 
                                     if external_state is not None:
-                                        new_door_state = external_state != "OK"
                                         wiring_details = device_data.get("wiringSchemeSpecificDetails", {})
-                                        wiring_type = wiring_details.get("wiringSchemeType")
-                                        if wiring_type == "TWO_EOL":
-                                            contact_two = wiring_details.get("contactTwoDetails", {})
-                                            contact_state = contact_two.get("contactState")
-                                            if contact_state:
-                                                new_door_state = contact_state != "OK"
-                                        elif wiring_type == "ONE_EOL":
-                                            # OR logic: open if externalContactState OR contactDetails says TRIGGERED
-                                            contact_details = wiring_details.get("contactDetails", {})
-                                            contact_state = contact_details.get("contactState")
-                                            if contact_state and contact_state != "OK":
-                                                new_door_state = True
-                                        elif wiring_type == "NO_EOL":
-                                            # OR logic: open if externalContactState OR contactState says TRIGGERED
-                                            contact_state = wiring_details.get("contactState")
-                                            if contact_state and contact_state != "OK":
-                                                new_door_state = True
+                                        new_door_state = self._parse_door_state_from_wiring(
+                                            external_state, wiring_details
+                                        )
 
                                         if old_door_state != new_door_state:
                                             device.attributes["door_opened"] = new_door_state
@@ -1166,8 +1165,8 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
                 if space_binding and space_binding.get("name"):
                     hub_name = str(space_binding.get("name"))
                     self.all_discovered_spaces[hub_id] = hub_name
-            except Exception:  # noqa: S110
-                pass  # Keep the fallback name
+            except AjaxRestApiError as err:
+                _LOGGER.debug("Could not resolve space name for %s: %s", hub_id, err)
 
             # Skip spaces that are not enabled
             if self._enabled_spaces is not None and hub_id not in self._enabled_spaces:
@@ -1465,12 +1464,8 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
         # The detailed data is nested in a "model" object that we merge into the device
         devices_list = await self.api.async_get_devices(space.hub_id, enrich=True)
 
-        # Check if we need to refresh battery/signal (every 5 minutes)
-        current_time = time.time()
-        need_details_refresh = current_time - self._last_device_details_refresh >= self._device_details_refresh_interval
-        if need_details_refresh:
-            _LOGGER.debug("Refreshing battery/signal - 5 min interval")
-            self._last_device_details_refresh = current_time
+        # Battery / signal fields are included in the enriched API response,
+        # so we read them every refresh — no bespoke throttling needed.
 
         new_devices_count = 0
         processed_ids: set[str] = set()  # Track processed IDs to skip duplicates
@@ -1496,8 +1491,6 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
             device_data = dict(device_summary)
             if "model" in device_summary:
                 device_data.update(device_summary["model"])
-
-            is_new_device = device_id not in space.devices
 
             # Parse device type - API uses camelCase (deviceType, deviceName)
             raw_device_type = device_data.get("deviceType", device_data.get("type", "unknown"))
@@ -1570,9 +1563,9 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
             else:
                 device.malfunctions = malfunctions_data
 
-            # Battery and signal: only update every 5 minutes (or for new devices)
-            # These don't change often and SQS sends MALFUNCTION events for low battery
-            if need_details_refresh or is_new_device:
+            # Battery and signal are present in the enriched response — always
+            # update so the UI reflects battery swaps / radio quality changes.
+            if True:
                 # Battery level: try multiple field names
                 # Round to int to avoid jitter on last decimal
                 battery = device_data.get("batteryChargeLevelPercentage")
@@ -2230,52 +2223,18 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
                 )
 
     async def _async_update_notifications(self, space_id: str, limit: int = 50) -> None:
-        """Update notifications for a specific space."""
+        """Update notifications for a specific space.
+
+        Notifications are delivered via SQS/SSE real-time events; there is no
+        polling API endpoint for them. This method is a no-op kept for the
+        public surface — it only ensures `unread_notifications` stays in sync.
+        """
         if self.account is None:
             return
         space = self.account.spaces.get(space_id)
         if not space:
             return
-
-        try:
-            # TODO: Fetch notifications from API when endpoint is available
-            # For now, notifications come from SQS real-time events
-            # notifications_data = await self.api.async_find_notifications(space_id, limit)
-            notifications_data: list[dict[str, Any]] = []
-
-            # Clear existing notifications and add new ones
-            space.notifications.clear()
-
-            for notif_data in notifications_data:
-                # Parse notification data - AjaxNotification already imported at module level
-
-                # Determine notification type based on event_type
-                event_type = notif_data.get("event_type", "")
-                notif_type = self._parse_notification_type(event_type)
-
-                # Create notification object
-                notification = AjaxNotification(
-                    id=notif_data.get("id", ""),
-                    space_id=notif_data.get("space_id", space_id),
-                    type=notif_type,
-                    title=event_type.replace("_", " ").title() if event_type else "Event",
-                    message=f"{notif_data.get('device_name', 'Device')}: {event_type.replace('_', ' ')}"
-                    if event_type
-                    else "",
-                    timestamp=notif_data.get("timestamp") or datetime.now(UTC),
-                    device_id=notif_data.get("device_id"),
-                    device_name=notif_data.get("device_name"),
-                    read=notif_data.get("read", False),
-                    user_name=notif_data.get("user_name"),  # User who triggered the event
-                )
-
-                space.notifications.append(notification)
-
-            # Update unread count
-            space.unread_notifications = sum(1 for n in space.notifications if not n.read)
-
-        except (AjaxRestApiError, AjaxRestAuthError, KeyError, ValueError) as err:
-            _LOGGER.error("Error updating notifications for space %s: %s", space_id, err)
+        space.unread_notifications = sum(1 for n in space.notifications if not n.read)
 
     async def _async_update_video_edges(self, space_id: str) -> None:
         """Update video edge devices (surveillance cameras) for a specific space."""
@@ -2982,6 +2941,8 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
 
         # Clean up the type string (remove formatting artifacts)
         # Example: "wire_input_mt {\n}\n" -> "wire_input_mt"
+        if not isinstance(type_str, str):
+            return None
         type_cleaned = type_str.strip().split()[0].lower() if type_str else ""
 
         # Try exact match (case insensitive)

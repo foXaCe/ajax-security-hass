@@ -185,8 +185,11 @@ class AjaxValve(CoordinatorEntity[AjaxDataCoordinator], ValveEntity):
                 self._device_id,
                 err,
             )
-            # Revert optimistic update on error
-            device.attributes["valveState"] = old_value
+            # Revert optimistic update on error (drop key if previously unset)
+            if old_value is None:
+                device.attributes.pop("valveState", None)
+            else:
+                device.attributes["valveState"] = old_value
             self.async_write_ha_state()
             await self.coordinator.async_request_refresh()
 
@@ -204,7 +207,7 @@ class AjaxValve(CoordinatorEntity[AjaxDataCoordinator], ValveEntity):
 
         # Add motor state if available
         motor_state = device.attributes.get("motorState")
-        if motor_state:
+        if isinstance(motor_state, str) and motor_state:
             attrs["motor_state"] = motor_state.lower()
 
         return attrs

@@ -715,10 +715,12 @@ class AjaxDeviceSensor(CoordinatorEntity[AjaxDataCoordinator], SensorEntity):
     @property
     def available(self) -> bool:
         """Return True if entity is available."""
+        if not self.coordinator.last_update_success:
+            return False
         device = self._get_device()
         if not device:
             return False
-        return device.attributes.get("online", True)
+        return bool(device.online)
 
     @property
     def device_info(self) -> DeviceInfo | None:

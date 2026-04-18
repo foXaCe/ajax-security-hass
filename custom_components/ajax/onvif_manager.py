@@ -40,6 +40,8 @@ class AjaxOnvifManager:
         self._password = password
         self._event_callback = event_callback
         self._clients: dict[str, AjaxOnvifClient] = {}
+        # Serialise add/remove so concurrent callers cannot duplicate clients.
+        self._clients_lock = asyncio.Lock()
 
     @property
     def connected_count(self) -> int:
@@ -66,35 +68,37 @@ class AjaxOnvifManager:
             )
             return False
 
-        # Skip if already connected
-        if video_edge.id in self._clients:
-            existing = self._clients[video_edge.id]
-            if existing.connected:
-                return True
-            # Stop disconnected client before replacing
-            await existing.async_stop()
+        async with self._clients_lock:
+            # Skip if already connected
+            if video_edge.id in self._clients:
+                existing = self._clients[video_edge.id]
+                if existing.connected:
+                    return True
+                # Stop disconnected client before replacing
+                await existing.async_stop()
+                self._clients.pop(video_edge.id, None)
 
-        # Create new client
-        client = AjaxOnvifClient(
-            video_edge=video_edge,
-            username=self._username,
-            password=self._password,
-            event_callback=self._event_callback,
-        )
+            # Create new client
+            client = AjaxOnvifClient(
+                video_edge=video_edge,
+                username=self._username,
+                password=self._password,
+                event_callback=self._event_callback,
+            )
 
-        # Try to connect
-        if not await client.async_connect():
-            return False
+            # Try to connect
+            if not await client.async_connect():
+                return False
 
-        # Subscribe to events
-        if not await client.async_subscribe_events():
-            await client.async_stop()  # Cleanup on partial failure
-            return False
+            # Subscribe to events
+            if not await client.async_subscribe_events():
+                await client.async_stop()  # Cleanup on partial failure
+                return False
 
-        # Start polling
-        await client.async_start_polling()
+            # Start polling
+            await client.async_start_polling()
 
-        self._clients[video_edge.id] = client
+            self._clients[video_edge.id] = client
 
         _LOGGER.info(
             "ONVIF client started for %s (%s)",
@@ -109,7 +113,8 @@ class AjaxOnvifManager:
         Args:
             video_edge_id: The ID of the video edge to remove
         """
-        client = self._clients.pop(video_edge_id, None)
+        async with self._clients_lock:
+            client = self._clients.pop(video_edge_id, None)
         if client:
             await client.async_stop()
             _LOGGER.debug("ONVIF client stopped for %s", video_edge_id)
@@ -171,12 +176,14 @@ class AjaxOnvifManager:
 
     async def async_stop(self) -> None:
         """Stop all ONVIF connections."""
-        # Stop all clients concurrently
-        tasks = [client.async_stop() for client in self._clients.values()]
-        if tasks:
-            await asyncio.gather(*tasks, return_exceptions=True)
-
-        self._clients.clear()
+        async with self._clients_lock:
+            clients = list(self._clients.values())
+            self._clients.clear()
+        if clients:
+            results = await asyncio.gather(*(c.async_stop() for c in clients), return_exceptions=True)
+            for res in results:
+                if isinstance(res, Exception):
+                    _LOGGER.warning("ONVIF client stop failed: %s", res)
         _LOGGER.debug("ONVIF manager stopped")
 
     async def async_update_video_edges(self, video_edges: list[AjaxVideoEdge]) -> None:

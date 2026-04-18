@@ -83,7 +83,7 @@ class ButtonHandler(AjaxDeviceHandler):
                     "translation_key": "button_mode",
                     "device_class": SensorDeviceClass.ENUM,
                     "options": ["panic_button", "smart_button", "interconnect_delay"],
-                    "value_fn": lambda: self.device.attributes.get("button_mode", "").lower(),
+                    "value_fn": lambda: (self.device.attributes.get("button_mode") or "").lower(),
                     "enabled_by_default": True,
                 }
             )
@@ -96,7 +96,7 @@ class ButtonHandler(AjaxDeviceHandler):
                     "translation_key": "button_brightness",
                     "device_class": SensorDeviceClass.ENUM,
                     "options": ["off", "low", "high"],
-                    "value_fn": lambda: self.device.attributes.get("brightness", "").lower(),
+                    "value_fn": lambda: (self.device.attributes.get("brightness") or "").lower(),
                     "enabled_by_default": True,
                 }
             )
@@ -109,7 +109,7 @@ class ButtonHandler(AjaxDeviceHandler):
                     "translation_key": "false_press_filter",
                     "device_class": SensorDeviceClass.ENUM,
                     "options": ["long_push", "double_click", "disabled"],
-                    "value_fn": lambda: self.device.attributes.get("false_press_filter", "").lower(),
+                    "value_fn": lambda: (self.device.attributes.get("false_press_filter") or "").lower(),
                     "enabled_by_default": True,
                 }
             )

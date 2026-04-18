@@ -226,7 +226,8 @@ class AjaxHubFirmwareUpdate(CoordinatorEntity[AjaxDataCoordinator], UpdateEntity
         """Initialize the update entity."""
         super().__init__(coordinator)
         self._space_id = space.id
-        self._attr_unique_id = f"{space.hub_id}_firmware_update"
+        # Use space.id (stable) rather than hub_id which may be None at first setup.
+        self._attr_unique_id = f"{space.id}_firmware_update"
 
         # Get hub model name
         hub_subtype = space.hub_details.get("hubSubtype") if space.hub_details else None
@@ -244,9 +245,9 @@ class AjaxHubFirmwareUpdate(CoordinatorEntity[AjaxDataCoordinator], UpdateEntity
         if space.hub_details and space.hub_details.get("hardwareVersions"):
             hw_version = space.hub_details["hardwareVersions"].get("pcb")
 
-        # Device info - link to existing hub device
+        # Device info - always keyed by space.id for stable registry entries.
         self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, space.hub_id)} if space.hub_id else {(DOMAIN, self._space_id)},
+            identifiers={(DOMAIN, self._space_id)},
             name=space.name,
             manufacturer=MANUFACTURER,
             model=model_display,

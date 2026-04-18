@@ -261,6 +261,13 @@ class SQSManager:
         self._last_state_update: dict[str, float] = {}  # hub_id -> timestamp
         self._recent_event_ids: dict[str, float] = {}  # event_key -> timestamp
         self._language: str = DEFAULT_LANGUAGE
+        # Track scheduled call_later handles so we can cancel them on stop()
+        # and strong-ref background tasks so they are not GC'd mid-flight.
+        self._pending_timers: set[asyncio.TimerHandle] = set()
+        self._background_tasks: set[asyncio.Task] = set()
+        # Serialise security_event handlers so overlapping events cannot
+        # flip the coordinator skip-flag in a racy way.
+        self._security_event_lock = asyncio.Lock()
 
     def set_language(self, language: str) -> None:
         """Set the language for event messages."""
@@ -284,14 +291,31 @@ class SQSManager:
             _LOGGER.error("Failed to start SQS Manager: %s", err)
             return False
 
+    def _schedule_later(self, delay: float, callback: callable) -> None:
+        """Wrap hass.loop.call_later to track the handle for cancellation."""
+        handle = self.coordinator.hass.loop.call_later(delay, callback)
+        self._pending_timers.add(handle)
+
+    def _spawn_background(self, coro) -> None:
+        """Create a tracked background task so it cannot be GC'd mid-flight."""
+        task = self.coordinator.hass.async_create_task(coro)
+        self._background_tasks.add(task)
+        task.add_done_callback(self._background_tasks.discard)
+
     async def stop(self) -> None:
         self._enabled = False
+        # Cancel all scheduled timers
+        for handle in list(self._pending_timers):
+            handle.cancel()
+        self._pending_timers.clear()
         try:
             await self.sqs_client.stop_receiving()
             await self.sqs_client.close()
             _LOGGER.info("SQS Manager stopped")
         except Exception as err:
             _LOGGER.error("Error stopping SQS Manager: %s", err)
+        if self._background_tasks:
+            await asyncio.gather(*self._background_tasks, return_exceptions=True)
 
     def _is_duplicate_event(self, event_key: str) -> bool:
         """Check if event was already processed within dedup window."""
@@ -809,7 +833,7 @@ class SQSManager:
             device.attributes["doorbell_ring"] = True
 
             # Schedule auto-reset of doorbell_ring state after 10 seconds
-            self.coordinator.hass.loop.call_later(
+            self._schedule_later(
                 10.0,
                 lambda: self._reset_doorbell_ring(space.id, device.id),
             )
@@ -1082,7 +1106,7 @@ class SQSManager:
         )
 
         # Schedule auto-reset after detection timeout (30 seconds)
-        self.coordinator.hass.loop.call_later(
+        self._schedule_later(
             30.0,
             lambda: self._reset_video_detection(space.id, video_edge.id, channel_id, detection_type),
         )
@@ -1131,7 +1155,7 @@ class SQSManager:
                 # Signal platforms to create entities for the new smart lock
                 async_dispatcher_send(self.coordinator.hass, SIGNAL_NEW_SMART_LOCK, space.id, source_id)
                 # Persist to storage so it survives reboots
-                self.coordinator.hass.async_create_task(self.coordinator._async_save_smart_locks())
+                self._spawn_background(self.coordinator._async_save_smart_locks())
             else:
                 _LOGGER.warning(
                     "SQS: Smart lock event without source_id: tag=%s, name=%s",

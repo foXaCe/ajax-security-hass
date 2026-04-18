@@ -131,6 +131,7 @@ DEVICE_TYPES = {
     "46": "ReX 2",
     "47": "LifeQuality",
     "48": "WaterStop",
+    "6A": "KeyPad (variant)",
     "4C": "Socket (type G/B)",
     "4D": "FireProtect 2",
     "4E": "Curtain Outdoor",
@@ -823,7 +824,7 @@ EVENT_CODES: dict[str, tuple[str, bool]] = {
     "M_22_07": ("user_added", False),
     "M_22_08": ("user_removed", False),
     "M_22_20": ("panic", True),
-    "M_22_24": ("armed", False),  # Unsuccessful arming attempt
+    "M_22_24": ("arm_failed", True),  # Unsuccessful arming attempt
     "M_22_26": ("armed", False),  # Armed with malfunctions
     "M_22_28": ("night_mode_off", False),
     "M_22_29": ("group_disarmed", False),  # Group disarmed (actual code used by Ajax)
@@ -963,9 +964,26 @@ EVENT_CODES: dict[str, tuple[str, bool]] = {
 }
 
 # Action to category mapping (for determining how to handle the event)
+# Explicit transition overrides for codes where the odd/even heuristic
+# misclassifies (e.g. user events, device state changes that are not a
+# sensor TRIGGERED/RECOVERED pair).
+_EVENT_CODE_TRANSITIONS: dict[str, str] = {
+    # Unsuccessful arming is always a single TRIGGERED-like event.
+    "M_22_24": "TRIGGERED",
+    # Tilt detection event fires as TRIGGERED even though ends with odd hex.
+    "M_0F_31": "TRIGGERED",
+    # Arm/disarm events are one-shot state changes, treat as TRIGGERED.
+    "M_22_20": "TRIGGERED",
+    "M_22_21": "TRIGGERED",
+    "M_22_28": "TRIGGERED",
+    "M_22_29": "TRIGGERED",
+    "M_22_2B": "TRIGGERED",
+}
+
 ACTION_CATEGORIES = {
     # Security state changes
     "armed": "security",
+    "arm_failed": "security",
     "disarmed": "security",
     "night_mode": "security",
     "night_mode_off": "security",
@@ -1102,19 +1120,19 @@ def parse_event_code(event_code: str, language: str = DEFAULT_LANGUAGE) -> dict[
     # Normalize the code (uppercase)
     code = event_code.upper()
 
-    # Determine transition from event code (M_XX_YY format)
-    # Last character of event signal determines state:
-    # Even = TRIGGERED, Odd = RECOVERED
-    transition = "TRIGGERED"
-    if code.startswith("M_") and len(code) >= 7:
-        try:
-            # Get the last character of the event signal (YY part)
-            last_char = code[-1]
-            # Convert hex digit to int and check if odd
-            if int(last_char, 16) % 2 == 1:
-                transition = "RECOVERED"
-        except ValueError:
-            pass  # Keep default TRIGGERED if parsing fails
+    # Transition resolution:
+    # 1. Explicit overrides for codes where the odd/even heuristic is wrong
+    # 2. Fallback: last hex digit of YY — odd = RECOVERED, even = TRIGGERED
+    #    (holds for most sensor pairs like M_01_20/M_01_21)
+    transition = _EVENT_CODE_TRANSITIONS.get(code)
+    if transition is None:
+        transition = "TRIGGERED"
+        if code.startswith("M_") and len(code) >= 7:
+            try:
+                if int(code[-1], 16) % 2 == 1:
+                    transition = "RECOVERED"
+            except ValueError:
+                pass
 
     # Look up in our mapping
     if code not in EVENT_CODES:

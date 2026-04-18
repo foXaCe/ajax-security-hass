@@ -83,6 +83,8 @@ class AjaxOnvifClient:
         self._pullpoint_manager: Any = None
         self._running = False
         self._poll_task: asyncio.Task | None = None
+        # Flag set by _on_subscription_lost so _poll_loop reacts immediately.
+        self._subscription_lost = False
         self._last_states: dict[str, bool] = {}  # Cache to filter duplicate events
 
     @property
@@ -105,11 +107,10 @@ class AjaxOnvifClient:
 
         try:
             _LOGGER.info(
-                "ONVIF: Connecting to %s at %s:%s (user=%s)",
+                "ONVIF: Connecting to %s at %s:%s",
                 self.video_edge.name,
                 self.video_edge.ip_address,
                 DEFAULT_ONVIF_PORT,
-                self._username,
             )
 
             # Create ONVIF camera instance with correct WSDL path
@@ -187,7 +188,9 @@ class AjaxOnvifClient:
         """Handle subscription lost event.
 
         Called by the pullpoint manager when the subscription expires or is lost.
+        Flag the poll loop so it recreates the subscription on the next iteration.
         """
+        self._subscription_lost = True
         _LOGGER.warning(
             "%s: ONVIF subscription lost, will recreate on next poll",
             self.video_edge.name,
@@ -240,13 +243,21 @@ class AjaxOnvifClient:
 
         while self._running:
             try:
-                # Auto-reconnect if subscription was lost
-                if self._pullpoint_manager and self._pullpoint_manager.closed:
+                # Auto-reconnect if subscription was lost (either flag-set by
+                # the manager callback, or detected via closed state).
+                needs_recreate = self._subscription_lost or (
+                    self._pullpoint_manager is not None and self._pullpoint_manager.closed
+                )
+                if needs_recreate:
                     _LOGGER.info(
                         "%s: ONVIF subscription lost, recreating...",
                         self.video_edge.name,
                     )
-                    await self.async_subscribe_events()
+                    self._subscription_lost = False
+                    if not await self.async_subscribe_events():
+                        backoff = min(backoff * 2, PULLPOINT_MAX_BACKOFF)
+                        await asyncio.sleep(backoff)
+                        continue
 
                 await self._pull_messages()
                 backoff = PULLPOINT_POLL_INTERVAL  # Reset on success

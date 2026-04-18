@@ -201,8 +201,11 @@ class AjaxSwitch(CoordinatorEntity[AjaxDataCoordinator], SwitchEntity):
         # Set unique ID
         self._attr_unique_id = f"{device_id}_{switch_key}"
 
-        # Set entity category if provided
-        self._attr_entity_category = switch_desc.get("entity_category", EntityCategory.CONFIG)
+        # Set entity category if provided (accept enum or string for back-compat)
+        cat = switch_desc.get("entity_category", EntityCategory.CONFIG)
+        if isinstance(cat, str):
+            cat = EntityCategory.DIAGNOSTIC if cat == "diagnostic" else EntityCategory.CONFIG
+        self._attr_entity_category = cat
 
         # Set entity name - use custom name if provided (for multi-gang channels),
         # otherwise use translation key
@@ -644,10 +647,10 @@ class AjaxDimmerSettingsSwitch(CoordinatorEntity[AjaxDataCoordinator], SwitchEnt
         space = self.coordinator.get_space(self._space_id)
         device = self._get_device()
         if not space or not device:
-            raise HomeAssistantError("Device not found")
+            raise HomeAssistantError(translation_domain=DOMAIN, translation_key="device_not_found")
 
         if not space.hub_id:
-            raise HomeAssistantError("Hub not found")
+            raise HomeAssistantError(translation_domain=DOMAIN, translation_key="hub_not_found")
 
         settings_key = self._switch_def["settings_key"]
         old_settings = list(device.attributes.get("settingsSwitch", []))
@@ -748,10 +751,10 @@ class AjaxDimmerBoolSwitch(CoordinatorEntity[AjaxDataCoordinator], SwitchEntity)
         space = self.coordinator.get_space(self._space_id)
         device = self._get_device()
         if not space or not device:
-            raise HomeAssistantError("Device not found")
+            raise HomeAssistantError(translation_domain=DOMAIN, translation_key="device_not_found")
 
         if not space.hub_id:
-            raise HomeAssistantError("Hub not found")
+            raise HomeAssistantError(translation_domain=DOMAIN, translation_key="hub_not_found")
 
         # Optimistic update with rollback
         old_value = device.attributes.get(self._attr_key)
@@ -839,10 +842,10 @@ class AjaxDimmerCalibrationSwitch(CoordinatorEntity[AjaxDataCoordinator], Switch
         space = self.coordinator.get_space(self._space_id)
         device = self._get_device()
         if not space or not device:
-            raise HomeAssistantError("Device not found")
+            raise HomeAssistantError(translation_domain=DOMAIN, translation_key="device_not_found")
 
         if not space.hub_id:
-            raise HomeAssistantError("Hub not found")
+            raise HomeAssistantError(translation_domain=DOMAIN, translation_key="hub_not_found")
 
         api_value = "ENABLED" if value else "DISABLED"
         payload = {"dimmerSettings": {"calibration": api_value}}

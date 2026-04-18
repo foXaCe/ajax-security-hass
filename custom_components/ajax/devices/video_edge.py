@@ -16,6 +16,12 @@ from typing import TYPE_CHECKING, Any
 
 from homeassistant.components.binary_sensor import BinarySensorDeviceClass
 from homeassistant.components.sensor import SensorDeviceClass
+from homeassistant.const import (
+    PERCENTAGE,
+    UnitOfInformation,
+    UnitOfTemperature,
+    UnitOfTime,
+)
 
 from ..models import VideoEdgeType
 
@@ -40,9 +46,10 @@ def _parse_iso_duration_to_timestamp(duration: str | None) -> datetime | None:
     if not duration:
         return None
 
-    # Match ISO 8601 duration: P[days]T[hours][minutes][seconds]
-    match = re.match(
-        r"P(?:(\d+)D)?T?(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?",
+    # Strict ISO 8601 duration: P[<days>D][T[<hours>H][<minutes>M][<seconds>S]]
+    # — T required before time parts.
+    match = re.fullmatch(
+        r"P(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?)?",
         duration,
     )
     if not match:
@@ -52,6 +59,10 @@ def _parse_iso_duration_to_timestamp(duration: str | None) -> datetime | None:
     hours = int(match.group(2)) if match.group(2) else 0
     minutes = int(match.group(3)) if match.group(3) else 0
     seconds = float(match.group(4)) if match.group(4) else 0
+
+    # Reject empty matches like "P" or "PT" (all components missing).
+    if days == 0 and hours == 0 and minutes == 0 and seconds == 0:
+        return None
 
     # Calculate the start time by subtracting the uptime from now
     uptime_delta = timedelta(days=days, hours=hours, minutes=minutes, seconds=seconds)
@@ -86,7 +97,14 @@ RECORD_POLICY_TRANSLATIONS = {
 
 
 class VideoEdgeHandler:
-    """Handler for Ajax Video Edge surveillance cameras."""
+    """Handler for Ajax Video Edge surveillance cameras.
+
+    Note: This handler intentionally does NOT inherit from AjaxDeviceHandler
+    because Video Edge cameras are modelled as AjaxVideoEdge (not AjaxDevice)
+    and have a distinct feature set (channels, storage, AI detection). It is
+    never registered in DEVICE_HANDLERS and must be instantiated directly by
+    the video-edge setup paths in each platform.
+    """
 
     def __init__(self, video_edge: AjaxVideoEdge, all_video_edges: dict | None = None) -> None:
         """Initialize the handler.
@@ -316,7 +334,7 @@ class VideoEdgeHandler:
                     {
                         "key": "cpu_usage",
                         "translation_key": "video_edge_cpu_usage",
-                        "native_unit_of_measurement": "%",
+                        "native_unit_of_measurement": PERCENTAGE,
                         "value_fn": lambda: self.video_edge.raw_data.get("systemInfo", {}).get("averageCpuConsumption"),
                         "enabled_by_default": True,
                         "entity_category": "diagnostic",
@@ -329,7 +347,7 @@ class VideoEdgeHandler:
                     {
                         "key": "ram_usage",
                         "translation_key": "video_edge_ram_usage",
-                        "native_unit_of_measurement": "%",
+                        "native_unit_of_measurement": PERCENTAGE,
                         "value_fn": lambda: self.video_edge.raw_data.get("systemInfo", {}).get("ramConsumption"),
                         "enabled_by_default": True,
                         "entity_category": "diagnostic",
@@ -346,10 +364,11 @@ class VideoEdgeHandler:
                     {
                         "key": "storage_total",
                         "translation_key": "video_edge_storage_total",
-                        "native_unit_of_measurement": "GB",
-                        "value_fn": lambda: round(
-                            self._get_first_storage().get("sizeTotal", 0) / (1024**3),
-                            1,
+                        "native_unit_of_measurement": UnitOfInformation.GIGABYTES,
+                        "value_fn": lambda: (
+                            round(size / (1024**3), 1)
+                            if isinstance((size := self._get_first_storage().get("sizeTotal")), (int, float))
+                            else None
                         ),
                         "enabled_by_default": True,
                         "entity_category": "diagnostic",
@@ -362,7 +381,7 @@ class VideoEdgeHandler:
                     {
                         "key": "storage_temperature",
                         "translation_key": "video_edge_storage_temperature",
-                        "native_unit_of_measurement": "°C",
+                        "native_unit_of_measurement": UnitOfTemperature.CELSIUS,
                         "value_fn": lambda: self._get_first_storage().get("temperature"),
                         "enabled_by_default": True,
                         "entity_category": "diagnostic",
@@ -420,7 +439,7 @@ class VideoEdgeHandler:
                 {
                     "key": "wifi_signal",
                     "translation_key": "video_edge_wifi_signal",
-                    "native_unit_of_measurement": "%",
+                    "native_unit_of_measurement": PERCENTAGE,
                     "value_fn": lambda: (
                         self.video_edge.raw_data.get("networkInterface", {}).get("wifi", {}).get("signalStrength")
                     ),
@@ -466,7 +485,7 @@ class VideoEdgeHandler:
                         )
 
         # NVR-specific sensors
-        if self.video_edge.video_edge_type.value == "NVR":
+        if self.video_edge.video_edge_type == VideoEdgeType.NVR:
             # Archive depth (current archive duration in days)
             if storage_devices and len(storage_devices) > 0:
                 storage = storage_devices[0]
@@ -475,7 +494,7 @@ class VideoEdgeHandler:
                         {
                             "key": "archive_depth",
                             "translation_key": "video_edge_archive_depth",
-                            "native_unit_of_measurement": "d",
+                            "native_unit_of_measurement": UnitOfTime.DAYS,
                             "value_fn": lambda: self._get_first_storage().get("archiveDepth"),
                             "enabled_by_default": True,
                         }
@@ -487,7 +506,7 @@ class VideoEdgeHandler:
                     {
                         "key": "led_brightness",
                         "translation_key": "video_edge_led_brightness",
-                        "native_unit_of_measurement": "%",
+                        "native_unit_of_measurement": PERCENTAGE,
                         "value_fn": lambda: self.video_edge.raw_data.get("ledBrightnessLevel"),
                         "enabled_by_default": True,
                     }
@@ -499,8 +518,12 @@ class VideoEdgeHandler:
                     {
                         "key": "max_preview_duration",
                         "translation_key": "video_edge_max_preview_duration",
-                        "native_unit_of_measurement": "min",
-                        "value_fn": lambda: (self.video_edge.raw_data.get("maxPreviewDuration") or 0) // 60,
+                        "native_unit_of_measurement": UnitOfTime.MINUTES,
+                        "value_fn": lambda: (
+                            int(raw) // 60
+                            if isinstance((raw := self.video_edge.raw_data.get("maxPreviewDuration")), (int, float))
+                            else None
+                        ),
                         "enabled_by_default": True,
                     }
                 )
@@ -604,7 +627,7 @@ class VideoEdgeHandler:
             return None
 
         # Only for NVR devices
-        if self.video_edge.video_edge_type.value != "NVR":
+        if self.video_edge.video_edge_type != VideoEdgeType.NVR:
             return None
 
         source_aliases = channel.get("sourceAliases", {})
@@ -693,14 +716,14 @@ class VideoEdgeHandler:
         linked_nvrs: list[dict[str, Any]] = []
 
         # Only search for NVR links if this is a camera (not an NVR itself)
-        if self.video_edge.video_edge_type.value == "NVR":
+        if self.video_edge.video_edge_type == VideoEdgeType.NVR:
             return linked_nvrs
 
         camera_id = self.video_edge.id
 
         for _ve_id, ve in self._all_video_edges.items():
             # Only check NVRs
-            if ve.video_edge_type.value != "NVR":
+            if ve.video_edge_type != VideoEdgeType.NVR:
                 continue
 
             # Check if any channel of this NVR has our camera as source

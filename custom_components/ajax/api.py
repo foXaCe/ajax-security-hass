@@ -368,7 +368,8 @@ class AjaxRestApi:
                         # Build SSE URL from proxy URL if not provided
                         self.sse_url = f"{self.proxy_url}/events?userId={self.user_id}"
                     if self.sse_url:
-                        _LOGGER.info("SSE endpoint: %s", self.sse_url)
+                        _LOGGER.info("SSE endpoint configured")
+                        _LOGGER.debug("SSE endpoint: %s", self.sse_url)
 
                 if not self.session_token:
                     raise AjaxRestApiError("No sessionToken in login response")
@@ -489,14 +490,7 @@ class AjaxRestApi:
                 _LOGGER.debug("Refresh response status: %s", response.status)
 
                 if response.status == 401:
-                    # Log detailed error for debugging
-                    error_body = ""
-                    with contextlib.suppress(Exception):
-                        error_body = await response.text()
-                    _LOGGER.warning(
-                        "Refresh token rejected (401): %s",
-                        error_body[:200] if error_body else "no response body",
-                    )
+                    _LOGGER.warning("Refresh token rejected (401)")
                     raise AjaxRestAuthError("Refresh token expired or invalid")
 
                 if response.status == 429:
@@ -718,8 +712,10 @@ class AjaxRestApi:
                                 )
                             else:
                                 await self._recover_auth()
-                        # Retry the request with the new token (only once)
-                        return await self._request(method, endpoint, data, _retry_on_auth_error=False)
+                        # Retry the request with the new token (only once), preserving bypass_cache
+                        return await self._request(
+                            method, endpoint, data, _retry_on_auth_error=False, bypass_cache=bypass_cache
+                        )
                     else:
                         # Already retried once, give up
                         _LOGGER.error("Authentication failed after token renewal")
@@ -741,9 +737,8 @@ class AjaxRestApi:
                             MAX_RETRIES,
                         )
                         await asyncio.sleep(wait_time)
-                        return await self._request(
-                            method, endpoint, data, _retry_on_auth_error, _retry_count + 1, bypass_cache
-                        )
+                        # Do not trigger a proactive reauth during a rate-limit retry
+                        return await self._request(method, endpoint, data, False, _retry_count + 1, bypass_cache)
                     _LOGGER.error("Rate limited on %s after %d retries", endpoint, MAX_RETRIES)
                     raise AjaxRestRateLimitError(f"Rate limited, retry after {retry_after}s")
 
@@ -1701,13 +1696,19 @@ class AjaxRestApi:
                             method, endpoint, data, _retry_on_auth_error, _retry_count + 1
                         )
                     error_text = await response.text()
-                    _LOGGER.error("Server error %s after %d retries: %s", response.status, MAX_RETRIES, error_text)
-                    raise AjaxRestApiError(f"Server error {response.status}: {error_text}")
+                    _LOGGER.error(
+                        "Server error %s after %d retries",
+                        response.status,
+                        MAX_RETRIES,
+                    )
+                    _LOGGER.debug("Server error body: %s", error_text[:200] if error_text else "(empty)")
+                    raise AjaxRestApiError(f"Server error {response.status}")
 
                 if response.status not in (200, 202, 204):
                     error_text = await response.text()
-                    _LOGGER.error("API error %s: %s", response.status, error_text)
-                    raise AjaxRestApiError(f"API error {response.status}: {error_text}")
+                    _LOGGER.error("API error %s", response.status)
+                    _LOGGER.debug("API error body: %s", error_text[:200] if error_text else "(empty)")
+                    raise AjaxRestApiError(f"API error {response.status}")
 
         except aiohttp.ClientError as err:
             # Transient network errors - retry with backoff

@@ -72,6 +72,7 @@ class AjaxDimmerLight(CoordinatorEntity[AjaxDataCoordinator], LightEntity):
     __slots__ = ("_space_id", "_device_id")
 
     _attr_has_entity_name = True
+    _attr_translation_key = "dimmer_light"
     _attr_color_mode = ColorMode.BRIGHTNESS
     _attr_supported_color_modes = {ColorMode.BRIGHTNESS}
 
@@ -132,10 +133,10 @@ class AjaxDimmerLight(CoordinatorEntity[AjaxDataCoordinator], LightEntity):
         if not device:
             return None
         # Ajax uses 0-100%, Home Assistant uses 0-255
-        brightness_percent = device.attributes.get("actualBrightnessCh1", 0)
-        if brightness_percent is None:
+        brightness_percent = device.attributes.get("actualBrightnessCh1")
+        if not isinstance(brightness_percent, (int, float)):
             return None
-        return int((brightness_percent / 100) * 255)
+        return min(255, max(0, round((brightness_percent / 100) * 255)))
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn on the light."""
@@ -156,12 +157,14 @@ class AjaxDimmerLight(CoordinatorEntity[AjaxDataCoordinator], LightEntity):
             brightness_percent = int((brightness / 255) * 100)
         else:
             # Use current brightness or 100%
-            current = device.attributes.get("actualBrightnessCh1", 100)
-            brightness_percent = current if current > 0 else 100
+            current = device.attributes.get("actualBrightnessCh1")
+            brightness_percent = current if isinstance(current, (int, float)) and current > 0 else 100
 
-        # Save old state for rollback
-        old_brightness = device.attributes.get("actualBrightnessCh1", 0)
-        old_statuses = device.attributes.get("channelStatuses", [])
+        # Save old state for rollback (preserve None/unset distinction)
+        had_brightness = "actualBrightnessCh1" in device.attributes
+        old_brightness = device.attributes.get("actualBrightnessCh1")
+        had_statuses = "channelStatuses" in device.attributes
+        old_statuses = device.attributes.get("channelStatuses")
 
         # Optimistic update
         device.attributes["actualBrightnessCh1"] = brightness_percent
@@ -178,8 +181,14 @@ class AjaxDimmerLight(CoordinatorEntity[AjaxDataCoordinator], LightEntity):
         except Exception as err:
             _LOGGER.error("Failed to turn on dimmer %s: %s", self._device_id, err)
             # Rollback on error
-            device.attributes["actualBrightnessCh1"] = old_brightness
-            device.attributes["channelStatuses"] = old_statuses
+            if had_brightness:
+                device.attributes["actualBrightnessCh1"] = old_brightness
+            else:
+                device.attributes.pop("actualBrightnessCh1", None)
+            if had_statuses:
+                device.attributes["channelStatuses"] = old_statuses
+            else:
+                device.attributes.pop("channelStatuses", None)
             self.async_write_ha_state()
 
     async def async_turn_off(self, **kwargs: Any) -> None:
@@ -194,9 +203,11 @@ class AjaxDimmerLight(CoordinatorEntity[AjaxDataCoordinator], LightEntity):
             _LOGGER.error("Hub ID not found for space %s", self._space_id)
             return
 
-        # Save old state for rollback
-        old_brightness = device.attributes.get("actualBrightnessCh1", 0)
-        old_statuses = device.attributes.get("channelStatuses", [])
+        # Save old state for rollback (preserve None/unset distinction)
+        had_brightness = "actualBrightnessCh1" in device.attributes
+        old_brightness = device.attributes.get("actualBrightnessCh1")
+        had_statuses = "channelStatuses" in device.attributes
+        old_statuses = device.attributes.get("channelStatuses")
 
         # Optimistic update
         device.attributes["actualBrightnessCh1"] = 0
@@ -213,8 +224,14 @@ class AjaxDimmerLight(CoordinatorEntity[AjaxDataCoordinator], LightEntity):
         except Exception as err:
             _LOGGER.error("Failed to turn off dimmer %s: %s", self._device_id, err)
             # Rollback on error
-            device.attributes["actualBrightnessCh1"] = old_brightness
-            device.attributes["channelStatuses"] = old_statuses
+            if had_brightness:
+                device.attributes["actualBrightnessCh1"] = old_brightness
+            else:
+                device.attributes.pop("actualBrightnessCh1", None)
+            if had_statuses:
+                device.attributes["channelStatuses"] = old_statuses
+            else:
+                device.attributes.pop("channelStatuses", None)
             self.async_write_ha_state()
 
     @callback

@@ -156,8 +156,8 @@ class AjaxConfigFlow(ConfigFlow, domain=DOMAIN):
                             space_binding = await self._api.async_get_space_by_hub(hub_id)
                             if space_binding and space_binding.get("name"):
                                 hub_name = space_binding.get("name")
-                        except Exception:
-                            pass  # Keep fallback name
+                        except AjaxRestApiError as err:
+                            _LOGGER.debug("Could not resolve space name for %s: %s", hub_id, err)
                         self._spaces.append({"id": hub_id, "name": hub_name})
 
                 await self._api.close()
@@ -285,11 +285,12 @@ class AjaxConfigFlow(ConfigFlow, domain=DOMAIN):
                                 space_binding = await self._api.async_get_space_by_hub(hub_id)
                                 if space_binding and space_binding.get("name"):
                                     hub_name = space_binding.get("name")
-                            except Exception:
-                                pass  # Keep fallback name
+                            except AjaxRestApiError as err:
+                                _LOGGER.debug("Could not resolve space name for %s: %s", hub_id, err)
                             self._spaces.append({"id": hub_id, "name": hub_name})
-                except Exception:
+                except AjaxRestApiError as err:
                     # Proxy may not have all endpoints - continue without space selection
+                    _LOGGER.debug("Proxy hubs discovery failed: %s", err)
                     self._spaces = []
 
                 await self._api.close()
@@ -393,8 +394,8 @@ class AjaxConfigFlow(ConfigFlow, domain=DOMAIN):
                             space_binding = await self._api.async_get_space_by_hub(hub_id)
                             if space_binding and space_binding.get("name"):
                                 hub_name = space_binding.get("name")
-                        except Exception:
-                            pass  # Keep fallback name
+                        except AjaxRestApiError as err:
+                            _LOGGER.debug("Could not resolve space name for %s: %s", hub_id, err)
                         self._spaces.append({"id": hub_id, "name": hub_name})
 
                 await self._api.close()

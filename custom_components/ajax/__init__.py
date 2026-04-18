@@ -12,6 +12,7 @@ from homeassistant.components.persistent_notification import async_create
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.exceptions import (
+    ConfigEntryAuthFailed,
     ConfigEntryNotReady,
     HomeAssistantError,
     ServiceValidationError,
@@ -20,9 +21,13 @@ from homeassistant.helpers import (
     area_registry as ar,
     config_validation as cv,
     device_registry as dr,
+    entity_registry as er,
 )
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
-from homeassistant.helpers.service import async_extract_config_entry_ids
+from homeassistant.helpers.service import (
+    async_extract_config_entry_ids,
+    async_extract_referenced_entity_ids,
+)
 
 from .api import AjaxRestApi, AjaxRestApiError, AjaxRestAuthError
 from .const import (
@@ -155,7 +160,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: AjaxConfigEntry) -> bool
         if auth_mode == AUTH_MODE_PROXY_SECURE:
             sse_url = api.sse_url
             if sse_url:
-                _LOGGER.info("SSE URL obtained from proxy: %s", sse_url)
+                _LOGGER.info("SSE URL obtained from proxy")
+                _LOGGER.debug("SSE URL: %s", sse_url)
             else:
                 _LOGGER.warning("No SSE URL received from proxy")
 
@@ -166,7 +172,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: AjaxConfigEntry) -> bool
     except AjaxRestAuthError as err:
         _LOGGER.error("Authentication failed: %s", err)
         await api.close()
-        return False
+        # Raise ConfigEntryAuthFailed so HA triggers the reauth flow automatically
+        raise ConfigEntryAuthFailed(str(err)) from err
     except AjaxRestApiError as err:
         _LOGGER.error("API error during setup: %s", err)
         await api.close()
@@ -179,6 +186,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: AjaxConfigEntry) -> bool
     enabled_spaces = entry.data.get(CONF_ENABLED_SPACES)  # None = all spaces
     coordinator = AjaxDataCoordinator(
         hass,
+        entry,
         api,
         aws_access_key_id=aws_access_key_id,
         aws_secret_access_key=aws_secret_access_key,
@@ -186,9 +194,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: AjaxConfigEntry) -> bool
         sse_url=sse_url,
         enabled_spaces=enabled_spaces,
     )
-
-    # Store config entry reference for options access
-    coordinator.config_entry = entry
 
     # Apply options to coordinator (default: disabled to reduce API calls)
     door_sensor_fast_poll = entry.options.get(CONF_DOOR_SENSOR_FAST_POLL, False)
@@ -277,21 +282,50 @@ async def _async_setup_services(hass: HomeAssistant) -> None:
             )
         return target_entries
 
+    def _resolve_target_spaces(call: ServiceCall, coordinator: AjaxDataCoordinator) -> list[str]:
+        """Resolve target alarm_control_panel entity_ids to a list of space_ids.
+
+        Falls back to all spaces only if no target was specified.
+        """
+        selected = async_extract_referenced_entity_ids(call.hass, call, expand_group=True)
+        referenced = set(selected.referenced) | set(selected.indirectly_referenced)
+        if not referenced:
+            return list(coordinator.account.spaces.keys())
+
+        registry = er.async_get(call.hass)
+        space_ids: list[str] = []
+        for entity_id in referenced:
+            entry = registry.async_get(entity_id)
+            if entry is None or entry.domain != "alarm_control_panel":
+                continue
+            uid = entry.unique_id or ""
+            # Main space panel unique_id: f"{entry_id}_alarm_{space_id}"
+            marker = "_alarm_"
+            if marker in uid:
+                space_id = uid.rsplit(marker, 1)[-1]
+                if space_id in coordinator.account.spaces:
+                    space_ids.append(space_id)
+        return space_ids
+
     async def handle_force_arm(call: ServiceCall) -> None:
         """Handle force arm service call."""
-        entity_id = call.data.get("entity_id")
-        _LOGGER.info("Force arming via service call (entity: %s)", entity_id)
+        _LOGGER.info("Force arming via service call")
 
         entries = await _extract_config_entry(call)
         entry = entries[0]
         coordinator = entry.runtime_data
-        # Get the first hub from coordinator
         if not coordinator.account or not coordinator.account.spaces:
             raise ServiceValidationError(
                 translation_domain=DOMAIN,
                 translation_key="no_hubs_found",
             )
-        for hub_id in coordinator.account.spaces:
+        target_spaces = _resolve_target_spaces(call, coordinator)
+        if not target_spaces:
+            raise ServiceValidationError(
+                translation_domain=DOMAIN,
+                translation_key="invalid_target",
+            )
+        for hub_id in target_spaces:
             try:
                 await coordinator.api.async_arm(hub_id, ignore_problems=True)
                 await coordinator.async_request_refresh()
@@ -306,8 +340,7 @@ async def _async_setup_services(hass: HomeAssistant) -> None:
 
     async def handle_force_arm_night(call: ServiceCall) -> None:
         """Handle force arm night mode service call."""
-        entity_id = call.data.get("entity_id")
-        _LOGGER.info("Force arming night mode via service call (entity: %s)", entity_id)
+        _LOGGER.info("Force arming night mode via service call")
 
         entries = await _extract_config_entry(call)
         entry = entries[0]
@@ -317,7 +350,13 @@ async def _async_setup_services(hass: HomeAssistant) -> None:
                 translation_domain=DOMAIN,
                 translation_key="no_hubs_found",
             )
-        for hub_id in coordinator.account.spaces:
+        target_spaces = _resolve_target_spaces(call, coordinator)
+        if not target_spaces:
+            raise ServiceValidationError(
+                translation_domain=DOMAIN,
+                translation_key="invalid_target",
+            )
+        for hub_id in target_spaces:
             try:
                 await coordinator.api.async_night_mode(hub_id, enabled=True)
                 await coordinator.async_request_refresh()

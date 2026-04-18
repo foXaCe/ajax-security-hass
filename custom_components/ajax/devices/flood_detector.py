@@ -100,7 +100,7 @@ class FloodDetectorHandler(AjaxDeviceHandler):
                         if isinstance(self.device.malfunctions, list)
                         else str(self.device.malfunctions)
                         if self.device.malfunctions
-                        else "None"
+                        else None
                     ),
                     "enabled_by_default": True,
                 }

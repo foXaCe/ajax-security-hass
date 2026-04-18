@@ -15,6 +15,7 @@ from typing import Any
 
 from homeassistant.components.lock import DOMAIN as LOCK_DOMAIN, LockEntity
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
@@ -109,27 +110,17 @@ class AjaxLock(CoordinatorEntity[AjaxDataCoordinator], LockEntity):
         return smart_lock.is_locked
 
     @property
-    def is_locking(self) -> bool:
-        """Return true if the lock is locking. Not applicable for read-only."""
-        return False
-
-    @property
-    def is_unlocking(self) -> bool:
-        """Return true if the lock is unlocking. Not applicable for read-only."""
-        return False
-
-    @property
     def available(self) -> bool:
         """Return if entity is available."""
         return self._get_smart_lock() is not None
 
     async def async_lock(self, **kwargs: Any) -> None:
         """Lock the lock. Not supported — read-only entity."""
-        _LOGGER.warning("Locking is not supported for Ajax smart locks (no API available)")
+        raise HomeAssistantError(translation_domain=DOMAIN, translation_key="lock_not_supported")
 
     async def async_unlock(self, **kwargs: Any) -> None:
         """Unlock the lock. Not supported — read-only entity."""
-        _LOGGER.warning("Unlocking is not supported for Ajax smart locks (no API available)")
+        raise HomeAssistantError(translation_domain=DOMAIN, translation_key="lock_not_supported")
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:

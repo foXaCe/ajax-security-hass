@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import logging
 
-from homeassistant.components.button import ButtonDeviceClass, ButtonEntity
+from homeassistant.components.button import ButtonEntity
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
+from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
@@ -41,11 +42,18 @@ async def async_setup_entry(
 
 
 class AjaxPanicButton(CoordinatorEntity[AjaxDataCoordinator], ButtonEntity):
-    """Representation of an Ajax panic button."""
+    """Representation of an Ajax panic button.
+
+    Disabled by default to avoid accidental taps that would trigger a
+    real alarm. Users must explicitly enable the entity.
+    """
 
     __slots__ = ("_entry", "_space_id")
 
-    _attr_device_class = ButtonDeviceClass.IDENTIFY
+    # No device_class: IDENTIFY is semantically "flash the device to find it",
+    # which does not match the destructive nature of a panic trigger.
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_entity_registry_enabled_default = False
 
     def __init__(self, coordinator: AjaxDataCoordinator, entry: AjaxConfigEntry, space_id: str) -> None:
         """Initialize the panic button."""
@@ -59,7 +67,7 @@ class AjaxPanicButton(CoordinatorEntity[AjaxDataCoordinator], ButtonEntity):
 
     async def async_press(self) -> None:
         """Handle the button press."""
-        _LOGGER.warning("PANIC BUTTON pressed by user!")
+        _LOGGER.info("Panic button pressed for space %s", self._space_id)
 
         try:
             await self.coordinator.async_press_panic_button(self._space_id)

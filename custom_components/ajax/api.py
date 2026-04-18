@@ -138,10 +138,11 @@ class AjaxRestApi:
         # Proxy cache info (from X-Cache-TTL and X-Cache headers)
         self.last_cache_ttl: int | None = None
         self.last_cache_hit: bool = False
-        # Flag to bypass cache on next request (set by coordinator after SSE event)
+        # Flag to bypass cache on next request (set via bypass_cache_next()).
         self._bypass_cache_once: bool = False
 
         # Rate limiting state
+        # (bypass_cache_next() is a public helper; see below.)
         self._request_timestamps: list[float] = []
         self._rate_limit_lock: asyncio.Lock = asyncio.Lock()
 
@@ -194,16 +195,23 @@ class AjaxRestApi:
     async def _get_session(self) -> aiohttp.ClientSession:
         """Get or create aiohttp session."""
         if self.session is None or self.session.closed:
-            # Create session with SSL verification setting
+            # Create session with SSL verification setting and bounded connection pool.
+            # limit_per_host prevents connector exhaustion if the Ajax API stalls.
             if self.verify_ssl:
-                connector = None  # Use default SSL verification
+                connector = aiohttp.TCPConnector(limit=20, limit_per_host=10)
             else:
-                # Disable SSL verification for self-signed certificates
-                connector = aiohttp.TCPConnector(ssl=False)
+                connector = aiohttp.TCPConnector(ssl=False, limit=20, limit_per_host=10)
                 _LOGGER.warning("SSL certificate verification disabled - use only with trusted self-signed certs")
             self.session = aiohttp.ClientSession(connector=connector)
             self._owns_session = True
         return self.session
+
+    def bypass_cache_next(self) -> None:
+        """Force the next request to skip the proxy cache.
+
+        Public API used by the coordinator after SSE/SQS events or user actions.
+        """
+        self._bypass_cache_once = True
 
     async def close(self):
         """Close the session if we own it."""

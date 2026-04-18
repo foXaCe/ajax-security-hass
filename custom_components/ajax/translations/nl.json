@@ -372,6 +372,11 @@
         "name": "Panieknop"
       }
     },
+    "camera": {
+      "camera_sub_stream": {
+        "name": "Sub-stream"
+      }
+    },
     "device_tracker": {
       "position": {
         "name": "Positie"
@@ -1529,20 +1534,6 @@
     },
     "system_armed": {
       "message": "Systeem ingeschakeld. Schakel uit."
-    }
-  },
-  "issues": {
-    "critical_firmware_update": {
-      "description": "Een **kritieke beveiligingsupdate** is beschikbaar voor **{device_name}**.\n\n- Huidige versie: {current_version}\n- Nieuwe versie: {new_version}\n\nWerk onmiddellijk bij via de Ajax-app.",
-      "title": "Kritieke firmware-update voor {device_name}"
-    },
-    "device_offline": {
-      "description": "Het apparaat **{device_name}** is momenteel offline en reageert niet. Controleer het apparaat en de verbinding.",
-      "title": "{device_name} is niet bereikbaar"
-    },
-    "firmware_update": {
-      "description": "Een firmware-update is beschikbaar voor **{device_name}**.\n\n- Huidige versie: {current_version}\n- Nieuwe versie: {new_version}\n\nWerk bij via de Ajax-app.",
-      "title": "Firmware-update beschikbaar voor {device_name}"
     }
   },
   "options": {

@@ -70,6 +70,8 @@ class AjaxAlarmControlPanel(CoordinatorEntity[AjaxDataCoordinator], AlarmControl
 
     _attr_has_entity_name = True
     _attr_name = None  # Use device name as entity name (main entity)
+    # Ajax exposes partial arming only at group level (see AjaxGroupAlarmControlPanel),
+    # so the space-level panel only advertises AWAY and NIGHT.
     _attr_supported_features = AlarmControlPanelEntityFeature.ARM_AWAY | AlarmControlPanelEntityFeature.ARM_NIGHT
     _attr_code_arm_required = False
     _attr_available = True  # Always available - keep last known state on API errors

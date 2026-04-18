@@ -2,6 +2,33 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.26.2] - 2026-04-18
+
+### Security
+- Redact sensitive fields (hub_id, mac, IP, tokens…) in `ajax_raw_devices.json` before writing it to disk
+- Escape markdown in user-supplied source/space names rendered in persistent notifications to neutralise `[text](javascript:…)` injection
+
+### Fixed
+- Previous optimistic fix on device availability was reading the wrong source (`attributes["online"]` instead of `device.online`), leaving entities stuck "Indisponible" — now reads `device.online`
+
+### Changed
+- Factorise `_get_recording_nvr_id` into `AjaxSpace.get_recording_nvr_id()` (removes 3× duplication across camera/sensor/binary_sensor)
+- Cache `space_binding` results per hub so `async_get_space_by_hub` is only hit on `full_refresh`, not on every tick
+- Expose `AjaxRestApi.bypass_cache_next()` as a public helper (coordinator no longer pokes `_bypass_cache_once` directly)
+- Bound aiohttp session connector (`limit=20`, `limit_per_host=10`) to avoid connector exhaustion
+- Guard `camera.async_camera_image` with an `asyncio.Lock` so two concurrent requests don't spawn two FFmpeg processes
+- Remove ~15 empty `_handle_coordinator_update` overrides that merely re-called `async_write_ha_state()`
+- `async_migrate_entry`: explicit while-loop-friendly multi-version pattern
+- Smart-lock `Store` schema now versioned via `SMART_LOCK_STORE_VERSION` constant with migration hook ready
+- ONVIF object detection now recognises `bicycle`/`motorcycle`/`car`/`truck`/`bus` as vehicles
+- Camera "sub stream" entity uses `translation_key` so the label follows the user's HA language
+- Logbook messages translated across 7 languages (fr/en/es/de/nl/sv/uk)
+- `event_codes.EVENT_TYPES` extended with de/nl/sv/uk translations
+- `pytest.ini`: scope `DeprecationWarning` suppression to third-party deps so HA breaking changes stay visible
+
+### Removed
+- `issues.critical_firmware_update`, `issues.device_offline`, `issues.firmware_update` from strings/translations — redundant with the `UpdateEntity` platform
+
 ## [0.26.1] - 2026-04-18
 
 ### Security

@@ -372,6 +372,11 @@
         "name": "Panikknapp"
       }
     },
+    "camera": {
+      "camera_sub_stream": {
+        "name": "Sub-stream"
+      }
+    },
     "device_tracker": {
       "position": {
         "name": "Position"
@@ -1529,20 +1534,6 @@
     },
     "system_armed": {
       "message": "Systemet tillkopplat. Vänligen koppla ifrån."
-    }
-  },
-  "issues": {
-    "critical_firmware_update": {
-      "description": "En **kritisk säkerhetsuppdatering** finns tillgänglig för **{device_name}**.\n\n- Nuvarande version: {current_version}\n- Ny version: {new_version}\n\nUppdatera omedelbart via Ajax-appen.",
-      "title": "Kritisk firmware-uppdatering för {device_name}"
-    },
-    "device_offline": {
-      "description": "Enheten **{device_name}** är för närvarande offline och svarar inte. Kontrollera enheten och dess anslutning.",
-      "title": "{device_name} är offline"
-    },
-    "firmware_update": {
-      "description": "En firmware-uppdatering finns tillgänglig för **{device_name}**.\n\n- Nuvarande version: {current_version}\n- Ny version: {new_version}\n\nUppdatera via Ajax-appen.",
-      "title": "Firmware-uppdatering tillgänglig för {device_name}"
     }
   },
   "options": {

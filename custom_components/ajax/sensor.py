@@ -20,7 +20,7 @@ from homeassistant.components.sensor import (
     SensorStateClass,
 )
 from homeassistant.const import PERCENTAGE
-from homeassistant.core import HomeAssistant, callback
+from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -611,11 +611,6 @@ class AjaxSpaceSensor(CoordinatorEntity[AjaxDataCoordinator], SensorEntity):
 
         return get_last_event_attributes(space)
 
-    @callback
-    def _handle_coordinator_update(self) -> None:
-        """Handle updated data from the coordinator."""
-        self.async_write_ha_state()
-
     @property
     def device_info(self) -> DeviceInfo | None:
         """Return device information."""
@@ -746,11 +741,6 @@ class AjaxDeviceSensor(CoordinatorEntity[AjaxDataCoordinator], SensorEntity):
         if not space:
             return None
         return space.devices.get(self._device_id)
-
-    @callback
-    def _handle_coordinator_update(self) -> None:
-        """Handle updated data from the coordinator."""
-        self.async_write_ha_state()
 
 
 # ==============================================================================
@@ -889,53 +879,11 @@ class AjaxVideoEdgeSensor(CoordinatorEntity[AjaxDataCoordinator], SensorEntity):
         return space.video_edges.get(self._video_edge_id)
 
     def _get_recording_nvr_id(self) -> str | None:
-        """Get the ID of the NVR that records this camera (if any).
-
-        Returns the NVR ID if this camera is recorded by an NVR,
-        None otherwise (standalone camera or NVR itself).
-        """
-        video_edge = self._get_video_edge()
-        if not video_edge:
-            return None
-
-        # NVRs don't have a parent NVR
-        if video_edge.video_edge_type.value == "NVR":
-            return None
-
+        """Return the NVR that records this camera (if any)."""
         space = self.coordinator.get_space(self._space_id)
         if not space:
             return None
-
-        camera_id = self._video_edge_id
-
-        # Check all NVRs to see if any record this camera
-        for ve_id, ve in space.video_edges.items():
-            if ve.video_edge_type.value != "NVR":
-                continue
-
-            channels = ve.channels if isinstance(ve.channels, list) else []
-            for channel in channels:
-                if not isinstance(channel, dict):
-                    continue
-                source_aliases = channel.get("sourceAliases", {})
-                if not isinstance(source_aliases, dict):
-                    continue
-                sources = source_aliases.get("sources", [])
-                if not isinstance(sources, list):
-                    continue
-
-                for source in sources:
-                    if not isinstance(source, dict):
-                        continue
-                    if source.get("sourceType") == "PRIMARY" and source.get("videoEdgeId") == camera_id:
-                        return ve_id  # Found the NVR that records this camera
-
-        return None
-
-    @callback
-    def _handle_coordinator_update(self) -> None:
-        """Handle updated data from the coordinator."""
-        self.async_write_ha_state()
+        return space.get_recording_nvr_id(self._video_edge_id)
 
 
 # ==============================================================================
@@ -1124,11 +1072,6 @@ class AjaxHubSensor(CoordinatorEntity[AjaxDataCoordinator], SensorEntity):
             identifiers={(DOMAIN, self._space_id)},
         )
 
-    @callback
-    def _handle_coordinator_update(self) -> None:
-        """Handle updated data from the coordinator."""
-        self.async_write_ha_state()
-
 
 # ==============================================================================
 # Smart Lock Sensors
@@ -1187,8 +1130,3 @@ class AjaxSmartLockSensor(CoordinatorEntity[AjaxDataCoordinator], SensorEntity):
         if not space:
             return None
         return space.smart_locks.get(self._smart_lock_id)
-
-    @callback
-    def _handle_coordinator_update(self) -> None:
-        """Handle updated data from the coordinator."""
-        self.async_write_ha_state()

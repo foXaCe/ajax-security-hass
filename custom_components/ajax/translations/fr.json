@@ -372,6 +372,11 @@
         "name": "Bouton Panique"
       }
     },
+    "camera": {
+      "camera_sub_stream": {
+        "name": "Flux secondaire"
+      }
+    },
     "device_tracker": {
       "position": {
         "name": "Position"
@@ -1529,20 +1534,6 @@
     },
     "system_armed": {
       "message": "Système armé. Veuillez désarmer."
-    }
-  },
-  "issues": {
-    "critical_firmware_update": {
-      "description": "Une **mise à jour de sécurité critique** est disponible pour **{device_name}**.\n\n- Version actuelle : {current_version}\n- Nouvelle version : {new_version}\n\nVeuillez mettre à jour immédiatement via l'application Ajax.",
-      "title": "Mise à jour firmware critique pour {device_name}"
-    },
-    "device_offline": {
-      "description": "L'appareil **{device_name}** est actuellement hors ligne et ne répond pas. Veuillez vérifier l'appareil et sa connexion.",
-      "title": "{device_name} est hors ligne"
-    },
-    "firmware_update": {
-      "description": "Une mise à jour firmware est disponible pour **{device_name}**.\n\n- Version actuelle : {current_version}\n- Nouvelle version : {new_version}\n\nVeuillez mettre à jour via l'application Ajax.",
-      "title": "Mise à jour firmware disponible pour {device_name}"
     }
   },
   "options": {

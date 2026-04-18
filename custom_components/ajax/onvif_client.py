@@ -422,7 +422,7 @@ class AjaxOnvifClient:
                 for ct in class_types:
                     if ct in ("human", "person"):
                         detection_types.add("VIDEO_HUMAN")
-                    elif ct == "vehicle":
+                    elif ct in ("vehicle", "car", "truck", "bus", "bicycle", "motorcycle", "motorbike"):
                         detection_types.add("VIDEO_VEHICLE")
                     elif ct in ("animal", "dog", "cat", "pet"):
                         detection_types.add("VIDEO_PET")

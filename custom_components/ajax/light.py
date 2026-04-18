@@ -14,7 +14,7 @@ from homeassistant.components.light import (
     ColorMode,
     LightEntity,
 )
-from homeassistant.core import HomeAssistant, callback
+from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -233,8 +233,3 @@ class AjaxDimmerLight(CoordinatorEntity[AjaxDataCoordinator], LightEntity):
             else:
                 device.attributes.pop("channelStatuses", None)
             self.async_write_ha_state()
-
-    @callback
-    def _handle_coordinator_update(self) -> None:
-        """Handle updated data from the coordinator."""
-        self.async_write_ha_state()

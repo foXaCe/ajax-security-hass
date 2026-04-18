@@ -457,6 +457,39 @@ class AjaxSpace:
         """Get all unread notifications."""
         return [n for n in self.notifications if not n.read]
 
+    def get_recording_nvr_id(self, camera_id: str) -> str | None:
+        """Return the ID of the NVR that records ``camera_id``, if any.
+
+        Scans NVR video_edges and matches a PRIMARY source whose
+        ``videoEdgeId`` equals the camera. Returns None for standalone
+        cameras and when the queried device is itself an NVR.
+        """
+        camera_ve = self.video_edges.get(camera_id)
+        if camera_ve is None or camera_ve.video_edge_type == VideoEdgeType.NVR:
+            return None
+
+        for ve in self.video_edges.values():
+            if ve.video_edge_type != VideoEdgeType.NVR:
+                continue
+            channels = ve.channels if isinstance(ve.channels, list) else []
+            for channel in channels:
+                if not isinstance(channel, dict):
+                    continue
+                source_aliases = channel.get("sourceAliases", {})
+                if not isinstance(source_aliases, dict):
+                    continue
+                sources = source_aliases.get("sources", [])
+                if not isinstance(sources, list):
+                    continue
+                for source in sources:
+                    if (
+                        isinstance(source, dict)
+                        and source.get("sourceType") == "PRIMARY"
+                        and source.get("videoEdgeId") == camera_id
+                    ):
+                        return ve.id
+        return None
+
 
 @dataclass
 class AjaxAccount:

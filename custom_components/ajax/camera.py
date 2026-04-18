@@ -156,9 +156,12 @@ class AjaxVideoEdgeCamera(CoordinatorEntity[AjaxDataCoordinator], Camera):
         else:
             self._attr_unique_id = f"{video_edge.id}_camera_{stream_type}"
 
-        # Camera name and default enabled state
+        # Camera name and default enabled state.
+        # We use translation_key for the generic sub-stream entity so the
+        # displayed name follows the user's HA language. NVR channel labels
+        # come from the API itself (channel_name) and stay as raw strings.
         if channel_index is not None:
-            # NVR with multiple channels
+            # NVR with multiple channels — rely on the channel label from the API.
             ch_label = channel_name or f"Channel {channel_index + 1}"
             if stream_type == "main":
                 self._attr_name = ch_label
@@ -168,7 +171,9 @@ class AjaxVideoEdgeCamera(CoordinatorEntity[AjaxDataCoordinator], Camera):
         elif stream_type == "main":
             self._attr_name = None  # Use device name
         else:
-            self._attr_name = "Sub stream"
+            self._attr_has_entity_name = True
+            self._attr_translation_key = "camera_sub_stream"
+            self._attr_name = None
             # Sub stream disabled by default (for 3G/4G use)
             self._attr_entity_registry_enabled_default = False
 
@@ -176,9 +181,11 @@ class AjaxVideoEdgeCamera(CoordinatorEntity[AjaxDataCoordinator], Camera):
         self._model_name = VIDEO_EDGE_MODEL_NAMES.get(video_edge.video_edge_type, "Video Edge")
         self._color = video_edge.color.title() if video_edge.color else ""
 
-        # Snapshot cache
+        # Snapshot cache (guarded by a lock so two concurrent image requests
+        # don't spawn two FFmpeg processes against the same camera).
         self._snapshot_cache: bytes | None = None
         self._snapshot_cache_time: float = 0
+        self._snapshot_lock: asyncio.Lock = asyncio.Lock()
 
     @property
     def _video_edge(self) -> AjaxVideoEdge | None:
@@ -222,48 +229,13 @@ class AjaxVideoEdgeCamera(CoordinatorEntity[AjaxDataCoordinator], Camera):
         )
 
     def _get_recording_nvr_id(self) -> str | None:
-        """Get the ID of the NVR that records this camera (if any).
-
-        Returns the NVR ID if this camera is recorded by an NVR,
-        None otherwise (standalone camera or NVR itself).
-        """
-        video_edge = self._video_edge
-        if not video_edge:
+        """Return the NVR that records this camera (if any)."""
+        if self.coordinator.data is None:
             return None
-
-        # NVRs don't have a parent NVR
-        if video_edge.video_edge_type.value == "NVR":
-            return None
-
         space = self.coordinator.data.spaces.get(self._space_id)
         if not space:
             return None
-
-        camera_id = self._video_edge_id
-
-        # Check all NVRs to see if any record this camera
-        for ve_id, ve in space.video_edges.items():
-            if ve.video_edge_type.value != "NVR":
-                continue
-
-            channels = ve.channels if isinstance(ve.channels, list) else []
-            for channel in channels:
-                if not isinstance(channel, dict):
-                    continue
-                source_aliases = channel.get("sourceAliases", {})
-                if not isinstance(source_aliases, dict):
-                    continue
-                sources = source_aliases.get("sources", [])
-                if not isinstance(sources, list):
-                    continue
-
-                for source in sources:
-                    if not isinstance(source, dict):
-                        continue
-                    if source.get("sourceType") == "PRIMARY" and source.get("videoEdgeId") == camera_id:
-                        return ve_id  # Found the NVR that records this camera
-
-        return None
+        return space.get_recording_nvr_id(self._video_edge_id)
 
     @property
     def extra_state_attributes(self) -> dict[str, str] | None:
@@ -353,58 +325,63 @@ class AjaxVideoEdgeCamera(CoordinatorEntity[AjaxDataCoordinator], Camera):
         We use FFmpeg to extract a single frame from the RTSP stream.
         Images are cached for SNAPSHOT_CACHE_DURATION seconds to reduce load.
         """
-        # Return cached snapshot if still valid
-        now = time.time()
-        if self._snapshot_cache and (now - self._snapshot_cache_time) < SNAPSHOT_CACHE_DURATION:
+        # Serialise concurrent callers so only one FFmpeg process runs at a
+        # time per camera; late callers pick up the fresh cache.
+        async with self._snapshot_lock:
+            now = time.time()
+            if self._snapshot_cache and (now - self._snapshot_cache_time) < SNAPSHOT_CACHE_DURATION:
+                return self._snapshot_cache
+
+            # Prefer sub stream for snapshots (640x480 vs 2560x1440 → ~4x faster decode)
+            rtsp_url = self._build_rtsp_url("sub") or self._build_rtsp_url("main")
+            if not rtsp_url:
+                return self._snapshot_cache  # Return old cache if available
+
+            ffmpeg_manager = get_ffmpeg_manager(self.hass)
+            process = None
+
+            try:
+                # FFmpeg command to extract a single frame as JPEG
+                # Using TCP transport for reliability
+                process = await asyncio.wait_for(
+                    asyncio.create_subprocess_exec(
+                        ffmpeg_manager.binary,
+                        "-rtsp_transport",
+                        "tcp",
+                        "-i",
+                        rtsp_url,
+                        "-frames:v",
+                        "1",
+                        "-q:v",
+                        "2",
+                        "-f",
+                        "image2",
+                        "-",
+                        stdout=asyncio.subprocess.PIPE,
+                        stderr=asyncio.subprocess.DEVNULL,
+                    ),
+                    timeout=15,
+                )
+
+                stdout, _ = await asyncio.wait_for(process.communicate(), timeout=15)
+                if stdout:
+                    self._snapshot_cache = stdout
+                    self._snapshot_cache_time = now
+                    return stdout
+            except TimeoutError:
+                _LOGGER.debug(
+                    "Timeout getting snapshot from %s",
+                    self._video_edge.name if self._video_edge else "camera",
+                )
+            except Exception as err:
+                # Scrub RTSP URL from error messages to avoid leaking credentials
+                err_msg = str(err).replace(rtsp_url, "rtsp://***:***@...") if rtsp_url else str(err)
+                _LOGGER.debug("Error getting snapshot: %s", err_msg)
+            finally:
+                # Kill orphaned FFmpeg process to prevent zombie/resource leak
+                if process is not None and process.returncode is None:
+                    process.kill()
+                    await process.wait()
+
+            # Return old cache on error
             return self._snapshot_cache
-
-        # Prefer sub stream for snapshots (640x480 vs 2560x1440 → ~4x faster decode)
-        rtsp_url = self._build_rtsp_url("sub") or self._build_rtsp_url("main")
-        if not rtsp_url:
-            return self._snapshot_cache  # Return old cache if available
-
-        ffmpeg_manager = get_ffmpeg_manager(self.hass)
-        process = None
-
-        try:
-            # FFmpeg command to extract a single frame as JPEG
-            # Using TCP transport for reliability
-            process = await asyncio.wait_for(
-                asyncio.create_subprocess_exec(
-                    ffmpeg_manager.binary,
-                    "-rtsp_transport",
-                    "tcp",
-                    "-i",
-                    rtsp_url,
-                    "-frames:v",
-                    "1",
-                    "-q:v",
-                    "2",
-                    "-f",
-                    "image2",
-                    "-",
-                    stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.DEVNULL,
-                ),
-                timeout=15,
-            )
-
-            stdout, _ = await asyncio.wait_for(process.communicate(), timeout=15)
-            if stdout:
-                self._snapshot_cache = stdout
-                self._snapshot_cache_time = now
-                return stdout
-        except TimeoutError:
-            _LOGGER.debug("Timeout getting snapshot from %s", self._video_edge.name if self._video_edge else "camera")
-        except Exception as err:
-            # Scrub RTSP URL from error messages to avoid leaking credentials
-            err_msg = str(err).replace(rtsp_url, "rtsp://***:***@...") if rtsp_url else str(err)
-            _LOGGER.debug("Error getting snapshot: %s", err_msg)
-        finally:
-            # Kill orphaned FFmpeg process to prevent zombie/resource leak
-            if process is not None and process.returncode is None:
-                process.kill()
-                await process.wait()
-
-        # Return old cache on error
-        return self._snapshot_cache

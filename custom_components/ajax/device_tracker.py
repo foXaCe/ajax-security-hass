@@ -11,7 +11,7 @@ from typing import Any
 
 from homeassistant.components.device_tracker import SourceType
 from homeassistant.components.device_tracker.config_entry import TrackerEntity
-from homeassistant.core import HomeAssistant, callback
+from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -147,8 +147,3 @@ class AjaxHubTracker(CoordinatorEntity[AjaxDataCoordinator], TrackerEntity):
             name="Ajax Hub" if space.name == "Hub" else space.name,
             manufacturer=MANUFACTURER,
         )
-
-    @callback
-    def _handle_coordinator_update(self) -> None:
-        """Handle updated data from the coordinator."""
-        self.async_write_ha_state()

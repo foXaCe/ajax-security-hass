@@ -11,7 +11,7 @@ import time
 from typing import Any
 
 from homeassistant.components.switch import SwitchEntity
-from homeassistant.core import HomeAssistant, callback
+from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity import EntityCategory
@@ -574,11 +574,6 @@ class AjaxSwitch(CoordinatorEntity[AjaxDataCoordinator], SwitchEntity):
             return None
         return space.devices.get(self._device_id)
 
-    @callback
-    def _handle_coordinator_update(self) -> None:
-        """Handle updated data from the coordinator."""
-        self.async_write_ha_state()
-
 
 class AjaxDimmerSettingsSwitch(CoordinatorEntity[AjaxDataCoordinator], SwitchEntity):
     """Switch entity for LightSwitchDimmer settings (settingsSwitch list)."""
@@ -628,11 +623,6 @@ class AjaxDimmerSettingsSwitch(CoordinatorEntity[AjaxDataCoordinator], SwitchEnt
             return False
         settings_list = device.attributes.get("settingsSwitch", [])
         return self._switch_def["settings_key"] in settings_list
-
-    @callback
-    def _handle_coordinator_update(self) -> None:
-        """Handle updated data from coordinator."""
-        self.async_write_ha_state()
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn the switch on."""
@@ -733,11 +723,6 @@ class AjaxDimmerBoolSwitch(CoordinatorEntity[AjaxDataCoordinator], SwitchEntity)
             return False
         return device.attributes.get(self._attr_key, False)
 
-    @callback
-    def _handle_coordinator_update(self) -> None:
-        """Handle updated data from coordinator."""
-        self.async_write_ha_state()
-
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn the switch on."""
         await self._set_value(True)
@@ -823,11 +808,6 @@ class AjaxDimmerCalibrationSwitch(CoordinatorEntity[AjaxDataCoordinator], Switch
             return False
         dimmer_settings = device.attributes.get("dimmerSettings", {})
         return dimmer_settings.get("calibration") == "ENABLED"
-
-    @callback
-    def _handle_coordinator_update(self) -> None:
-        """Handle updated data from coordinator."""
-        self.async_write_ha_state()
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn on calibration."""

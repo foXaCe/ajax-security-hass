@@ -161,8 +161,3 @@ class AjaxLock(CoordinatorEntity[AjaxDataCoordinator], LockEntity):
         if not space:
             return None
         return space.smart_locks.get(self._smart_lock_id)
-
-    @callback
-    def _handle_coordinator_update(self) -> None:
-        """Handle updated data from the coordinator."""
-        self.async_write_ha_state()

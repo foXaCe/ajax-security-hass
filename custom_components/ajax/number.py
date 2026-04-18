@@ -503,11 +503,6 @@ class AjaxDimmerNumber(CoordinatorEntity[AjaxDataCoordinator], NumberEntity):
             return None
         return device.attributes.get(self._number_def["attr_key"])
 
-    @callback
-    def _handle_coordinator_update(self) -> None:
-        """Handle updated data from coordinator."""
-        self.async_write_ha_state()
-
     async def async_set_native_value(self, value: float) -> None:
         """Set the number value."""
         space = self.coordinator.get_space(self._space_id)

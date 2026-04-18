@@ -33,6 +33,6 @@ exclude_dirs = ["tests", ".venv", "venv"]
 skips = ["B101", "B105", "B110"]  # assert_used, hardcoded_password (config key names), try_except_pass
 
 [tool.codespell]
-# French/Spanish/German words in translations - not typos
-ignore-words-list = "hass,groupe,connexion,vie,appareil,inclinaison,mouvement,normale,confort,chambre,auxiliar,doble,mis,foto"
+# French/Spanish/German/Dutch/Swedish words in translations - not typos
+ignore-words-list = "hass,groupe,connexion,vie,appareil,inclinaison,mouvement,normale,confort,chambre,auxiliar,doble,mis,foto,thuis,intervall,nd"
 skip = ".git,*.json,*.lock"

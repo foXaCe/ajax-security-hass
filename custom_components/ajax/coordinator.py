@@ -102,6 +102,11 @@ except ImportError:
 
 _LOGGER = logging.getLogger(__name__)
 
+# Storage schema version for SSE/SQS-discovered smart locks.
+# Increment when the on-disk layout changes and update
+# AjaxDataCoordinator._async_migrate_smart_locks_store accordingly.
+SMART_LOCK_STORE_VERSION = 1
+
 
 class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
     """Coordinator to manage Ajax data updates.
@@ -147,6 +152,8 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
         self.account: AjaxAccount | None = None
         self._enabled_spaces: list[str] | None = enabled_spaces
         self.all_discovered_spaces: dict[str, str] = {}  # space_id -> name (for options flow)
+        # Cached space_binding responses to avoid repeated per-tick API calls.
+        self._space_binding_cache: dict[str, dict] = {}  # hub_id -> space_binding
         self._fast_poll_tasks: dict[str, asyncio.Task] = {}  # device_id -> fast polling task for door sensors
         self._door_sensor_poll_task: asyncio.Task | None = (
             None  # Continuous door sensor polling when disarmed or in night mode
@@ -197,8 +204,10 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
         self._consecutive_auth_errors: int = 0
         self._max_auth_errors: int = 3  # Trigger reauth after 3 consecutive auth failures
 
-        # Persistent storage for SSE/SQS-discovered smart locks (survives reboots)
-        self._smart_lock_store: Store = Store(hass, 1, f"{DOMAIN}_smart_locks")
+        # Persistent storage for SSE/SQS-discovered smart locks (survives reboots).
+        # Schema migration is handled manually in _async_load_smart_locks so we
+        # stay compatible with Store implementations that predate migrate_func.
+        self._smart_lock_store: Store = Store(hass, SMART_LOCK_STORE_VERSION, f"{DOMAIN}_smart_locks")
 
         super().__init__(
             hass,
@@ -511,7 +520,7 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
 
             # Check if we need to bypass proxy cache (after SSE event or user action)
             if self._bypass_cache_next_refresh:
-                self.api._bypass_cache_once = True
+                self.api.bypass_cache_next()
                 self._bypass_cache_next_refresh = False
                 _LOGGER.debug("Bypassing proxy cache for this refresh")
 
@@ -703,6 +712,22 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
             self.account.name,
             self.account.user_id,
         )
+
+    @staticmethod
+    async def _async_migrate_smart_locks_store(old_major_version: int, old_minor_version: int, old_data: dict) -> dict:
+        """Migrate the smart-locks Store payload across schema versions.
+
+        The current schema (v1) is a mapping ``space_id -> list[smart_lock]``.
+        This function is a placeholder: the day we bump
+        ``SMART_LOCK_STORE_VERSION`` we translate ``old_data`` here.
+        """
+        _LOGGER.debug(
+            "Smart-lock store migration: %s.%s -> %s",
+            old_major_version,
+            old_minor_version,
+            SMART_LOCK_STORE_VERSION,
+        )
+        return old_data or {}
 
     async def _async_save_smart_locks(self) -> None:
         """Persist SSE/SQS-discovered smart locks to storage."""
@@ -1158,15 +1183,21 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
             hub_name = hub_data.get("hubName", f"Hub {hub_id[:6]}")
             self.all_discovered_spaces[hub_id] = hub_name
 
-            # Try to get the proper space name for all spaces (including disabled)
-            # This ensures the options flow shows correct names
-            try:
-                space_binding = await self.api.async_get_space_by_hub(hub_id)
-                if space_binding and space_binding.get("name"):
-                    hub_name = str(space_binding.get("name"))
-                    self.all_discovered_spaces[hub_id] = hub_name
-            except AjaxRestApiError as err:
-                _LOGGER.debug("Could not resolve space name for %s: %s", hub_id, err)
+            # Try to get the proper space name for all spaces (including disabled).
+            # Cache the result so we don't hit the API on every tick — refresh
+            # only on full_refresh or when the entry is missing.
+            cached_binding = self._space_binding_cache.get(hub_id)
+            if cached_binding is None or full_refresh:
+                try:
+                    space_binding = await self.api.async_get_space_by_hub(hub_id)
+                    if space_binding:
+                        self._space_binding_cache[hub_id] = space_binding
+                        cached_binding = space_binding
+                except AjaxRestApiError as err:
+                    _LOGGER.debug("Could not resolve space name for %s: %s", hub_id, err)
+            if cached_binding and cached_binding.get("name"):
+                hub_name = str(cached_binding.get("name"))
+                self.all_discovered_spaces[hub_id] = hub_name
 
             # Skip spaces that are not enabled
             if self._enabled_spaces is not None and hub_id not in self._enabled_spaces:
@@ -1187,20 +1218,18 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
                 rooms_map: dict = {}
 
                 if full_refresh or is_new_space:
-                    # Full refresh: fetch space binding, rooms
-                    try:
-                        space_binding = await self.api.async_get_space_by_hub(hub_id)
-                        if space_binding:
-                            space_name = space_binding.get("name")
-                            real_space_id = space_binding.get("id")
-                            _LOGGER.debug(
-                                "Found space '%s' (id: %s) for hub %s",
-                                space_name,
-                                real_space_id,
-                                hub_id,
-                            )
-                    except Exception as space_err:
-                        _LOGGER.debug("Could not get space for %s: %s", hub_id, space_err)
+                    # Full refresh: use the cached space_binding resolved above
+                    # rather than re-hitting the API.
+                    space_binding = self._space_binding_cache.get(hub_id)
+                    if space_binding:
+                        space_name = space_binding.get("name")
+                        real_space_id = space_binding.get("id")
+                        _LOGGER.debug(
+                            "Found space '%s' (id: %s) for hub %s",
+                            space_name,
+                            real_space_id,
+                            hub_id,
+                        )
 
                     # Get rooms for this hub
                     try:
@@ -2698,9 +2727,13 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
 
         if source_name:
             by_word = {"fr": "par", "en": "by", "es": "por"}.get(language, "by")
-            message = f"{message} {by_word} {source_name}"
+            # Persistent notifications render markdown — escape user-supplied
+            # source_name (from Ajax API) to neutralise [text](javascript:...)
+            # injection and stray markdown formatting.
+            safe_source = self._escape_markdown(source_name)
+            message = f"{message} {by_word} {safe_source}"
 
-        title = f"Ajax - {space_name}"
+        title = f"Ajax - {self._escape_markdown(space_name)}"
 
         async_create(
             self.hass,
@@ -2708,6 +2741,21 @@ class AjaxDataCoordinator(DataUpdateCoordinator[AjaxAccount]):
             title=title,
             notification_id=f"ajax_{action}_{int(time.time())}",
         )
+
+    @staticmethod
+    def _escape_markdown(text: str | None) -> str:
+        """Escape markdown special characters in user-supplied text.
+
+        Persistent notifications in Home Assistant render as markdown, so
+        names coming from the Ajax API must be neutralised before being
+        interpolated into the message body.
+        """
+        if not text:
+            return ""
+        escaped = str(text)
+        for ch in ("\\", "`", "*", "_", "[", "]", "(", ")", "{", "}", "#", "+", "!", "|", "<", ">"):
+            escaped = escaped.replace(ch, f"\\{ch}")
+        return escaped
 
     def _parse_security_state(self, state_value: Any) -> SecurityState:
         """Parse security state from API response."""

@@ -442,12 +442,17 @@ async def _async_setup_services(hass: HomeAssistant) -> None:
                             err,
                         )
 
-        # Write to file (include devices, cameras, and video edges)
+        # Write to file (include devices, cameras, and video edges).
+        # Redact sensitive fields before writing so the file is safe to share.
+        from homeassistant.components.diagnostics import async_redact_data
+
+        from .diagnostics import TO_REDACT
+
         output_path = Path(hass.config.path("ajax_raw_devices.json"))
         output_data = {
-            "devices": all_devices,
-            "cameras": all_cameras,
-            "video_edges": all_video_edges,
+            "devices": async_redact_data(all_devices, TO_REDACT),
+            "cameras": async_redact_data(all_cameras, TO_REDACT),
+            "video_edges": async_redact_data(all_video_edges, TO_REDACT),
         }
 
         def write_json():
@@ -805,14 +810,34 @@ async def async_unload_entry(hass: HomeAssistant, entry: AjaxConfigEntry) -> boo
 
 
 async def async_migrate_entry(hass: HomeAssistant, entry: AjaxConfigEntry) -> bool:
-    """Migrate old entry."""
-    # Add unique_id
-    if entry.version == 1 and entry.minor_version == 1:
+    """Migrate an old config entry up to the current schema.
+
+    Each migration step moves the entry forward by one minor (or major)
+    version. The loop handles users who skip versions — we only need to
+    keep the step-by-step transitions correct.
+    """
+    _LOGGER.debug(
+        "Migrating ConfigEntry from v%s.%s",
+        entry.version,
+        entry.minor_version,
+    )
+
+    # v1.1 → v1.2 : populate unique_id from e-mail.
+    if entry.version == 1 and entry.minor_version < 2:
         hass.config_entries.async_update_entry(
             entry,
-            unique_id=entry.data[CONF_EMAIL],
+            unique_id=entry.data.get(CONF_EMAIL),
             minor_version=2,
         )
-        _LOGGER.info("ConfigEntry migrated successfully to version %s.%s", 1, 2)
+        _LOGGER.info("ConfigEntry migrated to v1.2 (added unique_id)")
 
+    # Future migrations go here, following the same pattern:
+    # if entry.version == 1 and entry.minor_version < 3: ...
+    # if entry.version == 1 and entry.minor_version < 4: ...
+
+    _LOGGER.debug(
+        "ConfigEntry migration finished at v%s.%s",
+        entry.version,
+        entry.minor_version,
+    )
     return True

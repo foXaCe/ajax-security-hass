@@ -372,6 +372,11 @@
         "name": "Тривожна кнопка"
       }
     },
+    "camera": {
+      "camera_sub_stream": {
+        "name": "Додатковий потік"
+      }
+    },
     "device_tracker": {
       "position": {
         "name": "Позиція"
@@ -1529,20 +1534,6 @@
     },
     "system_armed": {
       "message": "Система під охороною. Будь ласка, зніміть."
-    }
-  },
-  "issues": {
-    "critical_firmware_update": {
-      "description": "Доступне **критичне оновлення безпеки** для **{device_name}**.\n\n- Поточна версія: {current_version}\n- Нова версія: {new_version}\n\nБудь ласка, негайно оновіть через додаток Ajax.",
-      "title": "Критичне оновлення прошивки для {device_name}"
-    },
-    "device_offline": {
-      "description": "Пристрій **{device_name}** наразі офлайн і не відповідає. Будь ласка, перевірте пристрій та його підключення.",
-      "title": "{device_name} офлайн"
-    },
-    "firmware_update": {
-      "description": "Доступне оновлення прошивки для **{device_name}**.\n\n- Поточна версія: {current_version}\n- Нова версія: {new_version}\n\nБудь ласка, оновіть через додаток Ajax.",
-      "title": "Доступне оновлення прошивки для {device_name}"
     }
   },
   "options": {

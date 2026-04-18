@@ -506,11 +506,6 @@ class AjaxDimmerSelect(CoordinatorEntity[AjaxDataCoordinator], SelectEntity):
                 return option
         return None
 
-    @callback
-    def _handle_coordinator_update(self) -> None:
-        """Handle updated data from coordinator."""
-        self.async_write_ha_state()
-
     async def async_select_option(self, option: str) -> None:
         """Set the select option."""
         space = self.coordinator.get_space(self._space_id)

@@ -6,12 +6,8 @@ Handles:
 
 from __future__ import annotations
 
-from homeassistant.components.binary_sensor import BinarySensorDeviceClass
-from homeassistant.components.sensor import (
-    SensorDeviceClass,
-    SensorStateClass,
-)
-from homeassistant.const import PERCENTAGE
+from homeassistant.components.event import EventDeviceClass
+from homeassistant.components.sensor import SensorDeviceClass
 
 from .base import AjaxDeviceHandler
 
@@ -25,60 +21,24 @@ class DoorbellHandler(AjaxDeviceHandler):
         The doorbell press itself is exposed via the event platform
         (see get_events); we only expose tamper here.
         """
-        return [
-            {
-                "key": "tamper",
-                "device_class": BinarySensorDeviceClass.TAMPER,
-                "value_fn": lambda: self.device.attributes.get("tampered", False),
-                "enabled_by_default": True,
-            },
-        ]
+        return [self._tamper_binary_sensor()]
 
     def get_sensors(self) -> list[dict]:
         """Return sensor entities for doorbell."""
-        sensors = []
-
-        # Battery level
-        sensors.append(
-            {
-                "key": "battery",
-                "device_class": SensorDeviceClass.BATTERY,
-                "native_unit_of_measurement": PERCENTAGE,
-                "state_class": SensorStateClass.MEASUREMENT,
-                "value_fn": lambda: self.device.battery_level if self.device.battery_level is not None else None,
-                "enabled_by_default": True,
-            }
-        )
-
-        # Signal strength
-        sensors.append(
-            {
-                "key": "signal_strength",
-                "translation_key": "signal_strength",
-                "native_unit_of_measurement": PERCENTAGE,
-                "state_class": SensorStateClass.MEASUREMENT,
-                "value_fn": lambda: self.device.signal_strength if self.device.signal_strength is not None else None,
-                "enabled_by_default": True,
-            }
-        )
-
-        # Last ring timestamp
-        sensors.append(
+        return [
+            self._battery_sensor(),
+            self._signal_strength_percent_sensor(),
             {
                 "key": "last_ring",
                 "translation_key": "last_ring",
                 "device_class": SensorDeviceClass.TIMESTAMP,
                 "value_fn": lambda: self.device.attributes.get("last_ring"),
                 "enabled_by_default": True,
-            }
-        )
-
-        return sensors
+            },
+        ]
 
     def get_events(self) -> list[dict]:
         """Return event entities for doorbell."""
-        from homeassistant.components.event import EventDeviceClass
-
         return [
             {
                 "key": "doorbell_press",
@@ -88,8 +48,3 @@ class DoorbellHandler(AjaxDeviceHandler):
                 "enabled_by_default": True,
             },
         ]
-
-    def get_switches(self) -> list[dict]:
-        """Return switch entities for doorbell."""
-        # Doorbell typically doesn't have configurable switches
-        return []

@@ -1482,6 +1482,11 @@
         }
       }
     },
+    "camera": {
+      "camera_sub_stream": {
+        "name": "Sub stream"
+      }
+    },
     "update": {
       "hub_firmware": {
         "name": "Firmware"
@@ -1625,20 +1630,6 @@
         "none": "None",
         "security_events": "Security events (alarms + arming)"
       }
-    }
-  },
-  "issues": {
-    "critical_firmware_update": {
-      "description": "A **critical security update** is available for **{device_name}**.\n\n- Current version: {current_version}\n- New version: {new_version}\n\nPlease update immediately via the Ajax app.",
-      "title": "Critical firmware update for {device_name}"
-    },
-    "device_offline": {
-      "description": "The device **{device_name}** is currently offline and not responding. Please check the device and its connection.",
-      "title": "{device_name} is offline"
-    },
-    "firmware_update": {
-      "description": "A firmware update is available for **{device_name}**.\n\n- Current version: {current_version}\n- New version: {new_version}\n\nPlease update via the Ajax app.",
-      "title": "Firmware update available for {device_name}"
     }
   },
   "services": {

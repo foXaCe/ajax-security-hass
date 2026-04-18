@@ -372,6 +372,11 @@
         "name": "Paniktaste"
       }
     },
+    "camera": {
+      "camera_sub_stream": {
+        "name": "Sub-Stream"
+      }
+    },
     "device_tracker": {
       "position": {
         "name": "Position"
@@ -1529,20 +1534,6 @@
     },
     "system_armed": {
       "message": "System ist scharf. Bitte deaktivieren."
-    }
-  },
-  "issues": {
-    "critical_firmware_update": {
-      "description": "Ein **kritisches Sicherheitsupdate** ist für **{device_name}** verfügbar.\n\n- Aktuelle Version: {current_version}\n- Neue Version: {new_version}\n\nBitte aktualisieren Sie sofort über die Ajax-App.",
-      "title": "Kritisches Firmware-Update für {device_name}"
-    },
-    "device_offline": {
-      "description": "Das Gerät **{device_name}** ist derzeit offline und reagiert nicht. Bitte überprüfen Sie das Gerät und seine Verbindung.",
-      "title": "{device_name} ist offline"
-    },
-    "firmware_update": {
-      "description": "Ein Firmware-Update ist für **{device_name}** verfügbar.\n\n- Aktuelle Version: {current_version}\n- Neue Version: {new_version}\n\nBitte aktualisieren Sie über die Ajax-App.",
-      "title": "Firmware-Update verfügbar für {device_name}"
     }
   },
   "options": {

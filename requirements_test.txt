@@ -17,4 +17,4 @@ aiohttp>=3.9.0
 aiobotocore>=2.7.0
 
 # Home Assistant core (for testing)
-homeassistant>=2024.1.0
+homeassistant>=2026.4.3

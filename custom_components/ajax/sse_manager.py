@@ -446,7 +446,7 @@ class SSEManager(EventHandlerMixin):
             new_state,
             source_name=source_name,
             source_type=source_type,
-        )        
+        )
 
     def _find_device(self, space, source_name: str, source_id: str):
         """Find device by name or ID.

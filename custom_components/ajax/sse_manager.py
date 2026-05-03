@@ -432,14 +432,21 @@ class SSEManager(EventHandlerMixin):
         # Fire HA bus event so automations can react to who triggered the
         # arm/disarm (user name, keypad, space control, HA...) — otherwise
         # only the coordinator REST fallback fires it without source info.
-        if state_changed:
-            self.coordinator._fire_security_state_event(
-                space,
-                old_state,
-                new_state,
-                source_name=source_name,
-                source_type=source_type,
-            )
+        # if state_changed:
+        #     self.coordinator._fire_security_state_event(
+        #         space,
+        #         old_state,
+        #         new_state,
+        #         source_name=source_name,
+        #         source_type=source_type,
+        #     )
+        self.coordinator._fire_security_state_event(
+            space,
+            old_state,
+            new_state,
+            source_name=source_name,
+            source_type=source_type,
+        )        
 
     def _find_device(self, space, source_name: str, source_id: str):
         """Find device by name or ID.

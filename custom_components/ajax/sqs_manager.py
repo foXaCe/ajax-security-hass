@@ -643,15 +643,21 @@ class SQSManager(EventHandlerMixin):
 
         # Fire HA bus event so automations can branch on who triggered
         # the arm/disarm (user name, keypad, space control, HA...).
-        if state_changed:
-            self.coordinator._fire_security_state_event(
-                space,
-                old_state,
-                new_state,
-                source_name=source_name,
-                source_type=source_type,
-            )
-
+        # if state_changed:
+        #     self.coordinator._fire_security_state_event(
+        #         space,
+        #         old_state,
+        #         new_state,
+        #         source_name=source_name,
+        #         source_type=source_type,
+        #     )
+        self.coordinator._fire_security_state_event(
+            space,
+            old_state,
+            new_state,
+            source_name=source_name,
+            source_type=source_type,
+        )
         return True
 
     async def _handle_door_event(

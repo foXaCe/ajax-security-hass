@@ -14,7 +14,7 @@ coverage>=7.13.5
 
 # Async support
 aiohttp>=3.13.5
-aiobotocore>=3.5.0
+aiobotocore>=3.7.0
 
 # Home Assistant core (for testing)
 homeassistant>=2026.4.4

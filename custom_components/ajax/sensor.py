@@ -21,15 +21,14 @@ from homeassistant.components.sensor import (
     SensorStateClass,
 )
 from homeassistant.const import PERCENTAGE
-from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers import entity_registry as er
+from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
-from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import AjaxConfigEntry
+from ._discovery import connect_new_entity_signal
 from .const import DOMAIN, MANUFACTURER, SIGNAL_NEW_DEVICE, SIGNAL_NEW_SMART_LOCK, SIGNAL_NEW_VIDEO_EDGE
 from .coordinator import AjaxDataCoordinator
 from .devices import VideoEdgeHandler, get_device_handler
@@ -567,86 +566,87 @@ async def async_setup_entry(
         async_add_entities(entities)
         _LOGGER.info("Added %d Ajax sensor(s)", len(entities))
 
-    @callback
-    def _async_add_new_device(space_id: str, device_id: str) -> None:
-        """Add sensors when a regular device is discovered after setup."""
+    def _build_device(space_id: str, device_id: str) -> list[tuple[str, SensorEntity]]:
+        """Build sensors for a newly-discovered regular device."""
         space = coordinator.get_space(space_id)
         device = space.devices.get(device_id) if space else None
         if not device:
-            return
-
+            return []
         handler_class = get_device_handler(device)
         if not handler_class:
-            return
-
-        ent_reg = er.async_get(hass)
-        new_entities: list[SensorEntity] = []
+            return []
         handler = handler_class(device)  # type: ignore[abstract]
-        for sensor_desc in handler.get_sensors() + handler.get_common_sensors():
-            unique_id = f"{device_id}_{sensor_desc['key']}"
-            if unique_id in seen_unique_ids or ent_reg.async_get_entity_id(SENSOR_DOMAIN, DOMAIN, unique_id):
-                continue
-            seen_unique_ids.add(unique_id)
-            new_entities.append(
+        return [
+            (
+                f"{device_id}_{sensor_desc['key']}",
                 AjaxDeviceSensor(
                     coordinator=coordinator,
                     space_id=space_id,
                     device_id=device_id,
                     sensor_key=sensor_desc["key"],
                     sensor_desc=sensor_desc,
-                )
+                ),
             )
+            for sensor_desc in handler.get_sensors() + handler.get_common_sensors()
+        ]
 
-        if new_entities:
-            async_add_entities(new_entities)
-            _LOGGER.info("Dynamically added %d sensor(s) for device %s", len(new_entities), device_id)
-
-    @callback
-    def _async_add_new_video_edge(space_id: str, video_edge_id: str) -> None:
-        """Add sensors when a Video Edge device is discovered after setup."""
+    def _build_video_edge(space_id: str, video_edge_id: str) -> list[tuple[str, SensorEntity]]:
+        """Build sensors for a newly-discovered Video Edge device."""
         space = coordinator.get_space(space_id)
-        if not space:
-            return
-        video_edge = space.video_edges.get(video_edge_id)
+        video_edge = space.video_edges.get(video_edge_id) if space else None
         if not video_edge:
-            return
-
-        ent_reg = er.async_get(hass)
-        new_entities: list[SensorEntity] = []
+            return []
         handler = VideoEdgeHandler(video_edge, space.video_edges)  # type: ignore[assignment]
-        for sensor_desc in handler.get_sensors():
-            unique_id = f"{video_edge_id}_{sensor_desc['key']}"
-            if unique_id in seen_unique_ids or ent_reg.async_get_entity_id(SENSOR_DOMAIN, DOMAIN, unique_id):
-                continue
-            seen_unique_ids.add(unique_id)
-            new_entities.append(
+        return [
+            (
+                f"{video_edge_id}_{sensor_desc['key']}",
                 AjaxVideoEdgeSensor(
                     coordinator=coordinator,
                     space_id=space_id,
                     video_edge_id=video_edge_id,
                     sensor_key=sensor_desc["key"],
                     sensor_desc=sensor_desc,
-                )
+                ),
             )
+            for sensor_desc in handler.get_sensors()
+        ]
 
-        if new_entities:
-            async_add_entities(new_entities)
-            _LOGGER.info("Dynamically added %d Video Edge sensor(s)", len(new_entities))
+    def _build_smart_lock(space_id: str, smart_lock_id: str) -> list[tuple[str, SensorEntity]]:
+        """Build the last-changed-by sensor for a newly-discovered smart lock."""
+        return [
+            (
+                f"{smart_lock_id}_last_changed_by",
+                AjaxSmartLockSensor(coordinator, space_id, smart_lock_id),
+            )
+        ]
 
-    @callback
-    def _async_add_new_smart_lock(space_id: str, smart_lock_id: str) -> None:
-        """Add sensors when a smart lock is discovered after setup."""
-        ent_reg = er.async_get(hass)
-        unique_id = f"{smart_lock_id}_last_changed_by"
-        if unique_id in seen_unique_ids or ent_reg.async_get_entity_id(SENSOR_DOMAIN, DOMAIN, unique_id):
-            return
-        seen_unique_ids.add(unique_id)
-        async_add_entities([AjaxSmartLockSensor(coordinator, space_id, smart_lock_id)])
-        _LOGGER.info("Dynamically added last_changed_by sensor for smart lock: %s", smart_lock_id)
-
-    entry.async_on_unload(async_dispatcher_connect(hass, SIGNAL_NEW_DEVICE, _async_add_new_device))
-    entry.async_on_unload(async_dispatcher_connect(hass, SIGNAL_NEW_VIDEO_EDGE, _async_add_new_video_edge))
-    entry.async_on_unload(async_dispatcher_connect(hass, SIGNAL_NEW_SMART_LOCK, _async_add_new_smart_lock))
+    connect_new_entity_signal(
+        hass,
+        entry,
+        SIGNAL_NEW_DEVICE,
+        SENSOR_DOMAIN,
+        async_add_entities,
+        _build_device,
+        label="sensor(s)",
+    )
+    connect_new_entity_signal(
+        hass,
+        entry,
+        SIGNAL_NEW_VIDEO_EDGE,
+        SENSOR_DOMAIN,
+        async_add_entities,
+        _build_video_edge,
+        label="Video Edge sensor(s)",
+    )
+    connect_new_entity_signal(
+        hass,
+        entry,
+        SIGNAL_NEW_SMART_LOCK,
+        SENSOR_DOMAIN,
+        async_add_entities,
+        _build_smart_lock,
+        label="smart lock sensor(s)",
+    )
 
 
 # ==============================================================================

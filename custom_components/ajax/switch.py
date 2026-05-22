@@ -11,16 +11,15 @@ import time
 from typing import Any
 
 from homeassistant.components.switch import DOMAIN as SWITCH_DOMAIN, SwitchEntity
-from homeassistant.core import HomeAssistant, callback
+from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
-from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.device_registry import DeviceInfo
-from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import AjaxConfigEntry
+from ._discovery import connect_new_entity_signal
 from .const import DOMAIN, MANUFACTURER, SIGNAL_NEW_DEVICE
 from .coordinator import AjaxDataCoordinator
 from .devices import DEVICE_HANDLERS, LightSwitchHandler, is_dimmer_device
@@ -177,62 +176,83 @@ async def async_setup_entry(
         async_add_entities(entities)
         _LOGGER.info("Added %d Ajax switch(es)", len(entities))
 
-    @callback
-    def _async_add_new_device(space_id: str, device_id: str) -> None:
-        """Add switches when a device is discovered after setup."""
+    def _build_device(space_id: str, device_id: str) -> list[tuple[str, SwitchEntity]]:
+        """Build switch entities for a newly-discovered device.
+
+        Returns every candidate ``(unique_id, entity)``; the discovery
+        helper drops the ones already present in the entity registry.
+        """
         space = coordinator.get_space(space_id)
         device = space.devices.get(device_id) if space else None
         if not device:
-            return
+            return []
 
-        ent_reg = er.async_get(hass)
-        new_entities: list[SwitchEntity] = []
-
-        def _is_new(unique_id: str) -> bool:
-            return ent_reg.async_get_entity_id(SWITCH_DOMAIN, DOMAIN, unique_id) is None
+        pairs: list[tuple[str, SwitchEntity]] = []
 
         if is_dimmer_device(device):
             if "settingsSwitch" in device.attributes:
                 for switch_def in DIMMER_SETTINGS_SWITCHES:
-                    if _is_new(f"{device_id}_{switch_def['key']}"):
-                        new_entities.append(AjaxDimmerSettingsSwitch(coordinator, space_id, device_id, switch_def))
-            if "nightModeArm" in device.attributes and _is_new(f"{device_id}_night_mode"):
-                new_entities.append(
-                    AjaxDimmerBoolSwitch(
-                        coordinator=coordinator,
-                        space_id=space_id,
-                        device_id=device_id,
-                        switch_key="night_mode",
-                        attr_key="nightModeArm",
-                        api_key="nightModeArm",
+                    pairs.append(
+                        (
+                            f"{device_id}_{switch_def['key']}",
+                            AjaxDimmerSettingsSwitch(coordinator, space_id, device_id, switch_def),
+                        )
+                    )
+            if "nightModeArm" in device.attributes:
+                pairs.append(
+                    (
+                        f"{device_id}_night_mode",
+                        AjaxDimmerBoolSwitch(
+                            coordinator=coordinator,
+                            space_id=space_id,
+                            device_id=device_id,
+                            switch_key="night_mode",
+                            attr_key="nightModeArm",
+                            api_key="nightModeArm",
+                        ),
                     )
                 )
             dimmer_settings = device.attributes.get("dimmerSettings", {})
-            if dimmer_settings and "calibration" in dimmer_settings and _is_new(f"{device_id}_dimmer_calibration"):
-                new_entities.append(AjaxDimmerCalibrationSwitch(coordinator, space_id, device_id))
+            if dimmer_settings and "calibration" in dimmer_settings:
+                pairs.append(
+                    (
+                        f"{device_id}_dimmer_calibration",
+                        AjaxDimmerCalibrationSwitch(coordinator, space_id, device_id),
+                    )
+                )
         else:
             handler_class = get_device_handler(device)
             if handler_class:
                 handler = handler_class(device)  # type: ignore[abstract]
                 for switch_desc in handler.get_switches():
-                    if _is_new(f"{device_id}_{switch_desc['key']}"):
-                        new_entities.append(
-                            AjaxSwitch(coordinator, space_id, device_id, switch_desc["key"], switch_desc)
+                    pairs.append(
+                        (
+                            f"{device_id}_{switch_desc['key']}",
+                            AjaxSwitch(coordinator, space_id, device_id, switch_desc["key"], switch_desc),
                         )
+                    )
 
             if is_lightswitch_device(device):
                 lightswitch_handler = LightSwitchHandler(device)
                 for switch_desc in lightswitch_handler.get_switches():
-                    if _is_new(f"{device_id}_{switch_desc['key']}"):
-                        new_entities.append(
-                            AjaxSwitch(coordinator, space_id, device_id, switch_desc["key"], switch_desc)
+                    pairs.append(
+                        (
+                            f"{device_id}_{switch_desc['key']}",
+                            AjaxSwitch(coordinator, space_id, device_id, switch_desc["key"], switch_desc),
                         )
+                    )
 
-        if new_entities:
-            async_add_entities(new_entities)
-            _LOGGER.info("Dynamically added %d switch entit(ies) for device %s", len(new_entities), device_id)
+        return pairs
 
-    entry.async_on_unload(async_dispatcher_connect(hass, SIGNAL_NEW_DEVICE, _async_add_new_device))
+    connect_new_entity_signal(
+        hass,
+        entry,
+        SIGNAL_NEW_DEVICE,
+        SWITCH_DOMAIN,
+        async_add_entities,
+        _build_device,
+        label="switch entit(ies)",
+    )
 
 
 class AjaxSwitch(CoordinatorEntity[AjaxDataCoordinator], SwitchEntity):

@@ -13,14 +13,13 @@ import logging
 from homeassistant.components.select import DOMAIN as SELECT_DOMAIN, SelectEntity
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
-from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.device_registry import DeviceInfo
-from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import AjaxConfigEntry
+from ._discovery import connect_new_entity_signal
 from .const import DOMAIN, SIGNAL_NEW_DEVICE
 from .coordinator import AjaxDataCoordinator
 from .devices.siren import SirenHandler
@@ -206,65 +205,72 @@ async def async_setup_entry(
         async_add_entities(entities)
         _LOGGER.info("Added %d Ajax select entities", len(entities))
 
-    @callback
-    def _async_add_new_device(space_id: str, device_id: str) -> None:
-        """Add select entities when a device is discovered after setup."""
+    def _build_device(space_id: str, device_id: str) -> list[tuple[str, SelectEntity]]:
+        """Build select entities for a newly-discovered device.
+
+        Returns every candidate ``(unique_id, entity)``; the discovery
+        helper drops the ones already present in the entity registry.
+        """
         space = coordinator.get_space(space_id)
         device = space.devices.get(device_id) if space else None
         if not device:
-            return
+            return []
 
-        ent_reg = er.async_get(hass)
-        new_entities: list[SelectEntity] = []
-
-        def _is_new(unique_id: str) -> bool:
-            return ent_reg.async_get_entity_id(SELECT_DOMAIN, DOMAIN, unique_id) is None
+        pairs: list[tuple[str, SelectEntity]] = []
 
         device_type = device.raw_type or ""
-        if device_type in DEVICES_WITH_DOOR_PLUS_SELECTS and _is_new(f"{device_id}_shock_sensitivity"):
-            new_entities.append(AjaxShockSensitivitySelect(coordinator, space_id, device_id))
+        if device_type in DEVICES_WITH_DOOR_PLUS_SELECTS:
+            pairs.append(
+                (f"{device_id}_shock_sensitivity", AjaxShockSensitivitySelect(coordinator, space_id, device_id))
+            )
 
-        if (
-            device.type == DeviceType.SOCKET
-            and device.attributes.get("indicationBrightness") in ["MIN", "MAX"]
-            and _is_new(f"{device_id}_led_brightness")
-        ):
-            new_entities.append(AjaxLedBrightnessSelect(coordinator, space_id, device_id))
+        if device.type == DeviceType.SOCKET and device.attributes.get("indicationBrightness") in ["MIN", "MAX"]:
+            pairs.append((f"{device_id}_led_brightness", AjaxLedBrightnessSelect(coordinator, space_id, device_id)))
 
-        if (
-            device.type == DeviceType.SOCKET
-            and "indicationMode" in device.attributes
-            and _is_new(f"{device_id}_indication_mode")
-        ):
-            new_entities.append(AjaxIndicationModeSelect(coordinator, space_id, device_id))
+        if device.type == DeviceType.SOCKET and "indicationMode" in device.attributes:
+            pairs.append((f"{device_id}_indication_mode", AjaxIndicationModeSelect(coordinator, space_id, device_id)))
 
         if is_dimmer_device(device):
             for select_def in DIMMER_SELECT_DEFINITIONS:
-                if _get_dimmer_attr(device, select_def["attr_key"]) is not None and _is_new(
-                    f"{device_id}_{select_def['key']}"
-                ):
-                    new_entities.append(AjaxDimmerSelect(coordinator, space_id, device_id, select_def))
+                if _get_dimmer_attr(device, select_def["attr_key"]) is not None:
+                    pairs.append(
+                        (
+                            f"{device_id}_{select_def['key']}",
+                            AjaxDimmerSelect(coordinator, space_id, device_id, select_def),
+                        )
+                    )
 
-        if (
-            is_lightswitch_device(device)
-            and "touchMode" in device.attributes
-            and _is_new(f"{device_id}_{LIGHTSWITCH_TOUCH_MODE_SELECT['key']}")
-        ):
-            new_entities.append(AjaxDimmerSelect(coordinator, space_id, device_id, LIGHTSWITCH_TOUCH_MODE_SELECT))
+        if is_lightswitch_device(device) and "touchMode" in device.attributes:
+            pairs.append(
+                (
+                    f"{device_id}_{LIGHTSWITCH_TOUCH_MODE_SELECT['key']}",
+                    AjaxDimmerSelect(coordinator, space_id, device_id, LIGHTSWITCH_TOUCH_MODE_SELECT),
+                )
+            )
 
         handler_class = SELECT_DEVICE_HANDLERS.get(device.type)
         if handler_class:
             handler = handler_class(device)
             if hasattr(handler, "get_selects"):
                 for select_desc in handler.get_selects():
-                    if _is_new(f"{device_id}_{select_desc['key']}"):
-                        new_entities.append(AjaxHandlerSelect(coordinator, space_id, device_id, select_desc))
+                    pairs.append(
+                        (
+                            f"{device_id}_{select_desc['key']}",
+                            AjaxHandlerSelect(coordinator, space_id, device_id, select_desc),
+                        )
+                    )
 
-        if new_entities:
-            async_add_entities(new_entities)
-            _LOGGER.info("Dynamically added %d select entit(ies) for device %s", len(new_entities), device_id)
+        return pairs
 
-    entry.async_on_unload(async_dispatcher_connect(hass, SIGNAL_NEW_DEVICE, _async_add_new_device))
+    connect_new_entity_signal(
+        hass,
+        entry,
+        SIGNAL_NEW_DEVICE,
+        SELECT_DOMAIN,
+        async_add_entities,
+        _build_device,
+        label="select entit(ies)",
+    )
 
 
 class AjaxDoorPlusBaseSelect(CoordinatorEntity[AjaxDataCoordinator], SelectEntity):

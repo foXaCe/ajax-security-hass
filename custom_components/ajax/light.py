@@ -15,15 +15,14 @@ from homeassistant.components.light import (
     ColorMode,
     LightEntity,
 )
-from homeassistant.core import HomeAssistant, callback
+from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
-from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.device_registry import DeviceInfo
-from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import AjaxConfigEntry
+from ._discovery import connect_new_entity_signal
 from .const import DOMAIN, MANUFACTURER, SIGNAL_NEW_DEVICE
 from .coordinator import AjaxDataCoordinator
 from .devices import is_dimmer_device
@@ -69,23 +68,28 @@ async def async_setup_entry(
         async_add_entities(entities)
         _LOGGER.info("Added %d Ajax light entit(ies)", len(entities))
 
-    @callback
-    def _async_add_new_device(space_id: str, device_id: str) -> None:
-        """Add light entity when a dimmer is discovered after setup."""
+    def _build_light(space_id: str, device_id: str) -> list[tuple[str, LightEntity]]:
+        """Build the light entity for a newly-discovered dimmer device."""
         space = coordinator.get_space(space_id)
         device = space.devices.get(device_id) if space else None
         if not device or device.type not in DIMMABLE_DEVICE_TYPES or not is_dimmer_device(device):
-            return
+            return []
+        return [
+            (
+                f"{device_id}_light",
+                AjaxDimmerLight(coordinator=coordinator, space_id=space_id, device_id=device_id),
+            )
+        ]
 
-        unique_id = f"{device_id}_light"
-        ent_reg = er.async_get(hass)
-        if ent_reg.async_get_entity_id(LIGHT_DOMAIN, DOMAIN, unique_id):
-            return
-
-        async_add_entities([AjaxDimmerLight(coordinator=coordinator, space_id=space_id, device_id=device_id)])
-        _LOGGER.info("Dynamically added light entity for dimmer device %s", device_id)
-
-    entry.async_on_unload(async_dispatcher_connect(hass, SIGNAL_NEW_DEVICE, _async_add_new_device))
+    connect_new_entity_signal(
+        hass,
+        entry,
+        SIGNAL_NEW_DEVICE,
+        LIGHT_DOMAIN,
+        async_add_entities,
+        _build_light,
+        label="light entit(ies)",
+    )
 
 
 class AjaxDimmerLight(CoordinatorEntity[AjaxDataCoordinator], LightEntity):

@@ -16,13 +16,13 @@ from homeassistant.components.binary_sensor import (
     BinarySensorEntity,
 )
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers import device_registry as dr, entity_registry as er
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.device_registry import DeviceInfo
-from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import AjaxConfigEntry
+from ._discovery import connect_new_entity_signal
 from .const import DOMAIN, MANUFACTURER, SIGNAL_NEW_DEVICE, SIGNAL_NEW_SMART_LOCK, SIGNAL_NEW_VIDEO_EDGE
 from .coordinator import AjaxDataCoordinator
 from .devices import VideoEdgeHandler, get_device_handler
@@ -175,90 +175,90 @@ async def async_setup_entry(
     if entities:
         _LOGGER.info("Added %d Ajax binary sensor(s)", len(entities))
 
-    @callback
-    def _async_add_new_device(space_id: str, device_id: str) -> None:
-        """Add binary sensors when a regular device is discovered after setup."""
+    def _build_device(space_id: str, device_id: str) -> list[tuple[str, BinarySensorEntity]]:
+        """Build binary sensors for a newly-discovered regular device."""
         space = coordinator.get_space(space_id)
         device = space.devices.get(device_id) if space else None
         if not device:
-            return
-
+            return []
         handler_class = get_device_handler(device)
         if not handler_class:
-            return
-
-        ent_reg = er.async_get(hass)
-        new_entities: list[BinarySensorEntity] = []
+            return []
         handler = handler_class(device)  # type: ignore[abstract]
-        for sensor_desc in handler.get_binary_sensors():
-            unique_id = f"{device_id}_{sensor_desc['key']}"
-            if unique_id in seen_unique_ids or ent_reg.async_get_entity_id(BINARY_SENSOR_DOMAIN, DOMAIN, unique_id):
-                continue
-            seen_unique_ids.add(unique_id)
-            new_entities.append(
+        return [
+            (
+                f"{device_id}_{sensor_desc['key']}",
                 AjaxBinarySensor(
                     coordinator=coordinator,
                     space_id=space_id,
                     device_id=device_id,
                     sensor_key=sensor_desc["key"],
                     sensor_desc=sensor_desc,
-                )
+                ),
             )
+            for sensor_desc in handler.get_binary_sensors()
+        ]
 
-        if new_entities:
-            async_add_entities(new_entities)
-            _LOGGER.info("Dynamically added %d binary sensor(s) for device %s", len(new_entities), device_id)
-
-    @callback
-    def _async_add_new_video_edge(space_id: str, video_edge_id: str) -> None:
-        """Add binary sensors when a Video Edge device is discovered after setup."""
+    def _build_video_edge(space_id: str, video_edge_id: str) -> list[tuple[str, BinarySensorEntity]]:
+        """Build binary sensors for a newly-discovered Video Edge device."""
         space = coordinator.get_space(space_id)
-        if not space:
-            return
-        video_edge = space.video_edges.get(video_edge_id)
+        video_edge = space.video_edges.get(video_edge_id) if space else None
         if not video_edge:
-            return
-
-        ent_reg = er.async_get(hass)
-        new_entities: list[BinarySensorEntity] = []
-        all_video_edges = space.video_edges
-        handler = VideoEdgeHandler(video_edge, all_video_edges)  # type: ignore[assignment]
+            return []
+        handler = VideoEdgeHandler(video_edge, space.video_edges)  # type: ignore[assignment]
+        pairs: list[tuple[str, BinarySensorEntity]] = []
         for sensor_desc in handler.get_binary_sensors():
             target_ve_id = sensor_desc.get("target_video_edge_id") or video_edge_id
-            unique_id = f"{target_ve_id}_{sensor_desc['key']}"
-            if unique_id in seen_unique_ids or ent_reg.async_get_entity_id(BINARY_SENSOR_DOMAIN, DOMAIN, unique_id):
-                continue
-            seen_unique_ids.add(unique_id)
-            new_entities.append(
-                AjaxVideoEdgeBinarySensor(
-                    coordinator=coordinator,
-                    space_id=space_id,
-                    video_edge_id=target_ve_id,
-                    sensor_key=sensor_desc["key"],
-                    sensor_desc=sensor_desc,
+            pairs.append(
+                (
+                    f"{target_ve_id}_{sensor_desc['key']}",
+                    AjaxVideoEdgeBinarySensor(
+                        coordinator=coordinator,
+                        space_id=space_id,
+                        video_edge_id=target_ve_id,
+                        sensor_key=sensor_desc["key"],
+                        sensor_desc=sensor_desc,
+                    ),
                 )
             )
+        return pairs
 
-        if new_entities:
-            async_add_entities(new_entities)
-            _LOGGER.info("Dynamically added %d Video Edge binary sensor(s)", len(new_entities))
+    def _build_smart_lock_door(space_id: str, smart_lock_id: str) -> list[tuple[str, BinarySensorEntity]]:
+        """Build the door binary sensor for a newly-discovered smart lock."""
+        return [
+            (
+                f"{smart_lock_id}_door",
+                AjaxSmartLockBinarySensor(coordinator=coordinator, space_id=space_id, smart_lock_id=smart_lock_id),
+            )
+        ]
 
-    @callback
-    def _async_add_new_smart_lock_door(space_id: str, smart_lock_id: str) -> None:
-        """Add new door binary sensor when a smart lock is discovered from SSE/SQS."""
-        # Check entity registry to avoid duplicates (more robust than manual set tracking)
-        ent_reg = er.async_get(hass)
-        unique_id = f"{smart_lock_id}_door"
-        if ent_reg.async_get_entity_id(BINARY_SENSOR_DOMAIN, DOMAIN, unique_id):
-            return
-        async_add_entities(
-            [AjaxSmartLockBinarySensor(coordinator=coordinator, space_id=space_id, smart_lock_id=smart_lock_id)]
-        )
-        _LOGGER.info("Dynamically added door sensor for smart lock: %s", smart_lock_id)
-
-    entry.async_on_unload(async_dispatcher_connect(hass, SIGNAL_NEW_DEVICE, _async_add_new_device))
-    entry.async_on_unload(async_dispatcher_connect(hass, SIGNAL_NEW_VIDEO_EDGE, _async_add_new_video_edge))
-    entry.async_on_unload(async_dispatcher_connect(hass, SIGNAL_NEW_SMART_LOCK, _async_add_new_smart_lock_door))
+    connect_new_entity_signal(
+        hass,
+        entry,
+        SIGNAL_NEW_DEVICE,
+        BINARY_SENSOR_DOMAIN,
+        async_add_entities,
+        _build_device,
+        label="binary sensor(s)",
+    )
+    connect_new_entity_signal(
+        hass,
+        entry,
+        SIGNAL_NEW_VIDEO_EDGE,
+        BINARY_SENSOR_DOMAIN,
+        async_add_entities,
+        _build_video_edge,
+        label="Video Edge binary sensor(s)",
+    )
+    connect_new_entity_signal(
+        hass,
+        entry,
+        SIGNAL_NEW_SMART_LOCK,
+        BINARY_SENSOR_DOMAIN,
+        async_add_entities,
+        _build_smart_lock_door,
+        label="smart lock door sensor(s)",
+    )
 
 
 class AjaxBinarySensor(CoordinatorEntity[AjaxDataCoordinator], BinarySensorEntity):

@@ -14,15 +14,14 @@ import logging
 from typing import Any
 
 from homeassistant.components.lock import DOMAIN as LOCK_DOMAIN, LockEntity
-from homeassistant.core import HomeAssistant, callback
+from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
-from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.device_registry import DeviceInfo
-from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import AjaxConfigEntry
+from ._discovery import connect_new_entity_signal
 from .const import DOMAIN, MANUFACTURER, SIGNAL_NEW_SMART_LOCK
 from .coordinator import AjaxDataCoordinator
 from .models import AjaxSmartLock
@@ -63,18 +62,24 @@ async def async_setup_entry(
         async_add_entities(entities)
         _LOGGER.info("Added %d Ajax lock(s)", len(entities))
 
-    @callback
-    def _async_add_new_smart_lock(space_id: str, smart_lock_id: str) -> None:
-        """Add new lock entity when a smart lock is discovered from SSE/SQS."""
-        # Check entity registry to avoid duplicates (more robust than manual set tracking)
-        ent_reg = er.async_get(hass)
-        unique_id = f"{smart_lock_id}_lock"
-        if ent_reg.async_get_entity_id(LOCK_DOMAIN, DOMAIN, unique_id):
-            return
-        async_add_entities([AjaxLock(coordinator=coordinator, space_id=space_id, smart_lock_id=smart_lock_id)])
-        _LOGGER.info("Dynamically added lock entity for smart lock: %s", smart_lock_id)
+    def _build_lock(space_id: str, smart_lock_id: str) -> list[tuple[str, LockEntity]]:
+        """Build the lock entity for a newly-discovered smart lock."""
+        return [
+            (
+                f"{smart_lock_id}_lock",
+                AjaxLock(coordinator=coordinator, space_id=space_id, smart_lock_id=smart_lock_id),
+            )
+        ]
 
-    entry.async_on_unload(async_dispatcher_connect(hass, SIGNAL_NEW_SMART_LOCK, _async_add_new_smart_lock))
+    connect_new_entity_signal(
+        hass,
+        entry,
+        SIGNAL_NEW_SMART_LOCK,
+        LOCK_DOMAIN,
+        async_add_entities,
+        _build_lock,
+        label="lock entit(ies)",
+    )
 
 
 class AjaxLock(CoordinatorEntity[AjaxDataCoordinator], LockEntity):

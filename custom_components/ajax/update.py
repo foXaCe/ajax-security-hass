@@ -16,14 +16,13 @@ from homeassistant.components.update import (
     UpdateEntity,
     UpdateEntityFeature,
 )
-from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers import entity_registry as er
+from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
-from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import AjaxConfigEntry
+from ._discovery import connect_new_entity_signal
 from .const import DOMAIN, MANUFACTURER, SIGNAL_NEW_VIDEO_EDGE
 from .coordinator import AjaxDataCoordinator
 from .models import VIDEO_EDGE_MODEL_NAMES, AjaxSpace, AjaxVideoEdge
@@ -80,25 +79,28 @@ async def async_setup_entry(
         _LOGGER.debug("Adding %d update entities", len(entities))
         async_add_entities(entities)
 
-    @callback
-    def _async_add_new_video_edge(space_id: str, video_edge_id: str) -> None:
-        """Add firmware update entity when a Video Edge device is discovered after setup."""
+    def _build_update(space_id: str, video_edge_id: str) -> list[tuple[str, UpdateEntity]]:
+        """Build the firmware update entity for a newly-discovered Video Edge."""
         space = coordinator.get_space(space_id)
         video_edge = space.video_edges.get(video_edge_id) if space else None
         if not video_edge:
-            return
+            return []
+        return [
+            (
+                f"{video_edge_id}_firmware_update",
+                AjaxVideoEdgeFirmwareUpdate(coordinator=coordinator, video_edge=video_edge, space_id=space_id),
+            )
+        ]
 
-        unique_id = f"{video_edge_id}_firmware_update"
-        ent_reg = er.async_get(hass)
-        if ent_reg.async_get_entity_id(UPDATE_DOMAIN, DOMAIN, unique_id):
-            return
-
-        async_add_entities(
-            [AjaxVideoEdgeFirmwareUpdate(coordinator=coordinator, video_edge=video_edge, space_id=space_id)]
-        )
-        _LOGGER.info("Dynamically added firmware update entity for Video Edge %s", video_edge_id)
-
-    entry.async_on_unload(async_dispatcher_connect(hass, SIGNAL_NEW_VIDEO_EDGE, _async_add_new_video_edge))
+    connect_new_entity_signal(
+        hass,
+        entry,
+        SIGNAL_NEW_VIDEO_EDGE,
+        UPDATE_DOMAIN,
+        async_add_entities,
+        _build_update,
+        label="firmware update entit(ies)",
+    )
 
 
 class AjaxVideoEdgeFirmwareUpdate(CoordinatorEntity[AjaxDataCoordinator], UpdateEntity):

@@ -10,13 +10,12 @@ import logging
 
 from homeassistant.components.event import DOMAIN as EVENT_DOMAIN, EventDeviceClass, EventEntity
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.device_registry import DeviceInfo
-from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import AjaxConfigEntry
+from ._discovery import connect_new_entity_signal
 from .const import DOMAIN, MANUFACTURER, SIGNAL_NEW_DEVICE, SIGNAL_NEW_SMART_LOCK, SIGNAL_NEW_VIDEO_EDGE
 from .coordinator import AjaxDataCoordinator
 from .devices import get_device_handler
@@ -155,51 +154,38 @@ async def async_setup_entry(
     if entities:
         _LOGGER.info("Added %d Ajax event entit(ies)", len(entities))
 
-    def _add_event_entities(new_entities: list[AjaxEventEntity]) -> None:
-        if new_entities:
-            async_add_entities(new_entities)
-            _LOGGER.info("Dynamically added %d Ajax event entit(ies)", len(new_entities))
-
-    @callback
-    def _async_add_new_device(space_id: str, device_id: str) -> None:
-        """Add event entities when a regular device is discovered after setup."""
+    def _build_device(space_id: str, device_id: str) -> list[tuple[str, EventEntity]]:
+        """Build event entities for a newly-discovered regular device."""
         space = coordinator.get_space(space_id)
         device = space.devices.get(device_id) if space else None
         if not device:
-            return
-
+            return []
         handler_class = get_device_handler(device)
         if not handler_class:
-            return
-
-        ent_reg = er.async_get(hass)
-        new_entities: list[AjaxEventEntity] = []
+            return []
         handler = handler_class(device)
-        for event_desc in handler.get_events():
-            unique_id = f"{device_id}_{event_desc['key']}"
-            if unique_id in seen_unique_ids or ent_reg.async_get_entity_id(EVENT_DOMAIN, DOMAIN, unique_id):
-                continue
-            seen_unique_ids.add(unique_id)
-            new_entities.append(
+        return [
+            (
+                f"{device_id}_{event_desc['key']}",
                 AjaxEventEntity(
                     coordinator=coordinator,
                     space_id=space_id,
                     device_id=device_id,
                     event_key=event_desc["key"],
                     event_desc=event_desc,
-                )
+                ),
             )
-        _add_event_entities(new_entities)
+            for event_desc in handler.get_events()
+        ]
 
-    @callback
-    def _async_add_new_video_edge(space_id: str, video_edge_id: str) -> None:
-        """Add event entities when a Video Edge device is discovered after setup."""
+    def _build_video_edge(space_id: str, video_edge_id: str) -> list[tuple[str, EventEntity]]:
+        """Build event entities for a newly-discovered Video Edge device."""
         space = coordinator.get_space(space_id)
         video_edge = space.video_edges.get(video_edge_id) if space else None
         if not video_edge or video_edge.video_edge_type == VideoEdgeType.NVR:
-            return
+            return []
 
-        ve_events = []
+        ve_events: list[dict] = []
         if video_edge.video_edge_type == VideoEdgeType.DOORBELL:
             ve_events.append(
                 {
@@ -219,35 +205,25 @@ async def async_setup_entry(
                 "enabled_by_default": True,
             }
         )
-
-        ent_reg = er.async_get(hass)
-        new_entities: list[AjaxEventEntity] = []
-        for event_desc in ve_events:
-            unique_id = f"{video_edge_id}_{event_desc['key']}"
-            if unique_id in seen_unique_ids or ent_reg.async_get_entity_id(EVENT_DOMAIN, DOMAIN, unique_id):
-                continue
-            seen_unique_ids.add(unique_id)
-            new_entities.append(
+        return [
+            (
+                f"{video_edge_id}_{event_desc['key']}",
                 AjaxEventEntity(
                     coordinator=coordinator,
                     space_id=space_id,
                     device_id=video_edge_id,
                     event_key=event_desc["key"],
                     event_desc=event_desc,
-                )
+                ),
             )
-        _add_event_entities(new_entities)
+            for event_desc in ve_events
+        ]
 
-    @callback
-    def _async_add_new_smart_lock(space_id: str, smart_lock_id: str) -> None:
-        """Add event entity when a smart lock is discovered after setup."""
-        unique_id = f"{smart_lock_id}_smart_lock_event"
-        ent_reg = er.async_get(hass)
-        if unique_id in seen_unique_ids or ent_reg.async_get_entity_id(EVENT_DOMAIN, DOMAIN, unique_id):
-            return
-        seen_unique_ids.add(unique_id)
-        _add_event_entities(
-            [
+    def _build_smart_lock(space_id: str, smart_lock_id: str) -> list[tuple[str, EventEntity]]:
+        """Build the event entity for a newly-discovered smart lock."""
+        return [
+            (
+                f"{smart_lock_id}_smart_lock_event",
                 AjaxEventEntity(
                     coordinator=coordinator,
                     space_id=space_id,
@@ -260,13 +236,37 @@ async def async_setup_entry(
                         "event_types": ["doorbell_pressed", "door_left_open"],
                         "enabled_by_default": True,
                     },
-                )
-            ]
-        )
+                ),
+            )
+        ]
 
-    entry.async_on_unload(async_dispatcher_connect(hass, SIGNAL_NEW_DEVICE, _async_add_new_device))
-    entry.async_on_unload(async_dispatcher_connect(hass, SIGNAL_NEW_VIDEO_EDGE, _async_add_new_video_edge))
-    entry.async_on_unload(async_dispatcher_connect(hass, SIGNAL_NEW_SMART_LOCK, _async_add_new_smart_lock))
+    connect_new_entity_signal(
+        hass,
+        entry,
+        SIGNAL_NEW_DEVICE,
+        EVENT_DOMAIN,
+        async_add_entities,
+        _build_device,
+        label="Ajax event entit(ies)",
+    )
+    connect_new_entity_signal(
+        hass,
+        entry,
+        SIGNAL_NEW_VIDEO_EDGE,
+        EVENT_DOMAIN,
+        async_add_entities,
+        _build_video_edge,
+        label="Video Edge event entit(ies)",
+    )
+    connect_new_entity_signal(
+        hass,
+        entry,
+        SIGNAL_NEW_SMART_LOCK,
+        EVENT_DOMAIN,
+        async_add_entities,
+        _build_smart_lock,
+        label="smart lock event entit(ies)",
+    )
 
 
 class AjaxEventEntity(CoordinatorEntity[AjaxDataCoordinator], EventEntity):

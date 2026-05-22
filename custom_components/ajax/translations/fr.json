@@ -2,6 +2,7 @@
   "config": {
     "abort": {
       "already_configured": "Cette intégration Ajax est déjà configurée.",
+      "api_not_initialized": "Le client API Ajax n'a pas pu être initialisé. Veuillez recommencer la configuration.",
       "hub_associated": "Hub associé à la configuration existante.",
       "no_spaces_available": "Aucun espace disponible. Veuillez recharger l'intégration.",
       "reauth_failed": "Échec de la ré-authentification. Veuillez reconfigurer l'intégration.",
@@ -1512,6 +1513,9 @@
     }
   },
   "exceptions": {
+    "arm_disarm_failed": {
+      "message": "Échec du changement d'état de l'alarme : {error}"
+    },
     "device_not_found": {
       "message": "Appareil non trouvé."
     },
@@ -1547,6 +1551,12 @@
     },
     "system_armed": {
       "message": "Système armé. Veuillez désarmer."
+    }
+  },
+  "issues": {
+    "verify_ssl_disabled": {
+      "description": "L'intégration Ajax se connecte au proxy sans vérifier le certificat SSL. Les jetons de session et identifiants transitent sur un canal qui ne peut pas être authentifié, les exposant à des attaques de l'homme du milieu. Réactivez « Vérifier le certificat SSL » dans l'étape Reconfigurer de l'intégration dès que votre proxy dispose d'un certificat valide.",
+      "title": "La vérification SSL est désactivée"
     }
   },
   "options": {

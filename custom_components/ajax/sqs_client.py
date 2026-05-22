@@ -119,9 +119,12 @@ class AjaxSQSClient:
         await self.stop_receiving()
         self._queue_url = None
 
-    # Callback timeout must stay well below VISIBILITY_TIMEOUT so redelivered
-    # messages never overlap with an in-flight callback.
-    CALLBACK_TIMEOUT = 10
+    # Callback timeout must stay below VISIBILITY_TIMEOUT (30s) so redelivered
+    # messages never overlap with an in-flight callback. Set to 20s (not 10s):
+    # a security event callback can run sleep(1s) + a metadata refresh under
+    # _security_event_lock contention, which can exceed 10s on a burst of
+    # arm/disarm events and trigger a needless requeue.
+    CALLBACK_TIMEOUT = 20
 
     # Non-recoverable SQS errors that should stop the loop instead of retrying.
     _FATAL_CLIENT_ERRORS = frozenset(

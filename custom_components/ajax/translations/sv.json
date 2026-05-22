@@ -2,6 +2,7 @@
   "config": {
     "abort": {
       "already_configured": "Denna Ajax-integration är redan konfigurerad.",
+      "api_not_initialized": "Ajax API-klienten kunde inte initieras. Starta om konfigurationen.",
       "hub_associated": "Hubb associerad med befintlig konfiguration.",
       "no_spaces_available": "Inga space tillgängliga. Pröva att ladda om integrationen.",
       "reauth_failed": "Re-authentisering misslyckades. Vänligen omkonfigurera integrationen.",
@@ -1512,6 +1513,9 @@
     }
   },
   "exceptions": {
+    "arm_disarm_failed": {
+      "message": "Kunde inte ändra larmtillståndet: {error}"
+    },
     "device_not_found": {
       "message": "Enhet hittades inte."
     },
@@ -1547,6 +1551,12 @@
     },
     "system_armed": {
       "message": "Systemet tillkopplat. Vänligen koppla ifrån."
+    }
+  },
+  "issues": {
+    "verify_ssl_disabled": {
+      "description": "Ajax-integrationen ansluter till proxyn utan SSL-certifikatverifiering. Sessionstoken och inloggningsuppgifter färdas över en kanal som inte kan autentiseras, vilket utsätter dem för man-in-the-middle-attacker. Återaktivera \"Verifiera SSL-certifikat\" i integrationens omkonfigureringssteg så snart din proxy har ett giltigt certifikat.",
+      "title": "SSL-verifiering är inaktiverad"
     }
   },
   "options": {

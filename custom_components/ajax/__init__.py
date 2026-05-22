@@ -23,6 +23,7 @@ from homeassistant.helpers import (
     config_validation as cv,
     device_registry as dr,
     entity_registry as er,
+    issue_registry as ir,
 )
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.service import (
@@ -137,9 +138,20 @@ async def async_setup_entry(hass: HomeAssistant, entry: AjaxConfigEntry) -> bool
     #       because async_get_clientsession() doesn't support disabling SSL verification
     if verify_ssl:
         session = async_get_clientsession(hass)
+        ir.async_delete_issue(hass, DOMAIN, f"verify_ssl_disabled_{entry.entry_id}")
     else:
         session = None  # API will create its own session with SSL disabled
         _LOGGER.warning("SSL verification disabled - using dedicated session")
+        # Surface a persistent Repairs issue: with verify_ssl=False the proxy
+        # TLS certificate is not validated, exposing credentials to MITM.
+        ir.async_create_issue(
+            hass,
+            DOMAIN,
+            f"verify_ssl_disabled_{entry.entry_id}",
+            is_fixable=False,
+            severity=ir.IssueSeverity.WARNING,
+            translation_key="verify_ssl_disabled",
+        )
 
     api = AjaxRestApi(
         api_key=api_key or "",  # type: ignore[arg-type]

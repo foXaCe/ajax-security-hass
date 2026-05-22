@@ -11,6 +11,7 @@ from homeassistant.components.alarm_control_panel import (
     AlarmControlPanelState,
 )
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -173,7 +174,11 @@ class AjaxAlarmControlPanel(CoordinatorEntity[AjaxDataCoordinator], AlarmControl
             _LOGGER.error("Failed to disarm: %s", err)
             # Revert on error - refresh from API with cache bypass
             await self.coordinator.async_request_refresh_bypass_cache()
-            raise
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="arm_disarm_failed",
+                translation_placeholders={"error": str(err)},
+            ) from err
 
     async def async_alarm_arm_away(self, code: str | None = None) -> None:
         """Send arm away command."""
@@ -191,7 +196,11 @@ class AjaxAlarmControlPanel(CoordinatorEntity[AjaxDataCoordinator], AlarmControl
             _LOGGER.error("Failed to arm: %s", err)
             # Revert on error - refresh from API with cache bypass
             await self.coordinator.async_request_refresh_bypass_cache()
-            raise
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="arm_disarm_failed",
+                translation_placeholders={"error": str(err)},
+            ) from err
 
     async def async_alarm_arm_night(self, code: str | None = None) -> None:
         """Send arm night command."""
@@ -209,7 +218,11 @@ class AjaxAlarmControlPanel(CoordinatorEntity[AjaxDataCoordinator], AlarmControl
             _LOGGER.error("Failed to arm night mode: %s", err)
             # Revert on error - refresh from API with cache bypass
             await self.coordinator.async_request_refresh_bypass_cache()
-            raise
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="arm_disarm_failed",
+                translation_placeholders={"error": str(err)},
+            ) from err
 
     async def async_added_to_hass(self) -> None:
         """When entity is added to hass, update device info in registry."""
@@ -369,7 +382,11 @@ class AjaxGroupAlarmControlPanel(CoordinatorEntity[AjaxDataCoordinator], AlarmCo
         except Exception as err:
             _LOGGER.error("Failed to disarm group: %s", err)
             await self.coordinator.async_request_refresh_bypass_cache()
-            raise
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="arm_disarm_failed",
+                translation_placeholders={"error": str(err)},
+            ) from err
 
     async def async_alarm_arm_away(self, code: str | None = None) -> None:
         """Send arm command for this group."""
@@ -386,7 +403,11 @@ class AjaxGroupAlarmControlPanel(CoordinatorEntity[AjaxDataCoordinator], AlarmCo
         except Exception as err:
             _LOGGER.error("Failed to arm group: %s", err)
             await self.coordinator.async_request_refresh_bypass_cache()
-            raise
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="arm_disarm_failed",
+                translation_placeholders={"error": str(err)},
+            ) from err
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:

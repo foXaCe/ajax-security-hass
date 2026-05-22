@@ -2,6 +2,7 @@
   "config": {
     "abort": {
       "already_configured": "Diese Ajax-Integration ist bereits konfiguriert.",
+      "api_not_initialized": "Der Ajax-API-Client konnte nicht initialisiert werden. Bitte starten Sie die Konfiguration neu.",
       "hub_associated": "Hub mit bestehender Konfiguration verknüpft.",
       "no_spaces_available": "Keine Bereiche verfügbar. Bitte laden Sie die Integration neu.",
       "reauth_failed": "Erneute Authentifizierung fehlgeschlagen. Bitte konfigurieren Sie die Integration neu.",
@@ -1512,6 +1513,9 @@
     }
   },
   "exceptions": {
+    "arm_disarm_failed": {
+      "message": "Ändern des Alarmzustands fehlgeschlagen: {error}"
+    },
     "device_not_found": {
       "message": "Gerät nicht gefunden."
     },
@@ -1547,6 +1551,12 @@
     },
     "system_armed": {
       "message": "System ist scharf. Bitte deaktivieren."
+    }
+  },
+  "issues": {
+    "verify_ssl_disabled": {
+      "description": "Die Ajax-Integration verbindet sich mit dem Proxy ohne SSL-Zertifikatsprüfung. Sitzungstoken und Anmeldedaten werden über einen Kanal übertragen, der nicht authentifiziert werden kann, wodurch sie Man-in-the-Middle-Angriffen ausgesetzt sind. Aktivieren Sie „SSL-Zertifikat überprüfen“ im Schritt „Neu konfigurieren“ der Integration wieder, sobald Ihr Proxy ein gültiges Zertifikat hat.",
+      "title": "SSL-Überprüfung ist deaktiviert"
     }
   },
   "options": {

@@ -2,6 +2,7 @@
   "config": {
     "abort": {
       "already_configured": "Deze Ajax-integratie is al geconfigureerd.",
+      "api_not_initialized": "De Ajax API-client kon niet worden geïnitialiseerd. Start de configuratie opnieuw.",
       "hub_associated": "Hub gekoppeld aan bestaande configuratie.",
       "no_spaces_available": "Geen ruimtes beschikbaar. Herlaad de integratie.",
       "reauth_failed": "Herauthenticatie mislukt. Configureer de integratie opnieuw.",
@@ -1512,6 +1513,9 @@
     }
   },
   "exceptions": {
+    "arm_disarm_failed": {
+      "message": "Wijzigen van de alarmstatus mislukt: {error}"
+    },
     "device_not_found": {
       "message": "Apparaat niet gevonden."
     },
@@ -1547,6 +1551,12 @@
     },
     "system_armed": {
       "message": "Systeem ingeschakeld. Schakel uit."
+    }
+  },
+  "issues": {
+    "verify_ssl_disabled": {
+      "description": "De Ajax-integratie maakt verbinding met de proxy zonder SSL-certificaatverificatie. Sessietokens en inloggegevens reizen over een kanaal dat niet kan worden geverifieerd, waardoor ze blootgesteld worden aan man-in-the-middle-aanvallen. Schakel \"SSL-certificaat verifiëren\" weer in bij de stap Herconfigureren van de integratie zodra uw proxy een geldig certificaat heeft.",
+      "title": "SSL-verificatie is uitgeschakeld"
     }
   },
   "options": {

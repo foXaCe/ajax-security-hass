@@ -12,6 +12,7 @@ subclass, which is true for both managers.
 from __future__ import annotations
 
 import logging
+import time
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -28,6 +29,11 @@ VIDEO_DETECTION_EVENT_TYPES: dict[str, str] = {
     "VIDEO_LINE_CROSSING": "line_crossing",
 }
 
+# Minimum delay between two discovery refreshes triggered by an unknown
+# device id seen in an SSE/SQS event — avoids hammering the API when a
+# burst of events references a device the integration doesn't know yet.
+_DISCOVERY_REFRESH_THROTTLE = 60.0
+
 
 class EventHandlerMixin:
     """Shared device/video-edge lookup and state-update helpers.
@@ -38,6 +44,25 @@ class EventHandlerMixin:
     """
 
     coordinator: AjaxDataCoordinator  # type: ignore[assignment]
+    _last_discovery_refresh: float = 0.0
+
+    def _request_discovery_refresh(self, source_id: str) -> None:
+        """Ask the coordinator to refresh when an unknown device appears.
+
+        SSE/SQS can reference a device added to the Ajax account since the
+        last poll. A normal `async_request_refresh` lets `_async_update_devices`
+        pick it up and emit `SIGNAL_NEW_DEVICE` on the next cycle, instead of
+        waiting up to an hour for the next full metadata refresh. Throttled so
+        a burst of events for a genuinely-absent id cannot spam the API.
+        """
+        if not source_id:
+            return
+        now = time.time()
+        if now - self._last_discovery_refresh < _DISCOVERY_REFRESH_THROTTLE:
+            return
+        self._last_discovery_refresh = now
+        _LOGGER.debug("Unknown device id=%s in event — requesting discovery refresh", source_id)
+        self.coordinator.hass.async_create_task(self.coordinator.async_request_refresh())
 
     def _find_video_edge(
         self, space: AjaxSpace, source_name: str, source_id: str

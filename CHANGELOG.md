@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.28.2] - 2026-05-22
+
+### Fixed
+- **Duplicate `ajax_armed`/`ajax_disarmed` bus events** under a REST/SSE race (#133 follow-up). The `_skip_state_change_event` flag that suppresses the REST poller's duplicate was set only *after* the `asyncio.sleep` preceding the metadata refresh, so a REST poll tick landing in that window fired its own event. The `_security_event_lock` now spans the whole sequence and the flag is set *before* the sleep — a single arm/disarm produces exactly one event again.
+- **Quality Scale Silver blockers**: the missing `api_not_initialized` abort string (config flow showed a raw key); `alarm_control_panel` arm/disarm/group actions now raise a typed `HomeAssistantError` with `translation_key` instead of leaking the raw API exception; added `tests/__init__.py` for pytest package discovery.
+- **SQS** `CALLBACK_TIMEOUT` raised 10 s → 20 s (still below the 30 s visibility timeout): a security-event callback running `sleep` + metadata refresh under lock contention could exceed 10 s and trigger a needless message requeue.
+- **Unknown device in an SSE/SQS event** now triggers a throttled coordinator refresh so the device is discovered (and `SIGNAL_NEW_DEVICE` fires) instead of staying invisible until the next hourly full refresh.
+
+### Changed
+- **Security**: a persistent Repairs issue is now raised while `verify_ssl` is disabled (MITM exposure stays visible in the UI, cleared automatically when re-enabled); per-event SSE/SQS log lines carrying the Ajax user's display name (PII) demoted from INFO to DEBUG.
+- **Performance**: `GET /hubs/{id}/devices` responses cached 5 s (keyed by `hub_id`+`enrich`) so the periodic update loop and the door-sensor fast-poll loop coalesce into one request when their schedules cross; the door-sensor loop calls `async_set_updated_data` once per pass instead of once per changed space.
+- **Refactor**: dynamic entity discovery centralised in a new `_discovery.py` helper — the 11 entity platforms shed ~600 lines of duplicated registry-filter / dispatcher-wiring boilerplate. The last 3 inline entity descriptors (`door_contact` tamper/temperature, `hub` firmware) migrated to the `devices/base.py` helpers.
+- Dependency bumps (dependabot): `homeassistant>=2026.5.3`, `aiobotocore>=3.7.0`, `coverage>=7.14.0`, `pytest-homeassistant-custom-component>=0.13.331`; pre-commit hooks autoupdate.
+
 ## [0.28.1] - 2026-05-03
 
 ### Fixed

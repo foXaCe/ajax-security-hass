@@ -36,3 +36,19 @@ skips = ["B101", "B105", "B110"]  # assert_used, hardcoded_password (config key 
 # French/Spanish/German/Dutch/Swedish/Ukrainian words in translations - not typos
 ignore-words-list = "hass,groupe,connexion,vie,appareil,inclinaison,mouvement,normale,confort,chambre,auxiliar,doble,mis,foto,thuis,intervall,nd,offen,temperatur,szenario,rauchkammer,ven,rauch,anstieg,scharf"
 skip = ".git,*.json,*.lock"
+
+[tool.coverage.run]
+source = ["custom_components/ajax"]
+omit = [
+    "tests/*",
+    # Vendored / generated tables: no business logic worth covering line by line.
+    "custom_components/ajax/event_codes.py",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+]

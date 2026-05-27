@@ -9,6 +9,7 @@ This module defines the data models that mirror the Ajax app structure:
 
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from enum import Enum
@@ -190,22 +191,18 @@ class AjaxDevice:
 
     def mark_optimistic(self, attr_key: str, ttl_seconds: float = 15.0) -> None:
         """Reserve ``attr_key`` against polling overwrite for ``ttl_seconds``."""
-        from time import time as _now  # local import to keep top-level untouched
-
         guard = self.attributes.setdefault("_optimistic_attrs", {})
-        guard[attr_key] = _now() + ttl_seconds
+        guard[attr_key] = time.time() + ttl_seconds
 
     def is_optimistic(self, attr_key: str) -> bool:
         """Return True if ``attr_key`` still has a pending optimistic update."""
-        from time import time as _now
-
         guard = self.attributes.get("_optimistic_attrs")
         if not guard:
             return False
         expiry = guard.get(attr_key)
         if expiry is None:
             return False
-        if _now() < expiry:
+        if time.time() < expiry:
             return True
         # Expired entry — clean it up so the dict cannot grow forever.
         del guard[attr_key]

@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.30.0] - 2026-05-28
+
+### Added
+- **Quality Scale: Platinum.** The three Platinum rules are now done — `async-dependency`, `inject-websession`, and `strict-typing`. `pyproject.toml` ships `strict = true` and CI's `typing` job blocks merges on any new mypy error. The cleanup pass took 392 → 0 strict errors (134 type-arg, 68 no-untyped-def, 59 no-any-return, 34 attr-defined, 32 no-untyped-call). All `# type: ignore[no-any-return]` are at REST/SQS JSON-payload boundaries — none in business logic.
+- **Native translations for the 5 Repairs issues** added in v0.29.0 (`onvif_init_failed`, `onvif_no_cameras`, `onvif_partial_cameras`, `sse_init_failed`, `sqs_init_failed`): de / es / nl / sv / uk now match the FR quality. Placeholders (`{error}`, `{connected}`, `{total}`) preserved.
+- **Test suite: 146 → 313 tests** (+114%). New entity tests use the `object.__new__(EntityClass)` pattern to exercise descriptor wiring and state mapping without a full HA fixture: `alarm_control_panel` SecurityState → AlarmControlPanelState routing for all 8 known states, `binary_sensor` / `sensor` / `switch` / `valve` / `lock` / `select` / `number` / `device_tracker` / `button` / `event` is_on / native_value / available / fire contracts. New module tests for `api.py` (URL routing per auth mode, devices cache TTL, rate-limit backoff), `sse_manager` (`_find_device` matching strategies, `is_state_protected` window, `_handle_door_event` mutations), `_coordinator_arm` (HA-action 10-second protection window, per-space lock identity), `_coordinator_events` (every SecurityState → bus event mapping). `diagnostics.py` coverage 42 → 87%.
+- **Performance invariants pinned** (`tests/test_perf_invariants.py`): no f-string in `_LOGGER.X(...)` calls, every entity class declares `__slots__`, main update interval stays ≥ 30 s, debouncer cooldown stays in [0.1 s, 2 s]. Verified cold-start setup blocking at 1.5 s (< Platinum 2 s target).
+- **mypy CI job** (`.github/workflows/ci.yml`) — runs on every push, fails the job on any new type error.
+
+### Fixed
+- **ONVIF Repairs issue reported `2/3 cameras connected` when the user had 2 cameras + 1 NVR.** The denominator counted the NVR, which `AjaxOnvifManager.async_start` deliberately skips (its sourceAliases-based channel→camera mapping is unreliable). The new `target_count` property excludes NVRs from the count so a healthy 2-camera + 1-NVR setup reports `2/2` and the repair issue auto-deletes instead of staying up as a phantom warning. `target_count == 0` (NVR-only setup) now emits an info log rather than the misleading `no_cameras` issue.
+
+### Changed
+- **`pyproject.toml [tool.mypy]`** flips to `strict = true` with `implicit_reexport = true` only for the `homeassistant.*` namespace (the HA team does not always update `__all__` when public symbols move).
+
 ## [0.29.0] - 2026-05-27
 
 ### Added

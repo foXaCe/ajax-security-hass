@@ -154,7 +154,17 @@ class AjaxOnvifMixin:
             ir.async_delete_issue(self.hass, DOMAIN, init_issue)
 
             connected = self.onvif_manager.connected_count
-            total = len(video_edges)
+            # Use the manager's target_count (excludes NVRs which are intentionally
+            # skipped) rather than len(video_edges) — otherwise the repair issue
+            # reports e.g. 2/3 when the user actually has 2 cameras + 1 NVR and
+            # both cameras are connected fine.
+            total = self.onvif_manager.target_count
+            if connected == 0 and total == 0:
+                # All video_edges are NVRs / unsupported types — nothing to alert on.
+                _LOGGER.info("✓ ONVIF initialized - no individual cameras to connect to (NVR-only setup)")
+                ir.async_delete_issue(self.hass, DOMAIN, no_cam_issue)
+                ir.async_delete_issue(self.hass, DOMAIN, partial_issue)
+                return
             if connected == 0:
                 _LOGGER.warning("ONVIF: No cameras connected - Check ONVIF credentials and camera network")
                 ir.async_delete_issue(self.hass, DOMAIN, partial_issue)

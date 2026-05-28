@@ -48,6 +48,16 @@ class AjaxOnvifManager:
         """Return number of connected cameras."""
         return sum(1 for client in self._clients.values() if client.connected)
 
+    @property
+    def target_count(self) -> int:
+        """Return number of cameras the manager is *trying* to connect.
+
+        Excludes NVRs (intentionally skipped — see ``async_start``). Use
+        this as the denominator in repair issues so an NVR doesn't make
+        the count look like a 2/3 failure to the user.
+        """
+        return len(self._clients)
+
     def get_client(self, video_edge_id: str) -> AjaxOnvifClient | None:
         """Get ONVIF client for a video edge device."""
         return self._clients.get(video_edge_id)

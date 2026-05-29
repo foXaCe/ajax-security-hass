@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.30.1] - 2026-05-28
+
+### Fixed
+- **Integration goes fully unavailable in Night Mode (#149).** A regression introduced by the v0.29.0 coordinator split: `SecurityState` was imported only under `TYPE_CHECKING` in the new `_coordinator_spaces.py`, but the night-mode code path uses it at runtime (`security_state = SecurityState.NIGHT_MODE`). The moment a hub reported night mode, every coordinator refresh raised `NameError: name 'SecurityState' is not defined`, so all Ajax entities became unavailable until night mode was turned off. The "groups" angle in the report was a correlation, not the cause. Affected v0.29.0 and v0.30.0. `SecurityState` is now imported at runtime.
+
+### Changed
+- **CI guard against this class of bug:** enabled the ruff `TC004` lint rule, which flags any `TYPE_CHECKING`-only import used in executable code. (`TC001/2/3` — the "move into TYPE_CHECKING" rules — are intentionally left off, since pushing a runtime-needed import into a `TYPE_CHECKING` block is exactly what caused this regression.)
+
+### Tests
+- Added `tests/test_coordinator_spaces_nightmode.py` — drives `_async_update_spaces_from_hubs` through the night-mode branch (the exact #149 repro: night mode + groups, plus three other triggers of the same line) so a re-import regression fails loudly, independently of the ruff guard.
+
 ## [0.30.0] - 2026-05-28
 
 ### Added

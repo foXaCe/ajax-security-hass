@@ -294,8 +294,19 @@ class SQSManager(EventHandlerMixin):
             return False
 
     def _schedule_later(self, delay: float, callback: Callable[[], Any]) -> None:
-        """Wrap hass.loop.call_later to track the handle for cancellation."""
-        handle = self.coordinator.hass.loop.call_later(delay, callback)
+        """Wrap hass.loop.call_later to track the handle for cancellation.
+
+        The handle removes itself from ``_pending_timers`` once it fires, so the
+        set only ever holds genuinely pending timers (otherwise every doorbell
+        ring / video detection would leak a spent TimerHandle for the lifetime
+        of the integration).
+        """
+
+        def _wrapped() -> None:
+            self._pending_timers.discard(handle)
+            callback()
+
+        handle = self.coordinator.hass.loop.call_later(delay, _wrapped)
         self._pending_timers.add(handle)
 
     def _spawn_background(self, coro: Any) -> None:

@@ -40,6 +40,7 @@ from .sqs_manager import (  # Import event mappings from SQS manager to avoid du
     MOTION_EVENTS,
     RELAY_EVENTS,
     SCENARIO_EVENTS,
+    SECURITY_EVENT_ACTIONS,
     SMOKE_EVENTS,
     TAMPER_EVENTS,
     VIDEO_EVENT_TYPES,
@@ -110,8 +111,19 @@ class SSEManager(EventHandlerMixin):
         return success
 
     def _schedule_later(self, delay: float, callback: Callable[[], Any]) -> None:
-        """Wrap hass.loop.call_later to track the handle for cancellation."""
-        handle = self.coordinator.hass.loop.call_later(delay, callback)
+        """Wrap hass.loop.call_later to track the handle for cancellation.
+
+        The handle removes itself from ``_pending_timers`` once it fires, so the
+        set only ever holds genuinely pending timers (otherwise every doorbell
+        ring / video detection would leak a spent TimerHandle for the lifetime
+        of the integration).
+        """
+
+        def _wrapped() -> None:
+            self._pending_timers.discard(handle)
+            callback()
+
+        handle = self.coordinator.hass.loop.call_later(delay, _wrapped)
         self._pending_timers.add(handle)
 
     def _spawn_background(self, coro: Any) -> None:
@@ -427,20 +439,31 @@ class SSEManager(EventHandlerMixin):
         if state_changed and not is_group_event and not is_full_arm_disarm:
             space.security_state = new_state
             self._last_state_update[space.hub_id] = time.time()  # type: ignore[index]
+            # Realign the polling interval (and door fast-poll) like the SQS
+            # handler does — otherwise transitions such as nightmodeoff leave
+            # the coordinator stuck on the previous (armed) interval.
+            self.coordinator._update_polling_interval(new_state)
+
+        # For group / night-mode-off events use the specific action
+        # (group_armed/group_disarmed/night_mode_off) instead of the system
+        # state value, so the notification label and the ALARMS_ONLY filter
+        # behave identically to the SQS transport.
+        notification_action = SECURITY_EVENT_ACTIONS.get(event_tag, new_state.value)
 
         # Always create notification (even if state unchanged).
         # DEBUG, not INFO: source_name is the Ajax user who armed/disarmed (PII).
         _LOGGER.debug(
-            "SSE instant: %s -> %s par %s (state_changed=%s)",
+            "SSE instant: %s -> %s par %s (action=%s, state_changed=%s)",
             old_state.value,
             new_state.value,
             source_name or "inconnu",
+            notification_action,
             state_changed,
         )
 
         # Create notification
         await self.coordinator._create_sqs_notification(
-            action=new_state.value,
+            action=notification_action,
             source_name=source_name,
             space_name=space.name,
         )

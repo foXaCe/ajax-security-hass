@@ -185,6 +185,7 @@ EVENT_AJAX_ARMED_HOME = "ajax_armed_home"
 EVENT_AJAX_SECURITY_STATE_CHANGED = "ajax_security_state_changed"
 EVENT_AJAX_BUTTON_PRESSED = "ajax_button_pressed"
 EVENT_AJAX_DOORBELL_RING = "ajax_doorbell_ring"
+EVENT_AJAX_SMART_LOCK_DOORBELL = "ajax_smart_lock_doorbell"
 EVENT_AJAX_SCENARIO_TRIGGERED = "ajax_scenario_triggered"
 EVENT_AJAX_CAMERA_DETECTION = "ajax_camera_detection"
 
@@ -270,6 +271,15 @@ def async_describe_events(
         }
 
     @callback
+    def async_describe_smart_lock_doorbell(event: Event) -> dict[str, str]:
+        device = event.data.get("device_name", "Smart Lock")
+        return {
+            LOGBOOK_ENTRY_NAME: device,
+            LOGBOOK_ENTRY_MESSAGE: _tr(hass, "rang"),
+            LOGBOOK_ENTRY_ICON: "mdi:doorbell",
+        }
+
+    @callback
     def async_describe_scenario(event: Event) -> dict[str, str]:
         scenario = event.data.get("scenario_name", "Scenario")
         target = event.data.get("target_name", "")
@@ -297,5 +307,6 @@ def async_describe_events(
     async_describe_event(DOMAIN, EVENT_AJAX_SECURITY_STATE_CHANGED, async_describe_state_changed)
     async_describe_event(DOMAIN, EVENT_AJAX_BUTTON_PRESSED, async_describe_button)
     async_describe_event(DOMAIN, EVENT_AJAX_DOORBELL_RING, async_describe_doorbell)
+    async_describe_event(DOMAIN, EVENT_AJAX_SMART_LOCK_DOORBELL, async_describe_smart_lock_doorbell)
     async_describe_event(DOMAIN, EVENT_AJAX_SCENARIO_TRIGGERED, async_describe_scenario)
     async_describe_event(DOMAIN, EVENT_AJAX_CAMERA_DETECTION, async_describe_camera_detection)

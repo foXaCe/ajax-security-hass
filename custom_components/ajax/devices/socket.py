@@ -87,7 +87,9 @@ class SocketHandler(AjaxDeviceHandler):
                     "key": "energy",
                     "translation_key": "energy",
                     "device_class": SensorDeviceClass.ENERGY,
-                    "native_unit_of_measurement": UnitOfEnergy.WATT_HOUR,
+                    # The coordinator normalises powerConsumedWattsPerHour (Wh) into the
+                    # ``energy`` attribute already divided by 1000, i.e. kWh.
+                    "native_unit_of_measurement": UnitOfEnergy.KILO_WATT_HOUR,
                     "state_class": SensorStateClass.TOTAL_INCREASING,
                     "value_fn": lambda: self.device.attributes.get(
                         "energy", self.device.attributes.get("powerConsumedWattsPerHour")
@@ -125,7 +127,9 @@ class SocketHandler(AjaxDeviceHandler):
                     "key": "current",
                     "translation_key": "current",
                     "device_class": SensorDeviceClass.CURRENT,
-                    "native_unit_of_measurement": UnitOfElectricCurrent.MILLIAMPERE,
+                    # The coordinator normalises currentMilliAmpere(s) (mA) into the
+                    # ``current`` attribute already divided by 1000, i.e. Amperes.
+                    "native_unit_of_measurement": UnitOfElectricCurrent.AMPERE,
                     "state_class": SensorStateClass.MEASUREMENT,
                     "value_fn": lambda: self.device.attributes.get(
                         "current",

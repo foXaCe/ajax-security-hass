@@ -35,10 +35,12 @@ class SmokeDetectorHandler(AjaxDeviceHandler):
             {
                 "key": "smoke",
                 "device_class": BinarySensorDeviceClass.SMOKE,
-                # Check both REST API state and SSE event attribute
+                # Real-time smoke detection: SSE writes ``smoke_detected``,
+                # SQS writes ``smoke_alarm``. ``state == "ALARM"`` never fires.
                 "value_fn": lambda: (
                     self.device.attributes.get("state") == "ALARM"
                     or self.device.attributes.get("smoke_detected", False)
+                    or self.device.attributes.get("smoke_alarm", False)
                 ),
                 "enabled_by_default": True,
             },

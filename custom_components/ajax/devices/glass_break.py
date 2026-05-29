@@ -21,14 +21,19 @@ class GlassBreakHandler(AjaxDeviceHandler):
         sensors = []
 
         # Main glass break sensor
-        # Note: Ajax API doesn't provide real-time glass break detection when disarmed.
-        # The 'state' field only shows ALARM when armed and glass break triggers alarm.
+        # Real-time glass break: SSE writes ``glass_break_detected`` (sse_manager),
+        # SQS writes ``glass_alarm`` (sqs_manager). ``state == "ALARM"`` never fires
+        # (the API reports PASSIVE) but is kept for symmetry with smoke/flood.
         sensors.append(
             {
                 "key": "glass_break",
                 "translation_key": "glass_break",
                 "device_class": BinarySensorDeviceClass.SAFETY,
-                "value_fn": lambda: self.device.attributes.get("state") == "ALARM",
+                "value_fn": lambda: (
+                    self.device.attributes.get("state") == "ALARM"
+                    or self.device.attributes.get("glass_break_detected", False)
+                    or self.device.attributes.get("glass_alarm", False)
+                ),
                 "enabled_by_default": True,
                 "name": None,
             }

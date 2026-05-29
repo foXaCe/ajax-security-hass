@@ -15,7 +15,7 @@ from homeassistant.components.sensor import (
     SensorDeviceClass,
     SensorStateClass,
 )
-from homeassistant.const import UnitOfEnergy, UnitOfPower
+from homeassistant.const import UnitOfElectricCurrent, UnitOfEnergy, UnitOfPower
 
 from custom_components.ajax.devices.socket import SocketHandler
 from custom_components.ajax.models import AjaxDevice, DeviceType
@@ -39,7 +39,8 @@ def test_socket_energy_sensor_is_long_term_stats_compatible() -> None:
 
     assert energy["device_class"] == SensorDeviceClass.ENERGY
     assert energy["state_class"] == SensorStateClass.TOTAL_INCREASING
-    assert energy["native_unit_of_measurement"] == UnitOfEnergy.WATT_HOUR
+    # The coordinator normalises the raw Wh reading into kWh before storing it.
+    assert energy["native_unit_of_measurement"] == UnitOfEnergy.KILO_WATT_HOUR
 
 
 def test_socket_energy_sensor_accepts_raw_api_key() -> None:
@@ -57,3 +58,13 @@ def test_socket_power_sensor_is_measurement() -> None:
     assert power["device_class"] == SensorDeviceClass.POWER
     assert power["state_class"] == SensorStateClass.MEASUREMENT
     assert power["native_unit_of_measurement"] == UnitOfPower.WATT
+
+
+def test_socket_current_sensor_unit_matches_coordinator_scaling() -> None:
+    """The coordinator stores ``current`` in Amperes (mA / 1000), so the
+    declared unit must be AMPERE — declaring MILLIAMPERE was a 1000x error."""
+    handler = _socket({"current": 0.5})
+    current = next(s for s in handler.get_sensors() if s["key"] == "current")
+
+    assert current["device_class"] == SensorDeviceClass.CURRENT
+    assert current["native_unit_of_measurement"] == UnitOfElectricCurrent.AMPERE

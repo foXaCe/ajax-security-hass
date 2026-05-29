@@ -87,6 +87,10 @@ def _keys(descriptors: list[dict]) -> set[str]:
     return {d["key"] for d in descriptors}
 
 
+def _by_key(descriptors: list[dict], key: str) -> dict:
+    return next(d for d in descriptors if d["key"] == key)
+
+
 def test_door_contact_handler_creates_door_sensor() -> None:
     handler = DoorContactHandler(_device(DeviceType.DOOR_CONTACT))
     sensors = handler.get_binary_sensors()
@@ -132,9 +136,49 @@ def test_flood_detector_handler_returns_moisture_descriptor() -> None:
     assert "moisture" in _keys(sensors)
 
 
+@pytest.mark.parametrize(
+    "attributes",
+    [
+        {"leak_detected": True},  # SSE transport (sse_manager)
+        {"flood_alarm": True},  # SQS transport (sqs_manager)
+        {"state": "ALARM"},  # REST (legacy, kept for symmetry)
+    ],
+)
+def test_flood_detector_moisture_fires_on_realtime_attributes(attributes: dict[str, Any]) -> None:
+    """Regression: the moisture sensor read a camelCase key nothing ever wrote."""
+    sensors = FloodDetectorHandler(_device(DeviceType.FLOOD_DETECTOR, attributes)).get_binary_sensors()
+    assert _by_key(sensors, "moisture")["value_fn"]() is True
+
+
+def test_flood_detector_moisture_off_without_alarm() -> None:
+    sensors = FloodDetectorHandler(_device(DeviceType.FLOOD_DETECTOR, {"leak_detected": False})).get_binary_sensors()
+    assert not _by_key(sensors, "moisture")["value_fn"]()
+
+
 def test_glass_break_handler_returns_glass_break_descriptor() -> None:
     sensors = GlassBreakHandler(_device(DeviceType.GLASS_BREAK)).get_binary_sensors()
     assert "glass_break" in _keys(sensors)
+
+
+@pytest.mark.parametrize(
+    "attributes",
+    [
+        {"glass_break_detected": True},  # SSE transport
+        {"glass_alarm": True},  # SQS transport
+        {"state": "ALARM"},  # REST (legacy)
+    ],
+)
+def test_glass_break_fires_on_realtime_attributes(attributes: dict[str, Any]) -> None:
+    """Regression: the dedicated GlassProtect sensor only read a key nothing wrote."""
+    sensors = GlassBreakHandler(_device(DeviceType.GLASS_BREAK, attributes)).get_binary_sensors()
+    assert _by_key(sensors, "glass_break")["value_fn"]() is True
+
+
+@pytest.mark.parametrize("attributes", [{"smoke_detected": True}, {"smoke_alarm": True}, {"state": "ALARM"}])
+def test_smoke_detector_smoke_fires_on_realtime_attributes(attributes: dict[str, Any]) -> None:
+    """Regression: the SQS smoke_alarm key was not read by the smoke sensor."""
+    sensors = SmokeDetectorHandler(_device(DeviceType.SMOKE_DETECTOR, attributes)).get_binary_sensors()
+    assert _by_key(sensors, "smoke")["value_fn"]() is True
 
 
 def test_button_handler_returns_button_press_event() -> None:

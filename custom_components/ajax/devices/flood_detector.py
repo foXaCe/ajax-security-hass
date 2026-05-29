@@ -24,9 +24,13 @@ class FloodDetectorHandler(AjaxDeviceHandler):
             {
                 "key": "moisture",
                 "device_class": BinarySensorDeviceClass.MOISTURE,
-                # Check both REST API attribute and SSE event state
+                # Real-time leak detection: SSE writes ``leak_detected`` (sse_manager),
+                # SQS writes ``flood_alarm`` (sqs_manager). ``state == "ALARM"`` never
+                # fires (the API reports PASSIVE) but is kept for symmetry with smoke.
                 "value_fn": lambda: (
-                    self.device.attributes.get("state") == "ALARM" or self.device.attributes.get("leakDetected", False)
+                    self.device.attributes.get("state") == "ALARM"
+                    or self.device.attributes.get("leak_detected", False)
+                    or self.device.attributes.get("flood_alarm", False)
                 ),
                 "enabled_by_default": True,
                 "name": None,

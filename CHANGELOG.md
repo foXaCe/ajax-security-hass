@@ -2,6 +2,63 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.31.0] - 2026-05-29
+
+A full code-review pass over the whole integration: 46 confirmed findings fixed, each adversarially verified, plus four agent-introduced regressions caught and corrected during a diff-verification pass. mypy `--strict` clean (58 files), ruff clean, **342 tests** (was 328).
+
+### ⚠️ Behaviour changes to be aware of
+- **WaterStop diagnostic sensor states changed.** `motor_state` now reports `off` / `rotate_to_closing` / `rotate_to_open` (was `off` / `on`) and `external_power` reports `supply` / `no_supply` (was `supply` / `battery` / `unknown`), matching the real Ajax `motorState` / `extPower` API enums. **Automations or history templates keyed on the old `on`, `battery` or `unknown` states will need updating.**
+- **SQS alarm-notification default flipped.** An *unset* notification-filter option now defaults to "all" instead of "none". If you never set a filter and currently receive no alarm notifications, you will start receiving them after this upgrade (only an explicit "none" suppresses them).
+- **SSE / proxy mode now produces alarm history and persistent notifications.** Motion, smoke/fire, flood and glass-break events — and a door opened while armed — now append to a space's recent-events history and raise a persistent notification, matching SQS behaviour. Proxy-mode users will start seeing these.
+- **Devices survive a partial poll.** A device missing from a single non-empty `200` response is no longer deleted immediately; it must be absent for **3 consecutive polls** first. A truncated proxy response no longer wipes devices (stale devices may linger up to ~3 polls longer).
+- **Hub "external power" binary sensor** now reads the dedicated `externallyPowered` field instead of inferring from `battery.state != DISCHARGED`; the reported state may change for some hubs and now reports even when no battery data exists.
+- **Video Edge, Video Edge sensor and firmware-update entities go *unavailable*** during failed coordinator updates instead of showing stale values.
+
+### Added
+- **Live discovery of spaces and groups.** A space or group added in Ajax after setup now creates its alarm-panel entity at runtime via the new `SIGNAL_NEW_SPACE` / `SIGNAL_NEW_GROUP` dispatcher signals — no integration reload required (mirrors the existing new-device path).
+- **SSE / proxy-mode alarm history & notifications** for motion, smoke/fire, flood, glass-break and door-while-armed (parity with the SQS transport). Door-while-armed records history without forcing the space to `TRIGGERED`, mirroring SQS.
+- **`arm_failed` event message** added to `EVENT_MESSAGES` in fr / en / es / de / nl / sv / uk (used by the unsuccessful-arming event code).
+- **"Unknown" label** for the Video Edge storage-status sensor across `strings.json` and all 7 languages, matching the code's fallback value.
+
+### Fixed
+- **Cross-hub event suppression (multi-hub).** Replaced the coordinator's single global `_skip_state_change_event` boolean with a per-hub `_skipped_state_change_hubs` set, so a metadata refresh on one hub no longer drops the REST-side arm/disarm state-change event for every *other* hub processed in the same tick.
+- **Night-mode unavailability (#149 class).** A transient `async_get_hub` failure inside the per-hub loop left `is_new_space` / `real_space_id` / `space_name` unbound, raising `UnboundLocalError` and flipping the whole refresh to failure (all entities unavailable). The except handler now initialises them so the space degrades gracefully (created as `NONE`, or kept) instead of crashing the tick.
+- **Optimistic arm/disarm reverted by a stale poll.** Space-level state updates now honour `has_pending_ha_action` (the same `ha_protected` guard the group path already had), so a REST poll landing inside the ~10 s window no longer snaps the panel back to its previous state after a user command.
+- **SSE second-event misattribution.** The SSE manager now *peeks* the pending-HA-action flag (`has_pending_ha_action`) instead of consuming it, so when Ajax emits two state events for one HA command (e.g. `arm` then `armwithmalfunctions`) both stay attributed to Home Assistant rather than the second firing a misleading "armed/disarmed by <user>" notification.
+- **Optimistic LED / brightness reverted by polling.** Siren `led_indication` and dimmer `actualBrightnessCh1` are now only overwritten from the API when *not* inside their optimistic-update guard; a poll within the TTL window no longer reverts the user's change. The siren blink-while-armed switch maps its optimistic write to `led_indication` (the attribute it actually reads), and multi-gang LightSwitch tracks the optimistic guard **per channel** so one channel's poll can't overwrite another's in-flight change.
+- **Cache bypass missed most of the refresh.** `bypass_cache_next()` set a one-shot boolean consumed by the *first* request of a cycle (the hub list), so device and space getters still served stale data. It now opens a short 2 s window covering the whole refresh cycle, and the space getter (which feeds cameras and smart locks) honours it too — entity state after an SSE/SQS event or user action is now fresh, not TTL-lagged.
+- **`Retry-After` HTTP-date crashed the back-off path.** A bare `int(Retry-After)` raised `ValueError` when a server sent an RFC 7231/9110 HTTP-date on a `429`, crashing the retry exactly when asked to back off. A new `_parse_retry_after()` handles both seconds and dates, clamps to non-negative, and falls back to 60 s.
+- **Panel state not restored on a failed command.** A failed arm/disarm/night-mode on space and group panels now captures and restores the previous state synchronously (`async_write_ha_state`) before the debounced refresh, instead of showing the wrong optimistic state during the debounce window.
+- **Night-mode arm switch never worked on LightSwitch / Transmitter.** Both read the camelCase `nightModeArm`, but the coordinator only stores the snake_case `night_mode_arm` alias — so the switch was never created on LightSwitch and always read `False` on Transmitter. Both now use `night_mode_arm`.
+- **Siren alarm-duration showed an invalid state.** `alarmDuration` is reported in **minutes** (not seconds); an earlier `/60` produced an off-list `0`. The select now maps 1:1 and snaps any off-list hub value to the nearest of `1/2/3/5/10/15`.
+- **FireProtect2 CO siren-trigger switch snapped back.** The CO switch read either `CO`/`CCO` token but the write only removed `CO`, so turning it off left the other token and the read flipped it back on. It now uses one token (prefer `CO`, else `CCO`) for both directions.
+- **Video Edge channel lookup returned the wrong channel.** `_get_channel_by_id` now does two passes (explicit-id match, then positional fallback) so out-of-order channel ids — e.g. after a camera is removed — no longer resolve to a neighbour by index.
+- **Video Edge enum sensors emitted raw API values.** Record-mode, record-policy and storage-status now fall back to the in-options `unknown` instead of `value.lower()` for unmapped enums. The boot-time sensor is normalised to whole minutes so it stops jittering by seconds every poll and inflating recorder history.
+- **Per-room device counts went stale.** `room.device_ids` is now rebuilt every poll (it was append-only), so a device moved between rooms or deleted no longer inflates the per-room `device_count` shown in panel attributes.
+- **Shared door-sensor polling stopped too early.** The shared polling task now only stops when *no* space is disarmed or in night mode, instead of being cancelled when any one space armed — other disarmed spaces keep getting timely door updates.
+- **Auth errors now drive reauth.** `AjaxRestAuthError` is re-raised (not swallowed) in the video-edge and smart-lock updaters, so token expiry counts toward the reauth threshold instead of being logged and ignored.
+- **Orphaned ONVIF clients.** On a partial ONVIF init failure, already-connected clients are stopped via `async_stop()` before the reference is dropped, preventing orphaned poll tasks / PullPoint subscriptions.
+- **Colliding notification IDs.** Arm/disarm persistent-notification ids now include the space and source name, so concurrent events no longer overwrite each other in the notifications panel.
+- **Arming-failure event misclassified.** Removed the `M_22_21 → TRIGGERED` override; it now resolves to `RECOVERED` via the odd/even hex heuristic, so an arming failure is no longer surfaced as a one-shot triggered state.
+- **ONVIF detection zone name dropped on secondary events.** The rule/zone name is now threaded into `_parse_event` so every emitted detection event (including secondary AI object-detection, motion, line-crossing and doorbell events) carries it, not just the single returned event.
+- **Diagnostics SQS connectivity** is derived from the live receiver thread and queue URL (the old `is_connected()` call didn't exist and always read `False`).
+- **Diagnostic dumps redacted.** `ajax_nvr_recordings.json` and `ajax_smart_locks.json` now pass through `async_redact_data`, and the diagnostics `TO_REDACT` set additionally covers `address`, `ssid`, `gateway`, `netmask`, `dns` and `networkInterface`.
+- **Flood-detector malfunctions sensor** simplified to the normalised int count (the list/string branches were dead code).
+
+### Changed
+- **Force-arm services route through the coordinator.** `force_arm` / `force_arm_night` now call `coordinator.async_arm_space` / `async_arm_night_mode(force=True)` (instead of the raw API), apply across **all** matched config entries, and report aggregated per-hub failures (raising `invalid_target` when nothing resolves) — multi-account users can drive them across every hub.
+- **Diagnostic services span all entries.** `get_raw_devices`, force-metadata-refresh, NVR-recordings and smart-lock dump handlers now iterate every matched config entry instead of only the first (they simply run for each; no failure aggregation).
+- **Night-mode fast-poll filter default** flipped so door/transmitter/wire-input sensors that don't report `night_mode_arm` are now *included* in night-mode fast polling (faster updates for those sensors in night mode).
+
+### Removed
+- **`devices/dimmer.py` dead handler methods** (`get_switches` / `get_numbers` / `get_selects`, ~280 lines): dimmer entities are built from static definitions in the platform files gated by `is_dimmer_device()`, so these were never invoked.
+- **`AjaxDevice.is_triggered` and `last_notification`**: dead code (trigger state is tracked via per-attribute flags + `last_trigger_time` in the SSE/SQS managers).
+- **Per-door-sensor fast-poll mechanism** (`_fast_poll_tasks`, `_async_fast_poll_door_sensor` and its teardown): superseded by the shared continuous door-sensor polling task.
+
+### Tests
+- **+14 regression tests (328 → 342).** New coverage for: `Retry-After` date parsing and the cache-bypass window (`test_api_helpers.py`); the night-mode runtime-import and hub-details `UnboundLocalError` paths (`test_coordinator_spaces_nightmode.py`); the transmitter / siren / WaterStop / Video Edge handler fixes (`test_device_handlers.py`); the Video Edge channel id-vs-index lookup (`test_models_extras.py`).
+- **New ENUM-options ⇄ translation parity guard** (`test_translations.py`): scans `devices/*.py` and fails if any literal `options` list has a key without a matching translated `state` entry in `strings.json` — the exact class of bug (WaterStop / Video Edge) caught in this pass.
+
 ## [0.30.1] - 2026-05-28
 
 ### Fixed

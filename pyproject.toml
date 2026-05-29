@@ -70,7 +70,10 @@ exclude_lines = [
 # on any new error here.
 # ---------------------------------------------------------------------------
 [tool.mypy]
-python_version = "3.13"
+# 3.14 matches the runtime the integration targets. Under follow_imports,
+# mypy parses Home Assistant's own source — on 3.13 it rejected HA's 3.14-only
+# syntax (parenthesis-less `except`); 3.14 parses it cleanly.
+python_version = "3.14"
 follow_imports = "silent"
 ignore_missing_imports = true
 strict = true

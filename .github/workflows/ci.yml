@@ -51,12 +51,17 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
-          python-version: "3.13"
+          # 3.14 matches the project's runtime: the test harness
+          # (pytest-homeassistant-custom-component) and recent Home Assistant
+          # releases require it, and mypy must parse HA's 3.14 source.
+          python-version: "3.14"
 
       - name: Install dependencies
-        run: |
-          pip install mypy homeassistant
-          pip install -r requirements_test.txt
+        # mypy only needs itself + homeassistant for stubs — NOT the pytest
+        # test harness. Pulling requirements_test.txt here used to fail the
+        # job on a Python-version conflict before mypy ever ran. Pin mypy so
+        # this mandatory gate stays reproducible; bump deliberately.
+        run: pip install "mypy==2.1.0" homeassistant
 
       - name: Run mypy
         run: mypy custom_components/ajax/

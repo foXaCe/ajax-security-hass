@@ -83,6 +83,8 @@ class AjaxSpacesMixin:
                     if space_binding:
                         self._space_binding_cache[hub_id] = space_binding
                         cached_binding = space_binding
+                except AjaxRestAuthError:
+                    raise  # propagate to _async_update_data for reauth counting
                 except AjaxRestApiError as err:
                     _LOGGER.debug("Could not resolve space name for %s: %s", hub_id, err)
             if cached_binding and cached_binding.get("name"):
@@ -156,12 +158,14 @@ class AjaxSpacesMixin:
                 hub_state = hub_details.get("state", "DISARMED")
                 # Night mode can be in dedicated fields OR in the state string itself
                 # e.g., state="DISARMED_NIGHT_MODE_ON" means night mode is active
+                # ``str(...)`` keeps this safe when the API returns state=null
+                # (or any non-string), mirroring the guard in _parse_security_state.
                 night_mode_active = (
                     hub_details.get("nightMode")
                     or hub_details.get("nightModeEnabled")
                     or hub_details.get("nightModeActive")
                     or hub_details.get("isNightMode")
-                    or "NIGHT_MODE_ON" in hub_state.upper()
+                    or "NIGHT_MODE_ON" in str(hub_state).upper()
                 )
                 _LOGGER.debug(
                     "Hub %s state parsing: state=%s, night_mode_active=%s",
@@ -173,17 +177,28 @@ class AjaxSpacesMixin:
                     security_state = SecurityState.NIGHT_MODE
                 else:
                     security_state = self._parse_security_state(hub_state)
-            except (AjaxRestApiError, AjaxRestAuthError) as err:
+            except AjaxRestAuthError:
+                # Let auth failures propagate to _async_update_data so they count
+                # toward the reauth threshold instead of silently degrading the
+                # space to NONE (otherwise an expired token never triggers reauth).
+                raise
+            except AjaxRestApiError as err:
                 _LOGGER.warning("Failed to get hub details for %s: %s", hub_id, err)
+                if hub_id in self.account.spaces:
+                    # Transient error on an already-known space: keep its current
+                    # state / real_space_id / name and retry next tick. Downgrading
+                    # to NONE here would fire a phantom ajax_security_state_changed
+                    # event and disable its cameras/locks until the next full refresh.
+                    continue
+                # Genuinely new space we could not resolve this tick: create a
+                # placeholder in NONE so the entity exists; it heals on the next
+                # successful refresh.
                 hub_name = f"Hub {hub_id}"
                 security_state = SecurityState.NONE
                 hub_details = {}
                 rooms_data = []
                 rooms_map = {}
-                # Names assigned inside the try block before the failing await
-                # never got bound; initialize them so the fall-through to the
-                # space create/update below does not raise UnboundLocalError.
-                is_new_space = hub_id not in self.account.spaces
+                is_new_space = True
                 real_space_id = None
                 space_name = None
 
@@ -246,7 +261,9 @@ class AjaxSpacesMixin:
                 try:
                     users_data = await self.api.async_get_users(hub_id)
                     space.users = users_data
-                except (AjaxRestApiError, AjaxRestAuthError):
+                except AjaxRestAuthError:
+                    raise  # propagate to _async_update_data for reauth counting
+                except AjaxRestApiError:
                     space.users = []
 
             # Fetch groups on every poll by default. When SSE/SQS is active,
@@ -314,7 +331,9 @@ class AjaxSpacesMixin:
                         len(space.groups),
                         ", ".join(group_states) if group_states else "none",
                     )
-                except (AjaxRestApiError, AjaxRestAuthError) as err:
+                except AjaxRestAuthError:
+                    raise  # propagate to _async_update_data for reauth counting
+                except AjaxRestApiError as err:
                     _LOGGER.warning("Failed to get groups for hub %s: %s", hub_id, err)
 
             # Check if SQS/SSE recently updated this hub's state

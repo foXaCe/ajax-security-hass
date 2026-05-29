@@ -156,16 +156,49 @@ async def test_hub_details_failure_does_not_raise_unbound_local(full_refresh: bo
 
 
 @pytest.mark.asyncio
-async def test_hub_details_failure_on_existing_space_keeps_it() -> None:
-    """A transient hub-details failure for an already-known space must not crash;
-    the space remains and is degraded, not removed.
+async def test_hub_details_failure_on_existing_space_preserves_state() -> None:
+    """A transient hub-details failure for an already-known space must not crash
+    AND must not downgrade it to NONE: doing so would fire a phantom
+    ajax_security_state_changed event and drop real_space_id (disabling its
+    cameras/locks) on every network blip. The previous state is kept instead.
     """
     mixin, account = _make_mixin(hub_state="DISARMED_NIGHT_MODE_ON")
-    # First successful tick creates the space in NIGHT_MODE.
+    # First successful tick creates the space in NIGHT_MODE with a real_space_id.
     await mixin._async_update_spaces_from_hubs(full_refresh=True)
     assert account.spaces["hub1"].security_state is SecurityState.NIGHT_MODE
+    assert account.spaces["hub1"].real_space_id == "real1"
 
-    # Next tick: hub-details fetch fails — must not raise.
+    # Next tick: hub-details fetch fails — must not raise, and must keep state.
     mixin.api.async_get_hub = AsyncMock(side_effect=AjaxRestApiError("boom"))
     await mixin._async_update_spaces_from_hubs(full_refresh=False)
-    assert "hub1" in account.spaces  # space survived the failure
+    space = account.spaces["hub1"]
+    assert space.security_state is SecurityState.NIGHT_MODE  # NOT degraded to NONE
+    assert space.real_space_id == "real1"  # NOT cleared
+    # No phantom state-change event was created for the transient failure.
+    mixin._create_event_from_state_change.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_hub_auth_error_propagates_for_reauth() -> None:
+    """An AjaxRestAuthError on the per-hub fetch must propagate (not be swallowed
+    into a NONE state), so _async_update_data can count it toward reauth.
+    """
+    from custom_components.ajax.api import AjaxRestAuthError
+
+    mixin, _account = _make_mixin(hub_state="DISARMED")
+    mixin.api.async_get_hub = AsyncMock(side_effect=AjaxRestAuthError("token expired"))
+    with pytest.raises(AjaxRestAuthError):
+        await mixin._async_update_spaces_from_hubs(full_refresh=True)
+
+
+@pytest.mark.parametrize("bad_state", [None, 123])
+@pytest.mark.asyncio
+async def test_null_hub_state_does_not_crash(bad_state: object) -> None:
+    """If the API returns state=null (or a non-string), the night-mode parse must
+    not raise AttributeError on ``.upper()`` and flip every entity unavailable.
+    """
+    mixin, account = _make_mixin(hub_state="DISARMED")
+    mixin.api.async_get_hub = AsyncMock(return_value={"state": bad_state, "groupsEnabled": False})
+    # Must not raise (str(None).upper() is safe).
+    await mixin._async_update_spaces_from_hubs(full_refresh=True)
+    assert "hub1" in account.spaces

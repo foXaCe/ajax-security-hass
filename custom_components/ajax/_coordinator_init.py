@@ -97,10 +97,12 @@ class AjaxBootstrapMixin:
             name=self.api.email.split("@")[0] if self.api.email else "Unknown",
             email=self.api.email or "",
         )
+        # Log only a truncated user_id — the full value is PII (and doubles as a
+        # session token in proxy mode), so keep it out of shared INFO logs.
         _LOGGER.info(
-            "Initialized account for %s (user_id: %s)",
+            "Initialized account for %s (user_id: %s…)",
             self.account.name,
-            self.account.user_id,
+            self.account.user_id[:8],
         )
 
     # ------------------------------------------------------------------

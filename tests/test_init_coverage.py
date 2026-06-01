@@ -113,7 +113,7 @@ async def test_extract_config_entry_no_target_raises(tmp_path: Any) -> None:
     call.hass.config_entries.async_loaded_entries.return_value = []
     with (
         patch(
-            "custom_components.ajax.async_extract_config_entry_ids",
+            "custom_components.ajax._services.async_extract_config_entry_ids",
             AsyncMock(return_value=set()),
         ),
         pytest.raises(ServiceValidationError),
@@ -132,10 +132,10 @@ async def test_extract_config_entry_filters_by_target_id(tmp_path: Any) -> None:
     call.hass.config_entries.async_loaded_entries.return_value = [entry, other]
     with (
         patch(
-            "custom_components.ajax.async_extract_config_entry_ids",
+            "custom_components.ajax._services.async_extract_config_entry_ids",
             AsyncMock(return_value={"wanted"}),
         ),
-        patch("custom_components.ajax.async_create"),
+        patch("custom_components.ajax._services.async_create"),
     ):
         await handlers[SERVICE_REFRESH_METADATA](call)
     coord.async_force_metadata_refresh.assert_awaited_once()
@@ -151,10 +151,10 @@ async def test_refresh_metadata_calls_coordinator_and_notifies(tmp_path: Any) ->
     call = _call(_entry(coord))
     with (
         patch(
-            "custom_components.ajax.async_extract_config_entry_ids",
+            "custom_components.ajax._services.async_extract_config_entry_ids",
             AsyncMock(return_value=set()),
         ),
-        patch("custom_components.ajax.async_create") as notify,
+        patch("custom_components.ajax._services.async_create") as notify,
     ):
         await handlers[SERVICE_REFRESH_METADATA](call)
     coord.async_force_metadata_refresh.assert_awaited_once()
@@ -182,11 +182,11 @@ async def test_force_arm_no_target_uses_all_spaces(tmp_path: Any) -> None:
     selected = SimpleNamespace(referenced=set(), indirectly_referenced=set())
     with (
         patch(
-            "custom_components.ajax.async_extract_config_entry_ids",
+            "custom_components.ajax._services.async_extract_config_entry_ids",
             AsyncMock(return_value=set()),
         ),
         patch(
-            "custom_components.ajax.async_extract_referenced_entity_ids",
+            "custom_components.ajax._services.async_extract_referenced_entity_ids",
             return_value=selected,
         ),
     ):
@@ -212,14 +212,14 @@ async def test_force_arm_resolves_referenced_entity_to_space(tmp_path: Any) -> N
     registry.async_get.return_value = reg_entry
     with (
         patch(
-            "custom_components.ajax.async_extract_config_entry_ids",
+            "custom_components.ajax._services.async_extract_config_entry_ids",
             AsyncMock(return_value=set()),
         ),
         patch(
-            "custom_components.ajax.async_extract_referenced_entity_ids",
+            "custom_components.ajax._services.async_extract_referenced_entity_ids",
             return_value=selected,
         ),
-        patch("custom_components.ajax.er.async_get", return_value=registry),
+        patch("custom_components.ajax._services.er.async_get", return_value=registry),
     ):
         await handlers[SERVICE_FORCE_ARM](call)
     coord.async_arm_space.assert_awaited_once_with("space42")
@@ -247,14 +247,14 @@ async def test_force_arm_ignores_non_alarm_and_unknown_entities(tmp_path: Any) -
     registry.async_get.side_effect = _get
     with (
         patch(
-            "custom_components.ajax.async_extract_config_entry_ids",
+            "custom_components.ajax._services.async_extract_config_entry_ids",
             AsyncMock(return_value=set()),
         ),
         patch(
-            "custom_components.ajax.async_extract_referenced_entity_ids",
+            "custom_components.ajax._services.async_extract_referenced_entity_ids",
             return_value=selected,
         ),
-        patch("custom_components.ajax.er.async_get", return_value=registry),
+        patch("custom_components.ajax._services.er.async_get", return_value=registry),
         pytest.raises(ServiceValidationError),
     ):
         # No resolvable target -> validation error
@@ -270,7 +270,7 @@ async def test_force_arm_skips_coordinator_without_spaces(tmp_path: Any) -> None
     call = _call(_entry(coord))
     with (
         patch(
-            "custom_components.ajax.async_extract_config_entry_ids",
+            "custom_components.ajax._services.async_extract_config_entry_ids",
             AsyncMock(return_value=set()),
         ),
         pytest.raises(ServiceValidationError),
@@ -287,11 +287,11 @@ async def test_force_arm_collects_failures(tmp_path: Any) -> None:
     selected = SimpleNamespace(referenced=set(), indirectly_referenced=set())
     with (
         patch(
-            "custom_components.ajax.async_extract_config_entry_ids",
+            "custom_components.ajax._services.async_extract_config_entry_ids",
             AsyncMock(return_value=set()),
         ),
         patch(
-            "custom_components.ajax.async_extract_referenced_entity_ids",
+            "custom_components.ajax._services.async_extract_referenced_entity_ids",
             return_value=selected,
         ),
         pytest.raises(HomeAssistantError),
@@ -307,7 +307,7 @@ async def test_resolve_target_spaces_empty_when_account_none(tmp_path: Any) -> N
     call = _call(_entry(coord))
     with (
         patch(
-            "custom_components.ajax.async_extract_config_entry_ids",
+            "custom_components.ajax._services.async_extract_config_entry_ids",
             AsyncMock(return_value=set()),
         ),
         pytest.raises(ServiceValidationError),
@@ -323,11 +323,11 @@ async def test_force_arm_night_success(tmp_path: Any) -> None:
     selected = SimpleNamespace(referenced=set(), indirectly_referenced=set())
     with (
         patch(
-            "custom_components.ajax.async_extract_config_entry_ids",
+            "custom_components.ajax._services.async_extract_config_entry_ids",
             AsyncMock(return_value=set()),
         ),
         patch(
-            "custom_components.ajax.async_extract_referenced_entity_ids",
+            "custom_components.ajax._services.async_extract_referenced_entity_ids",
             return_value=selected,
         ),
     ):
@@ -344,7 +344,7 @@ async def test_force_arm_night_no_target_raises(tmp_path: Any) -> None:
     call = _call(_entry(coord))
     with (
         patch(
-            "custom_components.ajax.async_extract_config_entry_ids",
+            "custom_components.ajax._services.async_extract_config_entry_ids",
             AsyncMock(return_value=set()),
         ),
         pytest.raises(ServiceValidationError),
@@ -368,14 +368,14 @@ async def test_force_arm_night_unresolved_target_raises(tmp_path: Any) -> None:
     )
     with (
         patch(
-            "custom_components.ajax.async_extract_config_entry_ids",
+            "custom_components.ajax._services.async_extract_config_entry_ids",
             AsyncMock(return_value=set()),
         ),
         patch(
-            "custom_components.ajax.async_extract_referenced_entity_ids",
+            "custom_components.ajax._services.async_extract_referenced_entity_ids",
             return_value=selected,
         ),
-        patch("custom_components.ajax.er.async_get", return_value=registry),
+        patch("custom_components.ajax._services.er.async_get", return_value=registry),
         pytest.raises(ServiceValidationError),
     ):
         await handlers[SERVICE_FORCE_ARM_NIGHT](call)
@@ -391,11 +391,11 @@ async def test_force_arm_night_collects_failures(tmp_path: Any) -> None:
     selected = SimpleNamespace(referenced=set(), indirectly_referenced=set())
     with (
         patch(
-            "custom_components.ajax.async_extract_config_entry_ids",
+            "custom_components.ajax._services.async_extract_config_entry_ids",
             AsyncMock(return_value=set()),
         ),
         patch(
-            "custom_components.ajax.async_extract_referenced_entity_ids",
+            "custom_components.ajax._services.async_extract_referenced_entity_ids",
             return_value=selected,
         ),
         pytest.raises(HomeAssistantError),
@@ -427,10 +427,10 @@ async def test_get_raw_devices_writes_file_and_notifies(tmp_path: Any) -> None:
     call = _call(_entry(coord))
     with (
         patch(
-            "custom_components.ajax.async_extract_config_entry_ids",
+            "custom_components.ajax._services.async_extract_config_entry_ids",
             AsyncMock(return_value=set()),
         ),
-        patch("custom_components.ajax.async_create") as notify,
+        patch("custom_components.ajax._services.async_create") as notify,
     ):
         await handlers[SERVICE_GET_RAW_DEVICES](call)
 
@@ -455,10 +455,10 @@ async def test_get_raw_devices_device_fetch_failure_falls_back_to_summary(
     call = _call(_entry(coord))
     with (
         patch(
-            "custom_components.ajax.async_extract_config_entry_ids",
+            "custom_components.ajax._services.async_extract_config_entry_ids",
             AsyncMock(return_value=set()),
         ),
-        patch("custom_components.ajax.async_create"),
+        patch("custom_components.ajax._services.async_create"),
     ):
         await handlers[SERVICE_GET_RAW_DEVICES](call)
     out = tmp_path / "ajax_raw_devices.json"
@@ -479,10 +479,10 @@ async def test_get_raw_devices_list_fetch_failure_logged(tmp_path: Any) -> None:
     call = _call(_entry(coord))
     with (
         patch(
-            "custom_components.ajax.async_extract_config_entry_ids",
+            "custom_components.ajax._services.async_extract_config_entry_ids",
             AsyncMock(return_value=set()),
         ),
-        patch("custom_components.ajax.async_create"),
+        patch("custom_components.ajax._services.async_create"),
     ):
         await handlers[SERVICE_GET_RAW_DEVICES](call)
     out = tmp_path / "ajax_raw_devices.json"
@@ -503,10 +503,10 @@ async def test_get_raw_devices_camera_full_fetch_failure(tmp_path: Any) -> None:
     call = _call(_entry(coord))
     with (
         patch(
-            "custom_components.ajax.async_extract_config_entry_ids",
+            "custom_components.ajax._services.async_extract_config_entry_ids",
             AsyncMock(return_value=set()),
         ),
-        patch("custom_components.ajax.async_create"),
+        patch("custom_components.ajax._services.async_create"),
     ):
         await handlers[SERVICE_GET_RAW_DEVICES](call)
     out = tmp_path / "ajax_raw_devices.json"
@@ -522,10 +522,10 @@ async def test_get_raw_devices_skips_account_none(tmp_path: Any) -> None:
     call = _call(_entry(coord))
     with (
         patch(
-            "custom_components.ajax.async_extract_config_entry_ids",
+            "custom_components.ajax._services.async_extract_config_entry_ids",
             AsyncMock(return_value=set()),
         ),
-        patch("custom_components.ajax.async_create"),
+        patch("custom_components.ajax._services.async_create"),
     ):
         await handlers[SERVICE_GET_RAW_DEVICES](call)
     out = tmp_path / "ajax_raw_devices.json"
@@ -567,10 +567,10 @@ async def test_get_nvr_recordings_happy_path(tmp_path: Any) -> None:
     call = _call(_entry(coord))
     with (
         patch(
-            "custom_components.ajax.async_extract_config_entry_ids",
+            "custom_components.ajax._services.async_extract_config_entry_ids",
             AsyncMock(return_value=set()),
         ),
-        patch("custom_components.ajax.async_create") as notify,
+        patch("custom_components.ajax._services.async_create") as notify,
     ):
         await handlers[SERVICE_GET_NVR_RECORDINGS](call)
     coord.api.async_get_nvr_recordings.assert_awaited_once()
@@ -591,10 +591,10 @@ async def test_get_nvr_recordings_channel_error(tmp_path: Any) -> None:
     call = _call(_entry(coord))
     with (
         patch(
-            "custom_components.ajax.async_extract_config_entry_ids",
+            "custom_components.ajax._services.async_extract_config_entry_ids",
             AsyncMock(return_value=set()),
         ),
-        patch("custom_components.ajax.async_create"),
+        patch("custom_components.ajax._services.async_create"),
     ):
         await handlers[SERVICE_GET_NVR_RECORDINGS](call)
     out = tmp_path / "ajax_nvr_recordings.json"
@@ -616,10 +616,10 @@ async def test_get_nvr_recordings_no_nvr_and_account_none(tmp_path: Any) -> None
     ]
     with (
         patch(
-            "custom_components.ajax.async_extract_config_entry_ids",
+            "custom_components.ajax._services.async_extract_config_entry_ids",
             AsyncMock(return_value=set()),
         ),
-        patch("custom_components.ajax.async_create"),
+        patch("custom_components.ajax._services.async_create"),
     ):
         await handlers[SERVICE_GET_NVR_RECORDINGS](call)
     out = tmp_path / "ajax_nvr_recordings.json"
@@ -661,10 +661,10 @@ async def test_get_smart_locks_api_and_sse_merge(tmp_path: Any) -> None:
     call = _call(_entry(coord))
     with (
         patch(
-            "custom_components.ajax.async_extract_config_entry_ids",
+            "custom_components.ajax._services.async_extract_config_entry_ids",
             AsyncMock(return_value=set()),
         ),
-        patch("custom_components.ajax.async_create") as notify,
+        patch("custom_components.ajax._services.async_create") as notify,
     ):
         await handlers[SERVICE_GET_SMART_LOCKS](call)
     out = tmp_path / "ajax_smart_locks.json"
@@ -691,10 +691,10 @@ async def test_get_smart_locks_api_error_keeps_sse(tmp_path: Any) -> None:
     call = _call(_entry(coord))
     with (
         patch(
-            "custom_components.ajax.async_extract_config_entry_ids",
+            "custom_components.ajax._services.async_extract_config_entry_ids",
             AsyncMock(return_value=set()),
         ),
-        patch("custom_components.ajax.async_create"),
+        patch("custom_components.ajax._services.async_create"),
     ):
         await handlers[SERVICE_GET_SMART_LOCKS](call)
     out = tmp_path / "ajax_smart_locks.json"
@@ -712,10 +712,10 @@ async def test_get_smart_locks_skips_space_without_real_space_id(tmp_path: Any) 
     call = _call(_entry(coord))
     with (
         patch(
-            "custom_components.ajax.async_extract_config_entry_ids",
+            "custom_components.ajax._services.async_extract_config_entry_ids",
             AsyncMock(return_value=set()),
         ),
-        patch("custom_components.ajax.async_create"),
+        patch("custom_components.ajax._services.async_create"),
     ):
         await handlers[SERVICE_GET_SMART_LOCKS](call)
     out = tmp_path / "ajax_smart_locks.json"
@@ -731,10 +731,10 @@ async def test_get_smart_locks_account_none(tmp_path: Any) -> None:
     call = _call(_entry(coord))
     with (
         patch(
-            "custom_components.ajax.async_extract_config_entry_ids",
+            "custom_components.ajax._services.async_extract_config_entry_ids",
             AsyncMock(return_value=set()),
         ),
-        patch("custom_components.ajax.async_create"),
+        patch("custom_components.ajax._services.async_create"),
     ):
         await handlers[SERVICE_GET_SMART_LOCKS](call)
     out = tmp_path / "ajax_smart_locks.json"

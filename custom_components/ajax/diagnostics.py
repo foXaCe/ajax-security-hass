@@ -82,7 +82,7 @@ def _connectivity_snapshot(coordinator: Any) -> dict[str, Any]:
     return {
         "sse": {
             "enabled": sse is not None,
-            "connected": getattr(sse_client, "is_connected", lambda: False)() if sse_client else False,
+            "connected": bool(getattr(sse_client, "is_connected", False)) if sse_client else False,
         },
         "sqs": {
             "enabled": sqs is not None,

@@ -13,12 +13,32 @@ An overhaul pass: latent bugs fixed, dead code removed, test coverage raised fro
 - Comprehensive unit-test suite: coverage 32 % → 97 %, with a migration "guarantee" test pinning that the v1.3 migration reproduces the exact runtime `unique_id` format (so the in-place rename can never orphan an entity).
 
 ### Fixed
+- **Motion detection was never reported in direct (SQS) mode.** The SQS motion handler wrote the attribute `motion` while the motion binary sensor reads `motion_detected` (the key the SSE handler already writes), so a real-time motion event never turned the sensor on when armed in direct mode. It now writes `motion_detected` (+ `motion_detected_at`).
+- **Diagnostics download crashed for every proxy / SSE user.** `_connectivity_snapshot` tried to *call* `AjaxSSEClient.is_connected`, which is a `@property` returning a `bool` — `TypeError: 'bool' object is not callable` aborted the whole download. It now reads the property without calling it.
+- **CombiProtect glass-break was silent in direct (SQS) mode.** Its glass-break sensor only read the SSE key `glass_break_detected`; SQS writes `glass_alarm`. It now reads both (matching the standalone GlassProtect sensor).
+- **Door-sensor fast-polling could silently die.** The background loop iterated `account.spaces` while awaiting an API call; a hub discovered concurrently raised `RuntimeError: dictionary changed size during iteration` and killed the task until reload. The loop now snapshots the spaces first.
+- **DoorProtect Plus / GlassProtect config switches bounced back.** The shock-sensor / accelerometer / extra-contact / ignore-simple-impact / blink-while-armed switches set an optimistic state, but the poller overwrote it without checking the optimistic guard. The poller now honours the reservation (parity with the other config switches).
+- **Doorbell "Last ring" sensor went `unknown` on every ring.** The `TIMESTAMP` sensor received an ISO **string**; Home Assistant requires a `datetime`. The stored value is now parsed back to a `datetime`.
+- **Duplicate hub-battery sensor.** `hub_battery` was defined twice (space-level *and* hub-level), producing a colliding `unique_id`; Home Assistant silently dropped one entity and logged an error on every start. It is now defined once.
+- **Manual Call Point colour sensor errored for some colours.** The `ENUM` options listed only red/blue/white/black; a yellow/green/graphite device raised `ValueError`. The full Ajax colour set is now declared (with translations in all 7 languages).
+- **Socket external-power monitoring was wired to the wrong key.** The socket sensor gated/read `external_power` (never populated) while the REST poller writes `externally_powered`, and the SSE power event wrote a third, dead key. All three now agree on `externally_powered`.
+- **Auth failures on the rooms endpoint bypassed reauth.** `async_get_rooms` errors were swallowed by a broad `except`, so a token expiry surfacing there never counted toward the reauth threshold. `AjaxRestAuthError` now propagates (parity with the hub/users/groups fetches).
 - **External Contact entity lagged ~30 s in proxy mode (#151).** `extcontactopened` / `extcontactclosed` real-time events were routed through the door handler and wrote `door_opened`, so the *External Contact* binary sensor only ever updated from the REST poll. They now write `external_contact_opened` (matching the REST poll and the sensor's value_fn) in both the SSE and SQS managers — real-time again.
 - **Smoke detector high-temperature alarm ignored real-time SSE.** The `high_temperature` binary sensor only read the REST `temperatureAlarmDetected` key and missed the SSE `temperature_alert` key, so a temperature alarm only showed up at the next poll. It now reads both.
 - **Dimmer switches bounced back after toggling.** `AjaxDimmerSettingsSwitch` and `AjaxDimmerBoolSwitch` applied an optimistic state without guarding it, so a poll landing within ~1 s reverted the toggle. The state is now reserved for 15 s and cleared on the error rollback (parity with the other switches).
 - **A malformed `model` payload could abort a whole refresh.** Device reconciliation now guards against a non-object `model` field instead of raising `TypeError` and halting the poll cycle.
 - **Hardening:** `get_nvr_recordings` no longer dereferences a not-yet-populated coordinator; the API client raises a clear "not logged in" error (instead of building a `user/None/…` URL) on the device/camera endpoints; the SSE "alarm triggered by motion" log now shows the previous state rather than the new one.
 - **Deprecation warnings cleared:** `TrackerEntity` is imported from its public path, and the firmware-update entity passes `hw_version` as a string — both silencing Home Assistant 2026.x deprecation notices.
+
+### Changed
+- **Internal modularisation (no behaviour change, no `unique_id` change — verified against a live install).** The largest modules were split along clean responsibility lines so the codebase is easier to maintain:
+  - SSE/SQS event-mapping tables → `event_maps.py` (a single source of truth shared by both managers, removing the `sse_manager → sqs_manager` import).
+  - `coordinator.py` → door-sensor fast-polling extracted to `_coordinator_door_poll.py` (`AjaxDoorPollingMixin`).
+  - `_coordinator_devices.py` → stateless attribute normalisation + motion-impulse expiry extracted to `_device_normalize.py`.
+  - `switch.py` → entity classes split into `_switch_entity.py` (generic) and `_switch_dimmer.py` (LightSwitchDimmer).
+  - `config_flow.py` → options flow extracted to `config_flow_options.py`.
+  - `__init__.py` → service registration extracted to `_services.py`.
+- Test coverage raised **97 % → 98 %** (1833 tests), notably bringing `__init__` (setup entry) and `coordinator` (constructor) to ~100 %.
 
 ### Removed
 - Dead code: unused API client methods (`async_control_device`, `async_set_light_state`, `async_get_nvr_status`), an unreferenced notification parser, `sse_client.update_session_token`, `onvif_manager.get_client`, and abandoned poll-count instrumentation in the SQS client.

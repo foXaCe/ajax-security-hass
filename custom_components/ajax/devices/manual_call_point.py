@@ -73,7 +73,7 @@ class ManualCallPointHandler(AjaxDeviceHandler):
                     "key": "device_color",
                     "translation_key": "device_color",
                     "device_class": SensorDeviceClass.ENUM,
-                    "options": ["red", "blue", "white", "black"],
+                    "options": ["red", "blue", "white", "black", "yellow", "green", "graphite"],
                     "value_fn": lambda: (self.device.attributes.get("color") or "").lower(),
                     "enabled_by_default": False,
                 }

@@ -983,19 +983,10 @@ def _get_hub_sensors(space: AjaxSpace) -> list[dict[str, Any]]:
     sensors = []
     hub_details = space.hub_details or {}
 
-    # Hub battery level
-    battery = hub_details.get("battery", {})
-    if battery and "chargeLevelPercentage" in battery:
-        sensors.append(
-            {
-                "key": "hub_battery",
-                "device_class": SensorDeviceClass.BATTERY,
-                "native_unit_of_measurement": PERCENTAGE,
-                "state_class": SensorStateClass.MEASUREMENT,
-                "value_fn": lambda hd=hub_details: hd.get("battery", {}).get("chargeLevelPercentage"),
-                "enabled_by_default": True,
-            }
-        )
+    # Hub battery is provided by the SPACE_SENSORS list (AjaxSpaceSensor,
+    # translation_key "hub_battery"). Defining it here too produced a duplicate
+    # unique_id ({entry}_{hub_id}_hub_battery, since space_id == hub_id) and HA
+    # silently dropped one of the two entities — keep it solely in SPACE_SENSORS.
 
     # GSM signal level
     gsm = hub_details.get("gsm", {})

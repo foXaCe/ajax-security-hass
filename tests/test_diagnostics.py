@@ -127,7 +127,10 @@ def test_connectivity_snapshot_all_disabled() -> None:
 
 def test_connectivity_snapshot_with_sse_connected() -> None:
     sse_client = MagicMock()
-    sse_client.is_connected = MagicMock(return_value=True)
+    # ``AjaxSSEClient.is_connected`` is a @property returning a bool, not a
+    # callable — model it as a plain bool so this test would catch the regression
+    # where diagnostics tried to call it.
+    sse_client.is_connected = True
     sse_manager = SimpleNamespace(sse_client=sse_client)
     coord = _fake_coordinator(sse_manager=sse_manager)
     snap = diagnostics._connectivity_snapshot(coord)
@@ -366,3 +369,57 @@ async def test_async_get_config_entry_diagnostics_redacts_and_bundles_runtime() 
     assert result["config_entry_data"]["api_key"] == "**REDACTED**"
     # Runtime bundle present.
     assert set(result["diagnostics"].keys()) == {"runtime", "connectivity", "stats", "cache", "spaces"}
+
+
+def _raw_coordinator() -> SimpleNamespace:
+    """Coordinator with a populated space + API mocks for get_ajax_raw_data."""
+    coord = _fake_coordinator()
+    coord.entry_id = "e1"
+    space = next(iter(coord.account.spaces.values()))
+    space.hub_id = "hub1"
+    space.real_space_id = "rs1"
+    coord.api.async_get_devices = AsyncMock(return_value=[{"id": "d1"}, {"id": "d2"}])
+    # d1 resolves to a full payload; d2 fetch fails -> falls back to the summary.
+    coord.api.async_get_device = AsyncMock(
+        side_effect=[{"id": "d1", "deviceType": "DoorProtect"}, RuntimeError("boom")]
+    )
+    coord.api.async_get_cameras = AsyncMock(return_value=[{"id": "c1"}])
+    coord.api.async_get_camera = AsyncMock(return_value={"id": "c1", "full": True})
+    coord.api.async_get_video_edges = AsyncMock(return_value=[{"id": "ve1"}])
+    return coord
+
+
+async def test_get_ajax_raw_data_collects_and_falls_back() -> None:
+    coord = _raw_coordinator()
+    entry = SimpleNamespace(runtime_data=coord, data={})
+    raw = await diagnostics.get_ajax_raw_data(MagicMock(), entry)
+    # d1 full + d2 fallback summary == 2 devices; camera + video-edge counted.
+    assert raw["summary"] == {
+        "hubs": 1,
+        "devices": 2,
+        "cameras": 1,
+        "video_edges": 1,
+        "device_types": {"DoorProtect": 1, "unknown": 1},
+    }
+    assert {"id": "d2"} in raw["devices"]  # fallback used the light summary
+
+
+async def test_async_get_device_diagnostics_builds_device_info() -> None:
+    from custom_components.ajax.const import DOMAIN
+
+    coord = _raw_coordinator()
+    entry = SimpleNamespace(runtime_data=coord, data={"email": "user@example.com"})
+    device = SimpleNamespace(
+        identifiers={(DOMAIN, "e1_d1")},  # namespaced; stripped to bare "d1"
+        manufacturer="Ajax Systems",
+        model="DoorProtect",
+        model_id="dp1",
+        serial_number="SN1",
+        sw_version="2.0",
+        hw_version="HW1",
+    )
+    result = await diagnostics.async_get_device_diagnostics(MagicMock(), entry, device)
+    assert result["device_info"]["model"] == "DoorProtect"
+    assert result["config_entry_data"]["email"] == "**REDACTED**"
+    # target_device_id filtered the fetch to the requested device only.
+    assert [d["id"] for d in result["ajax_data"]["devices"]] == ["d1"]

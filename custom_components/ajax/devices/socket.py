@@ -40,14 +40,16 @@ class SocketHandler(AjaxDeviceHandler):
             }
         ]
 
-        # External power status (some models)
-        if "external_power" in self.device.attributes:
+        # External power status (some models). ``externally_powered`` is the
+        # attribute populated by the REST poller (from ``externallyPowered``)
+        # and by SSE power events — the same key the siren/hub handlers read.
+        if "externally_powered" in self.device.attributes:
             sensors.append(
                 {
                     "key": "external_power",
                     "translation_key": "external_power",
                     "device_class": BinarySensorDeviceClass.POWER,
-                    "value_fn": lambda: self.device.attributes.get("external_power", False),
+                    "value_fn": lambda: self.device.attributes.get("externally_powered", False),
                     "enabled_by_default": True,
                 }
             )

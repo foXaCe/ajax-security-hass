@@ -648,7 +648,10 @@
           "black": "Black",
           "blue": "Blue",
           "red": "Red",
-          "white": "White"
+          "white": "White",
+          "yellow": "Yellow",
+          "green": "Green",
+          "graphite": "Graphite"
         }
       },
       "device_label": {

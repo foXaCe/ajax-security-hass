@@ -658,8 +658,11 @@
         "state": {
           "black": "Negro",
           "blue": "Azul",
+          "graphite": "Grafito",
+          "green": "Verde",
           "red": "Rojo",
-          "white": "Blanco"
+          "white": "Blanco",
+          "yellow": "Amarillo"
         }
       },
       "device_label": {

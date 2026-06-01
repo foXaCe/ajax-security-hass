@@ -133,6 +133,11 @@ class AjaxSpacesMixin:
                             len(rooms_map),
                             hub_id,
                         )
+                    except AjaxRestAuthError:
+                        # Auth failures must propagate so they count toward the
+                        # reauth threshold (same contract as the hub/users/groups
+                        # fetches in this method).
+                        raise
                     except Exception as room_err:
                         _LOGGER.warning("Could not get rooms for hub %s: %s", hub_id, room_err)
                 else:

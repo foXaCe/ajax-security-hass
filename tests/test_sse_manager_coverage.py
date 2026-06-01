@@ -593,7 +593,8 @@ def test_device_status_power_branch() -> None:
     space = _space()
     space.devices[dev.id] = dev
     mgr._handle_device_status_event(space, "externalpowerdisconnected", "Dev", "d1")
-    assert dev.attributes["external_power_lost"] is True
+    # Power lost -> externally_powered is False (the key the socket sensor reads).
+    assert dev.attributes["externally_powered"] is False
 
 
 def test_device_status_missing_device_no_crash() -> None:

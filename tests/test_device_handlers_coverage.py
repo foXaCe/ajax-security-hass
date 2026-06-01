@@ -608,7 +608,7 @@ def test_smoke_detector_siren_trigger_smoke_via_smoke_alarm_attr() -> None:
 
 def test_socket_binary_sensors_external_power() -> None:
     handler = SocketHandler(
-        _device(DeviceType.SOCKET, {"external_power": True}, malfunctions=[1]),
+        _device(DeviceType.SOCKET, {"externally_powered": True}, malfunctions=[1]),
     )
     binary = handler.get_binary_sensors()
     assert {"problem", "external_power"} <= _keys(binary)
@@ -1421,7 +1421,9 @@ def test_doorbell_sensors_and_events() -> None:
     )
     sensors = handler.get_sensors()
     assert {"battery", "signal_strength", "last_ring"} <= _keys(sensors)
-    assert _by_key(sensors, "last_ring")["value_fn"]() == "2026-05-31T10:00:00Z"
+    # TIMESTAMP sensor must return a datetime parsed from the stored ISO string.
+    ring = _by_key(sensors, "last_ring")["value_fn"]()
+    assert ring is not None and ring.isoformat() == "2026-05-31T10:00:00+00:00"
     assert _by_key(handler.get_binary_sensors(), "tamper")["value_fn"]() is True
     assert _by_key(handler.get_events(), "doorbell_press")["event_types"] == ["ring"]
 

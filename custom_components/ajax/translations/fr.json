@@ -12,7 +12,7 @@
       "cannot_connect": "Échec de la connexion à l'API Ajax. Vérifiez votre connexion Internet.",
       "entry_not_found": "Configuration introuvable. Veuillez réessayer.",
       "invalid_2fa": "Code de vérification invalide. Veuillez réessayer.",
-      "invalid_account_type": "Type de compte non supporté. Utilisez un compte utilisateur (pas un compte PRO/Entreprise).",
+      "invalid_account_type": "Type de compte non pris en charge. Utilisez un compte utilisateur (pas un compte PRO/Entreprise).",
       "invalid_api_key": "Clé API invalide ou manquante. Vérifiez votre clé API entreprise.",
       "invalid_auth": "Identifiants API invalides. Vérifiez votre clé API, email et mot de passe.",
       "invalid_password": "Email ou mot de passe incorrect. Vérifiez vos identifiants de compte Ajax.",
@@ -53,7 +53,7 @@
           "aws_secret_access_key": "Clé secrète AWS pour les événements SQS en temps réel",
           "email": "Votre adresse email de compte Ajax",
           "password": "Votre mot de passe de compte Ajax",
-          "queue_name": "Nom de la file SQS (ex: ajax-events-xxxxx-prod.fifo)"
+          "queue_name": "Nom de la file SQS (ex. : ajax-events-xxxxx-prod.fifo)"
         },
         "description": "Entrez vos identifiants API Ajax.\n\n⚠️ **Compte utilisateur uniquement** (pas de compte PRO/Entreprise).\n\nOptionnel : Ajoutez les identifiants AWS pour recevoir les événements en temps réel.",
         "title": "Connexion directe"
@@ -107,7 +107,7 @@
           "auth_mode": "Mode d'authentification"
         },
         "data_description": {
-          "auth_mode": "Proxy: connexion via le serveur proxy Ajax. Direct: clé API entreprise uniquement."
+          "auth_mode": "Proxy : connexion via le serveur proxy Ajax. Direct : clé API entreprise uniquement."
         },
         "description": "Choisissez le mode de connexion à Ajax Systems.",
         "title": "Mode de connexion"
@@ -1539,7 +1539,7 @@
       "message": "Cible invalide pour le service."
     },
     "lock_not_supported": {
-      "message": "Le verrouillage/déverrouillage à distance n'est pas supporté par les serrures intelligentes Ajax."
+      "message": "Le verrouillage/déverrouillage à distance n'est pas pris en charge par les serrures intelligentes Ajax."
     },
     "no_api_key": {
       "message": "Aucune clé API configurée pour cette entité."
@@ -1592,11 +1592,11 @@
           "queue_name": "Nom de file SQS"
         },
         "data_description": {
-          "aws_access_key_id": "Exemple: AKIA3SFSAKBHLDDOCGFG",
+          "aws_access_key_id": "Exemple : AKIA3SFSAKBHLDDOCGFG",
           "aws_secret_access_key": "Clé secrète fournie par Ajax (40 caractères)",
-          "queue_name": "Exemple: ajax-events-V6WHbk3e-prod.fifo"
+          "queue_name": "Exemple : ajax-events-V6WHbk3e-prod.fifo"
         },
-        "description": "Configurez les identifiants AWS pour recevoir les événements en temps réel.\n\n**Configuration actuelle:**\n- Clé d'accès: {current_access_key}\n- Clé secrète: {current_secret_key}\n- File SQS: {current_queue}\n\nLaissez un champ vide pour conserver la valeur actuelle.",
+        "description": "Configurez les identifiants AWS pour recevoir les événements en temps réel.\n\n**Configuration actuelle :**\n- Clé d'accès : {current_access_key}\n- Clé secrète : {current_secret_key}\n- File SQS : {current_queue}\n\nLaissez un champ vide pour conserver la valeur actuelle.",
         "title": "Identifiants AWS SQS"
       },
       "enabled_spaces": {
@@ -1634,7 +1634,7 @@
         "data_description": {
           "door_sensor_fast_poll": "Interroger les capteurs de porte toutes les 5 secondes en mode désarmé. Désactiver pour réduire les appels API."
         },
-        "description": "Configurez le comportement du polling API pour optimiser les performances.\n\n**Comportement actuel:**\n- Polling léger (état hub + appareils): toutes les 30-60s\n- Rafraîchissement métadonnées (pièces, utilisateurs, groupes): toutes les heures",
+        "description": "Configurez le comportement du polling API pour optimiser les performances.\n\n**Comportement actuel :**\n- Polling léger (état hub + appareils) : toutes les 30-60s\n- Rafraîchissement métadonnées (pièces, utilisateurs, groupes) : toutes les heures",
         "title": "Paramètres de polling"
       },
       "proxy_settings": {
@@ -1658,7 +1658,7 @@
           "rtsp_password": "Mot de passe associé à l'utilisateur ONVIF",
           "rtsp_username": "Nom d'utilisateur créé dans l'app Ajax pour ONVIF"
         },
-        "description": "Configurez les identifiants ONVIF/RTSP pour accéder aux flux vidéo des caméras Video Edge.\n\n**Configuration actuelle:**\n- Utilisateur: {current_username}\n- Mot de passe: {current_password}\n\n⚠️ Ces identifiants doivent être créés dans l'app Ajax (Caméra → Paramètres → ONVIF).",
+        "description": "Configurez les identifiants ONVIF/RTSP pour accéder aux flux vidéo des caméras Video Edge.\n\n**Configuration actuelle :**\n- Utilisateur : {current_username}\n- Mot de passe : {current_password}\n\n⚠️ Ces identifiants doivent être créés dans l'app Ajax (Caméra → Paramètres → ONVIF).",
         "title": "Identifiants RTSP/ONVIF"
       }
     }

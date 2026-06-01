@@ -14,8 +14,8 @@
       "invalid_2fa": "Code de vérification invalide. Veuillez réessayer.",
       "invalid_account_type": "Type de compte non pris en charge. Utilisez un compte utilisateur (pas un compte PRO/Entreprise).",
       "invalid_api_key": "Clé API invalide ou manquante. Vérifiez votre clé API entreprise.",
-      "invalid_auth": "Identifiants API invalides. Vérifiez votre clé API, email et mot de passe.",
-      "invalid_password": "Email ou mot de passe incorrect. Vérifiez vos identifiants de compte Ajax.",
+      "invalid_auth": "Identifiants API invalides. Vérifiez votre clé API, e-mail et mot de passe.",
+      "invalid_password": "E-mail ou mot de passe incorrect. Vérifiez vos identifiants de compte Ajax.",
       "invalid_proxy_url": "URL du proxy invalide. L'URL doit commencer par http:// ou https://",
       "no_spaces_selected": "Veuillez sélectionner au moins un espace à activer.",
       "unknown": "Erreur inattendue. Consultez les journaux pour plus de détails."
@@ -43,7 +43,7 @@
           "api_key": "Clé API",
           "aws_access_key_id": "Clé d'accès AWS (Optionnel)",
           "aws_secret_access_key": "Clé secrète AWS (Optionnel)",
-          "email": "Adresse email",
+          "email": "Adresse e-mail",
           "password": "Mot de passe",
           "queue_name": "Nom de file SQS (Optionnel)"
         },
@@ -51,7 +51,7 @@
           "api_key": "Votre clé API fournie par Ajax Systems",
           "aws_access_key_id": "Clé d'accès AWS pour les événements SQS en temps réel",
           "aws_secret_access_key": "Clé secrète AWS pour les événements SQS en temps réel",
-          "email": "Votre adresse email de compte Ajax",
+          "email": "Votre adresse e-mail de compte Ajax",
           "password": "Votre mot de passe de compte Ajax",
           "queue_name": "Nom de la file SQS (ex. : ajax-events-xxxxx-prod.fifo)"
         },
@@ -60,13 +60,13 @@
       },
       "proxy": {
         "data": {
-          "email": "Adresse email",
+          "email": "Adresse e-mail",
           "password": "Mot de passe",
           "proxy_url": "URL du proxy",
           "verify_ssl": "Vérifier le certificat SSL"
         },
         "data_description": {
-          "email": "Votre adresse email de compte Ajax",
+          "email": "Votre adresse e-mail de compte Ajax",
           "password": "Votre mot de passe de compte Ajax",
           "proxy_url": "URL du serveur proxy Ajax",
           "verify_ssl": "Désactiver si vous utilisez un certificat auto-signé (HTTPS)"
@@ -84,7 +84,7 @@
       "reconfigure": {
         "data": {
           "api_key": "Clé API",
-          "email": "Email",
+          "email": "E-mail",
           "password": "Mot de passe",
           "proxy_url": "URL du proxy",
           "verify_ssl": "Vérifier le certificat SSL"

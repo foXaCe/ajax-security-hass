@@ -467,7 +467,7 @@ async def test_handle_motion_event_detected_no_alarm_when_disarmed() -> None:
     dev = _device(dtype=DeviceType.MOTION_DETECTOR)
     space.devices["d1"] = dev
     assert await mgr._handle_motion_event(space, "motiondetected", "Front Door", "d1") is True
-    assert dev.attributes["motion"] is True
+    assert dev.attributes["motion_detected"] is True
     assert space.security_state == SecurityState.DISARMED
 
 
@@ -486,7 +486,7 @@ async def test_handle_motion_event_cleared() -> None:
     dev = _device(dtype=DeviceType.MOTION_DETECTOR)
     space.devices["d1"] = dev
     await mgr._handle_motion_event(space, "nomotiondetected", "Front Door", "d1")
-    assert dev.attributes["motion"] is False
+    assert dev.attributes["motion_detected"] is False
     assert dev.last_trigger_time is None
 
 

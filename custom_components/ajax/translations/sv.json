@@ -658,8 +658,11 @@
         "state": {
           "black": "Svart",
           "blue": "Blå",
+          "graphite": "Grafit",
+          "green": "Grön",
           "red": "Röd",
-          "white": "Vit"
+          "white": "Vit",
+          "yellow": "Gul"
         }
       },
       "device_label": {

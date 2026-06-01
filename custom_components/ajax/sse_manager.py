@@ -23,8 +23,7 @@ from homeassistant.helpers.dispatcher import async_dispatcher_send
 
 from .const import SIGNAL_NEW_SMART_LOCK
 from .event_codes import DEFAULT_LANGUAGE, parse_event_code
-from .models import AjaxDevice, AjaxSmartLock, AjaxSpace
-from .sqs_manager import (  # Import event mappings from SQS manager to avoid duplication
+from .event_maps import (  # Single source of truth for event mappings
     BUTTON_EVENTS,
     DEVICE_STATUS_EVENTS,
     DOOR_EVENTS,
@@ -47,6 +46,7 @@ from .sqs_manager import (  # Import event mappings from SQS manager to avoid du
     VIDEO_EVENTS,
     WIRE_INPUT_EVENTS,
 )
+from .models import AjaxDevice, AjaxSmartLock, AjaxSpace
 
 if TYPE_CHECKING:
     from .coordinator import AjaxDataCoordinator
@@ -754,7 +754,12 @@ class SSEManager(EventHandlerMixin):
             elif "battery" in action_key:
                 dev.attributes["low_battery"] = is_problem
             elif "power" in action_key:
-                dev.attributes["external_power_lost"] = is_problem
+                # ``externally_powered`` is the key the REST poller and the
+                # socket / siren handlers read (True = mains present). SSE reports
+                # the inverse (is_problem = power lost), so invert and reserve it
+                # against the next poll overwriting it.
+                dev.attributes["externally_powered"] = not is_problem
+                dev.mark_optimistic("externally_powered", 15.0)
             _LOGGER.info("SSE instant: %s -> %s", dev.name, action_key)
         else:
             _LOGGER.warning(

@@ -48,7 +48,12 @@ class MotionDetectorHandler(AjaxDeviceHandler):
                     "key": "glass_break",
                     "translation_key": "glass_break",
                     "device_class": BinarySensorDeviceClass.SAFETY,
-                    "value_fn": lambda: self.device.attributes.get("glass_break_detected", False),
+                    # SSE writes ``glass_break_detected``; SQS writes ``glass_alarm``.
+                    # Read both so a CombiProtect glass break reports in either mode.
+                    "value_fn": lambda: (
+                        self.device.attributes.get("glass_break_detected", False)
+                        or self.device.attributes.get("glass_alarm", False)
+                    ),
                     "enabled_by_default": True,
                 }
             )

@@ -10,6 +10,7 @@ from typing import Any
 
 from homeassistant.components.event import EventDeviceClass
 from homeassistant.components.sensor import SensorDeviceClass
+from homeassistant.util import dt as dt_util
 
 from .base import AjaxDeviceHandler
 
@@ -34,7 +35,13 @@ class DoorbellHandler(AjaxDeviceHandler):
                 "key": "last_ring",
                 "translation_key": "last_ring",
                 "device_class": SensorDeviceClass.TIMESTAMP,
-                "value_fn": lambda: self.device.attributes.get("last_ring"),
+                # ``last_ring`` is stored as an ISO string by the SSE/SQS handlers;
+                # a TIMESTAMP sensor must return a ``datetime``, so parse it back.
+                "value_fn": lambda: (
+                    dt_util.parse_datetime(self.device.attributes["last_ring"])
+                    if self.device.attributes.get("last_ring")
+                    else None
+                ),
                 "enabled_by_default": True,
             },
         ]

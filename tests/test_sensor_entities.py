@@ -279,10 +279,11 @@ def test_get_hub_sensors_empty_when_no_details() -> None:
     assert _get_hub_sensors(_space_with_hub({})) == []
 
 
-def test_get_hub_sensors_battery() -> None:
+def test_get_hub_sensors_no_battery_duplicate() -> None:
+    # hub_battery is owned by SPACE_SENSORS (AjaxSpaceSensor); _get_hub_sensors
+    # must NOT also emit it or the unique_id collides (space_id == hub_id).
     sensors = _hub_sensor_by_key({"battery": {"chargeLevelPercentage": 88}})
-    assert "hub_battery" in sensors
-    assert sensors["hub_battery"]["value_fn"]() == 88
+    assert "hub_battery" not in sensors
 
 
 def test_get_hub_sensors_gsm_signal_network_sim_lowercased() -> None:

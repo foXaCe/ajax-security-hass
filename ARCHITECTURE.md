@@ -22,10 +22,13 @@ Ajax cloud ──REST──▶ api.AjaxRestApi ──▶ coordinator.AjaxDataCoo
 
 | File / dir | Role |
 |---|---|
-| `__init__.py` | `async_setup_entry` / `async_unload_entry`, integration services, **`async_migrate_entry`** (ConfigEntry schema migrations). |
+| `__init__.py` | `async_setup_entry` / `async_unload_entry`, **`async_migrate_entry`** (ConfigEntry schema migrations), HA-area sync. |
+| `_services.py` | Integration service registration (`force_arm`, `force_arm_night`, `get_raw_devices`, `refresh_metadata`, `get_nvr_recordings`, `get_smart_locks`) + handlers. |
 | `coordinator.py` | `AjaxDataCoordinator` — composed from the `_coordinator_*` mixins. Exposes `entry_id: str` for entity namespacing. |
 | `_coordinator_init.py` | Coordinator init, stores. |
-| `_coordinator_devices.py` | Device reconciliation pipeline, attribute normalisation, stale-device cleanup, motion-impulse expiry. |
+| `_coordinator_devices.py` | Device reconciliation pipeline, stale-device cleanup. Inherits `_device_normalize`. |
+| `_device_normalize.py` | `AjaxDeviceNormalizeMixin` — stateless attribute normalisation (raw Ajax field names → handler shapes) + motion-impulse expiry. |
+| `_coordinator_door_poll.py` | `AjaxDoorPollingMixin` — fast 5 s door/transmitter/wire-input polling while disarmed / night mode. |
 | `_coordinator_state.py` | Payload parsers (security state, device type), video-edge / smart-lock pollers. |
 | `_coordinator_spaces.py` | Space / hub / users / groups parsing, night mode. |
 | `_coordinator_arm.py` | Arm / disarm / night / panic / group services + per-space locks + HA-action tracking. |
@@ -35,14 +38,15 @@ Ajax cloud ──REST──▶ api.AjaxRestApi ──▶ coordinator.AjaxDataCoo
 | `models.py` | Dataclasses: `AjaxAccount`, `AjaxSpace`, `AjaxDevice`, `AjaxVideoEdge`, `AjaxSmartLock`, enums; optimistic-update helpers (`mark_optimistic` / `is_optimistic`). |
 | `sse_client.py` / `sse_manager.py` | SSE transport + event handlers (proxy mode). |
 | `sqs_client.py` / `sqs_manager.py` | AWS SQS transport (daemon thread) + event handlers (direct mode). |
+| `event_maps.py` | **Single source of truth** for the event-tag / event-code lookup tables shared by both managers (no HA/transport imports). |
 | `_event_helpers.py` | `EventHandlerMixin` shared by both managers (video-edge lookup, detection state, doorbell/video reset, discovery throttle). |
 | `_discovery.py` | `connect_new_entity_signal` — dynamic-entity discovery; dedupes on **`entity.unique_id`**. |
 | `_ids.py` | **Single source of truth** for config-entry-scoped registry ids (`device_identifier`, `entity_unique_id`). |
 | `event_codes.py` | Vendored Ajax event-code table (excluded from coverage). |
-| `config_flow.py` | `ConfigFlow` (user/direct/proxy/2FA/select_spaces/dhcp/reauth/reconfigure) + `OptionsFlow`. |
+| `config_flow.py` / `config_flow_options.py` | `ConfigFlow` (user/direct/proxy/2FA/select_spaces/dhcp/reauth/reconfigure); `OptionsFlow` lives in `config_flow_options.py`. |
 | `diagnostics.py` | Redacted config-entry / device diagnostics. |
 | `devices/` | One handler per Ajax device type (`base.py` + 18 handlers); `DEVICE_HANDLERS` map + `get_device_handler` / `is_dimmer_device`. |
-| Platforms | `sensor.py`, `binary_sensor.py`, `switch.py`, `number.py`, `select.py`, `light.py`, `valve.py`, `lock.py`, `camera.py`, `event.py`, `alarm_control_panel.py`, `device_tracker.py`, `update.py`, `button.py`. |
+| Platforms | `sensor.py`, `binary_sensor.py`, `switch.py` (+ `_switch_entity.py` / `_switch_dimmer.py`), `number.py`, `select.py`, `light.py`, `valve.py`, `lock.py`, `camera.py`, `event.py`, `alarm_control_panel.py`, `device_tracker.py`, `update.py`, `button.py`. |
 
 ## Identifier namespacing (schema v1.3)
 

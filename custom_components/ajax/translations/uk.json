@@ -658,8 +658,11 @@
         "state": {
           "black": "Чорний",
           "blue": "Синій",
+          "graphite": "Графіт",
+          "green": "Зелений",
           "red": "Червоний",
-          "white": "Білий"
+          "white": "Білий",
+          "yellow": "Жовтий"
         }
       },
       "device_label": {

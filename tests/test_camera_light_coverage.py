@@ -29,6 +29,23 @@ if "turbojpeg" not in sys.modules:
     _turbojpeg_stub.TurboJPEG = MagicMock()
     sys.modules["turbojpeg"] = _turbojpeg_stub
 
+# camera.py imports homeassistant.components.ffmpeg, which pulls in the optional
+# ``ha-ffmpeg`` (haffmpeg) wheel — not installed in CI. Stub the exact surface
+# HA's ffmpeg component imports before loading the camera platform under test.
+# ``HAFFmpeg`` must be a real class: HA uses it as a PEP 695 TypeVar bound
+# (``class FFmpegBase[_HAFFmpegT: HAFFmpeg]``), which a MagicMock can't satisfy.
+if "haffmpeg" not in sys.modules:
+    _haffmpeg = ModuleType("haffmpeg")
+    _haffmpeg_core = ModuleType("haffmpeg.core")
+    _haffmpeg_core.HAFFmpeg = type("HAFFmpeg", (), {})
+    _haffmpeg_tools = ModuleType("haffmpeg.tools")
+    _haffmpeg_tools.IMAGE_JPEG = "image/jpeg"
+    _haffmpeg_tools.FFVersion = type("FFVersion", (), {})
+    _haffmpeg_tools.ImageFrame = type("ImageFrame", (), {})
+    sys.modules["haffmpeg"] = _haffmpeg
+    sys.modules["haffmpeg.core"] = _haffmpeg_core
+    sys.modules["haffmpeg.tools"] = _haffmpeg_tools
+
 from custom_components.ajax import camera as camera_module, light as light_module
 from custom_components.ajax.camera import AjaxVideoEdgeCamera, async_setup_entry as camera_setup_entry
 from custom_components.ajax.const import CONF_RTSP_PASSWORD, CONF_RTSP_USERNAME

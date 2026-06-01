@@ -31,6 +31,7 @@ from homeassistant.helpers.service import (
     async_extract_referenced_entity_ids,
 )
 
+from ._ids import device_identifier
 from .api import AjaxRestApi, AjaxRestApiError, AjaxRestAuthError
 from .const import (
     AUTH_MODE_DIRECT,
@@ -588,7 +589,9 @@ async def _async_setup_services(hass: HomeAssistant) -> None:
 
         for entry in entries:
             coordinator = entry.runtime_data
-            for _space_id, space in coordinator.data.spaces.items():
+            if not coordinator.account:
+                continue
+            for _space_id, space in coordinator.account.spaces.items():
                 for ve_id, video_edge in space.video_edges.items():
                     if video_edge.video_edge_type.value == "NVR":
                         # Found an NVR
@@ -829,7 +832,9 @@ async def _async_setup_areas(hass: HomeAssistant, coordinator: AjaxDataCoordinat
             for device_id, device in space.devices.items():
                 if device.room_id == room_id:
                     # Find the HA device by identifiers
-                    ha_device = device_reg.async_get_device(identifiers={(DOMAIN, device_id)})
+                    ha_device = device_reg.async_get_device(
+                        identifiers={device_identifier(coordinator.entry_id, device_id)}
+                    )
                     # Only assign area if device has no area yet (respect user changes)
                     if ha_device and ha_device.area_id is None:
                         device_reg.async_update_device(ha_device.id, area_id=area.id)
@@ -880,8 +885,48 @@ async def async_migrate_entry(hass: HomeAssistant, entry: AjaxConfigEntry) -> bo
         )
         _LOGGER.info("ConfigEntry migrated to v1.2 (added unique_id)")
 
+    # v1.2 → v1.3 : namespace entity unique_id and device identifiers with the
+    # config entry id so two Ajax accounts can no longer collide in the entity /
+    # device registries. The runtime format (see _ids.py + each entity __init__)
+    # is f"{entry_id}_{...}"; we reproduce it here by prepending f"{entry_id}_"
+    # to every legacy id not already namespaced — idempotent, and a no-op for the
+    # space / alarm / panic entities that already carried the entry id.
+    if entry.version == 1 and entry.minor_version < 3:
+        prefix = f"{entry.entry_id}_"
+
+        # Rename entity unique_ids in place (preserves entity_id, history and
+        # automations). A manual loop — rather than er.async_migrate_entries —
+        # so we can survive a collision: if a namespaced twin already exists
+        # (e.g. an earlier interrupted upgrade let the platform recreate the
+        # entity), drop the stale legacy row instead of raising.
+        ent_reg = er.async_get(hass)
+        for reg_entry in list(er.async_entries_for_config_entry(ent_reg, entry.entry_id)):
+            if reg_entry.unique_id.startswith(prefix):
+                continue
+            new_unique_id = f"{prefix}{reg_entry.unique_id}"
+            if ent_reg.async_get_entity_id(reg_entry.domain, DOMAIN, new_unique_id) is not None:
+                ent_reg.async_remove(reg_entry.entity_id)
+                continue
+            ent_reg.async_update_entity(reg_entry.entity_id, new_unique_id=new_unique_id)
+
+        dev_reg = dr.async_get(hass)
+        for device in dr.async_entries_for_config_entry(dev_reg, entry.entry_id):
+            new_identifiers = {
+                (domain, raw) if domain != DOMAIN or raw.startswith(prefix) else (domain, f"{prefix}{raw}")
+                for domain, raw in device.identifiers
+            }
+            if new_identifiers != device.identifiers:
+                try:
+                    dev_reg.async_update_device(device.id, new_identifiers=new_identifiers)
+                except ValueError:
+                    # Namespaced twin device already present — leave the stale
+                    # one for _async_cleanup_stale_devices to prune later.
+                    _LOGGER.warning("Skipped device id migration for %s (target already exists)", device.id)
+
+        hass.config_entries.async_update_entry(entry, minor_version=3)
+        _LOGGER.info("ConfigEntry migrated to v1.3 (namespaced registry ids)")
+
     # Future migrations go here, following the same pattern:
-    # if entry.version == 1 and entry.minor_version < 3: ...
     # if entry.version == 1 and entry.minor_version < 4: ...
 
     _LOGGER.debug(
@@ -917,7 +962,13 @@ async def async_remove_config_entry_device(
         known_ids.update(space.video_edges.keys())
         known_ids.update(space.smart_locks.keys())
 
-    return all(not (domain == DOMAIN and identifier in known_ids) for domain, identifier in device_entry.identifiers)
+    # Identifiers are namespaced f"{entry_id}_{ajax_id}" (schema v1.3); strip the
+    # prefix before comparing against the bare Ajax ids the coordinator tracks.
+    prefix = f"{config_entry.entry_id}_"
+    return all(
+        not (domain == DOMAIN and identifier.removeprefix(prefix) in known_ids)
+        for domain, identifier in device_entry.identifiers
+    )
 
 
 # Re-export the typed config entry alias so platforms can `from . import AjaxConfigEntry`

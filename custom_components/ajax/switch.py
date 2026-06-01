@@ -20,9 +20,10 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import AjaxConfigEntry
 from ._discovery import connect_new_entity_signal
+from ._ids import device_identifier
 from .const import DOMAIN, MANUFACTURER, SIGNAL_NEW_DEVICE
 from .coordinator import AjaxDataCoordinator
-from .devices import DEVICE_HANDLERS, LightSwitchHandler, is_dimmer_device
+from .devices import LightSwitchHandler, get_device_handler, is_dimmer_device
 from .models import AjaxDevice, AjaxSpace, DeviceType, SecurityState
 
 _LOGGER = logging.getLogger(__name__)
@@ -57,16 +58,6 @@ def is_lightswitch_device(device: AjaxDevice) -> bool:
     """Check if device is a LightSwitch (non-dimmer)."""
     raw_type = (device.raw_type or "").lower().replace("_", "").replace(" ", "")
     return "lightswitch" in raw_type and "dimmer" not in raw_type
-
-
-def get_device_handler(device: AjaxDevice) -> type | None:
-    """Get the appropriate handler for a device.
-
-    Dimmer devices are handled separately, not via handlers.
-    """
-    if is_dimmer_device(device):
-        return None
-    return DEVICE_HANDLERS.get(device.type)
 
 
 async def async_setup_entry(
@@ -278,7 +269,7 @@ class AjaxSwitch(CoordinatorEntity[AjaxDataCoordinator], SwitchEntity):
         self._switch_desc = switch_desc
 
         # Set unique ID
-        self._attr_unique_id = f"{device_id}_{switch_key}"
+        self._attr_unique_id = f"{self.coordinator.entry_id}_{device_id}_{switch_key}"
 
         # Set entity category if provided (accept enum or string for back-compat)
         cat = switch_desc.get("entity_category", EntityCategory.CONFIG)
@@ -700,11 +691,11 @@ class AjaxSwitch(CoordinatorEntity[AjaxDataCoordinator], SwitchEntity):
             return None
 
         return DeviceInfo(
-            identifiers={(DOMAIN, self._device_id)},
+            identifiers={device_identifier(self.coordinator.entry_id, self._device_id)},
             name=device.name,
             manufacturer=MANUFACTURER,
             model=device.raw_type,
-            via_device=(DOMAIN, self._space_id),
+            via_device=device_identifier(self.coordinator.entry_id, self._space_id),
             sw_version=device.firmware_version,
             hw_version=device.hardware_version,
             suggested_area=device.room_name,
@@ -739,7 +730,7 @@ class AjaxDimmerSettingsSwitch(CoordinatorEntity[AjaxDataCoordinator], SwitchEnt
         self._device_id = device_id
         self._switch_def = switch_def
 
-        self._attr_unique_id = f"{device_id}_{switch_def['key']}"
+        self._attr_unique_id = f"{self.coordinator.entry_id}_{device_id}_{switch_def['key']}"
         self._attr_translation_key = switch_def["translation_key"]
 
     def _get_device(self) -> AjaxDevice | None:
@@ -756,7 +747,7 @@ class AjaxDimmerSettingsSwitch(CoordinatorEntity[AjaxDataCoordinator], SwitchEnt
     @property
     def device_info(self) -> DeviceInfo:
         """Return device info."""
-        return DeviceInfo(identifiers={(DOMAIN, self._device_id)})
+        return DeviceInfo(identifiers={device_identifier(self.coordinator.entry_id, self._device_id)})
 
     @property
     def is_on(self) -> bool:
@@ -794,8 +785,10 @@ class AjaxDimmerSettingsSwitch(CoordinatorEntity[AjaxDataCoordinator], SwitchEnt
         elif not value and settings_key in new_settings:
             new_settings.remove(settings_key)
 
-        # Optimistic update
+        # Optimistic update — reserve against polling overwrite; the coordinator
+        # honours is_optimistic("settingsSwitch") before rewriting from a poll.
         device.attributes["settingsSwitch"] = new_settings
+        device.mark_optimistic("settingsSwitch", 15.0)
         self.async_write_ha_state()
 
         try:
@@ -809,8 +802,9 @@ class AjaxDimmerSettingsSwitch(CoordinatorEntity[AjaxDataCoordinator], SwitchEnt
             )
         except Exception as err:
             _LOGGER.error("Failed to set settingsSwitch: %s", err)
-            # Rollback optimistic update
+            # Rollback optimistic update + drop the guard so the refresh re-syncs.
             device.attributes["settingsSwitch"] = old_settings
+            device.attributes.get("_optimistic_attrs", {}).pop("settingsSwitch", None)
             self.async_write_ha_state()
             await self.coordinator.async_request_refresh()
             raise HomeAssistantError(
@@ -844,7 +838,7 @@ class AjaxDimmerBoolSwitch(CoordinatorEntity[AjaxDataCoordinator], SwitchEntity)
         self._attr_key = attr_key
         self._api_key = api_key
 
-        self._attr_unique_id = f"{device_id}_{switch_key}"
+        self._attr_unique_id = f"{self.coordinator.entry_id}_{device_id}_{switch_key}"
         self._attr_translation_key = switch_key
 
     def _get_device(self) -> AjaxDevice | None:
@@ -861,7 +855,7 @@ class AjaxDimmerBoolSwitch(CoordinatorEntity[AjaxDataCoordinator], SwitchEntity)
     @property
     def device_info(self) -> DeviceInfo:
         """Return device info."""
-        return DeviceInfo(identifiers={(DOMAIN, self._device_id)})
+        return DeviceInfo(identifiers={device_identifier(self.coordinator.entry_id, self._device_id)})
 
     @property
     def is_on(self) -> bool:
@@ -889,9 +883,11 @@ class AjaxDimmerBoolSwitch(CoordinatorEntity[AjaxDataCoordinator], SwitchEntity)
         if not space.hub_id:
             raise HomeAssistantError(translation_domain=DOMAIN, translation_key="hub_not_found")
 
-        # Optimistic update with rollback
+        # Optimistic update with rollback — reserve against polling overwrite;
+        # the coordinator honours is_optimistic(attr_key) before rewriting.
         old_value = device.attributes.get(self._attr_key)
         device.attributes[self._attr_key] = value
+        device.mark_optimistic(self._attr_key, 15.0)
         self.async_write_ha_state()
 
         try:
@@ -904,8 +900,9 @@ class AjaxDimmerBoolSwitch(CoordinatorEntity[AjaxDataCoordinator], SwitchEntity)
             )
         except Exception as err:
             _LOGGER.error("Failed to set %s: %s", self._api_key, err)
-            # Rollback optimistic update
+            # Rollback optimistic update + drop the guard so the refresh re-syncs.
             device.attributes[self._attr_key] = old_value
+            device.attributes.get("_optimistic_attrs", {}).pop(self._attr_key, None)
             self.async_write_ha_state()
             await self.coordinator.async_request_refresh()
             raise HomeAssistantError(
@@ -934,7 +931,7 @@ class AjaxDimmerCalibrationSwitch(CoordinatorEntity[AjaxDataCoordinator], Switch
         self._space_id = space_id
         self._device_id = device_id
 
-        self._attr_unique_id = f"{device_id}_dimmer_calibration"
+        self._attr_unique_id = f"{self.coordinator.entry_id}_{device_id}_dimmer_calibration"
         self._attr_translation_key = "dimmer_calibration"
 
     def _get_device(self) -> AjaxDevice | None:
@@ -951,7 +948,7 @@ class AjaxDimmerCalibrationSwitch(CoordinatorEntity[AjaxDataCoordinator], Switch
     @property
     def device_info(self) -> DeviceInfo:
         """Return device info."""
-        return DeviceInfo(identifiers={(DOMAIN, self._device_id)})
+        return DeviceInfo(identifiers={device_identifier(self.coordinator.entry_id, self._device_id)})
 
     @property
     def is_on(self) -> bool:

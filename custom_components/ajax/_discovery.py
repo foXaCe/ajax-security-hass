@@ -71,10 +71,14 @@ def connect_new_entity_signal(
         if not pairs:
             return
         ent_reg = er.async_get(hass)
+        # Dedup on the entity's OWN unique_id (entry-namespaced since schema
+        # v1.3), never on the builder's key — that way the dedup key and the
+        # registered key can never drift apart.
         fresh = [
             entity
-            for unique_id, entity in pairs
-            if ent_reg.async_get_entity_id(platform_domain, DOMAIN, unique_id) is None
+            for _key, entity in pairs
+            if entity.unique_id is not None
+            and ent_reg.async_get_entity_id(platform_domain, DOMAIN, entity.unique_id) is None
         ]
         if fresh:
             async_add_entities(fresh)

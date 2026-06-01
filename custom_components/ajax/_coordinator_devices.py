@@ -27,6 +27,7 @@ from typing import TYPE_CHECKING, Any
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 
+from ._ids import device_identifier
 from .const import DOMAIN, SIGNAL_NEW_DEVICE
 from .models import AjaxDevice, DeviceType
 
@@ -47,6 +48,7 @@ class AjaxDevicesMixin:
         account: AjaxAccount | None
         api: AjaxRestApi
         hass: HomeAssistant
+        entry_id: str
         _initial_load_done: bool
 
         def _parse_device_type(self, type_str: str) -> DeviceType: ...
@@ -74,14 +76,19 @@ class AjaxDevicesMixin:
             # Smart locks
             known_ids.update(space.smart_locks.keys())
 
-        # Scan HA device registry for Ajax devices
+        # Scan THIS entry's HA devices only (multi-account: never touch another
+        # entry's devices). Identifiers are namespaced f"{entry_id}_{ajax_id}",
+        # so strip the prefix before comparing against the bare Ajax ids.
         device_registry = dr.async_get(self.hass)
+        prefix = f"{self.entry_id}_"
         stale_devices: list[tuple[str, str]] = []  # (ha_device_id, ajax_id)
 
-        for ha_device in device_registry.devices.values():
+        for ha_device in dr.async_entries_for_config_entry(device_registry, self.entry_id):
             for id_tuple in ha_device.identifiers:
-                if len(id_tuple) == 2 and id_tuple[0] == DOMAIN and id_tuple[1] not in known_ids:
-                    stale_devices.append((ha_device.id, id_tuple[1]))
+                if len(id_tuple) == 2 and id_tuple[0] == DOMAIN:
+                    ajax_id = id_tuple[1].removeprefix(prefix)
+                    if ajax_id not in known_ids:
+                        stale_devices.append((ha_device.id, ajax_id))
 
         # Remove stale devices
         for ha_device_id, ajax_id in stale_devices:
@@ -142,7 +149,10 @@ class AjaxDevicesMixin:
             # With enrich=True, detailed data is in the "model" sub-object
             # Merge model into device_data so the rest of the code works
             device_data = dict(device_summary)
-            if "model" in device_summary:
+            # A non-conformant API variant can return ``model`` as null / a list
+            # instead of the documented object; guard so a single bad payload
+            # cannot abort the whole reconciliation cycle with a TypeError.
+            if isinstance(device_summary.get("model"), dict):
                 device_data.update(device_summary["model"])
 
             # Parse device type - API uses camelCase (deviceType, deviceName)
@@ -706,7 +716,9 @@ class AjaxDevicesMixin:
                     device_name = removed_device.name if removed_device else device_id
 
                     # Remove from HA device registry
-                    ha_device = device_registry.async_get_device(identifiers={(DOMAIN, device_id)})
+                    ha_device = device_registry.async_get_device(
+                        identifiers={device_identifier(self.entry_id, device_id)}
+                    )
                     if ha_device:
                         device_registry.async_remove_device(ha_device.id)
                         _LOGGER.info(

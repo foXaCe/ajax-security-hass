@@ -29,7 +29,8 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import AjaxConfigEntry
 from ._discovery import connect_new_entity_signal
-from .const import DOMAIN, MANUFACTURER, SIGNAL_NEW_DEVICE, SIGNAL_NEW_SMART_LOCK, SIGNAL_NEW_VIDEO_EDGE
+from ._ids import device_identifier
+from .const import MANUFACTURER, SIGNAL_NEW_DEVICE, SIGNAL_NEW_SMART_LOCK, SIGNAL_NEW_VIDEO_EDGE
 from .coordinator import AjaxDataCoordinator
 from .devices import VideoEdgeHandler, get_device_handler
 from .devices.base import resolve_entity_category
@@ -714,7 +715,7 @@ class AjaxSpaceSensor(CoordinatorEntity[AjaxDataCoordinator], SensorEntity):
                 sw_version = firmware["version"]
 
         return DeviceInfo(
-            identifiers={(DOMAIN, self._space_id)},
+            identifiers={device_identifier(self.coordinator.entry_id, self._space_id)},
             name=hub_display_name,
             manufacturer=MANUFACTURER,
             model=format_hub_type(space.hub_details.get("hubSubtype")) if space.hub_details else "Security Hub",
@@ -747,7 +748,7 @@ class AjaxDeviceSensor(CoordinatorEntity[AjaxDataCoordinator], SensorEntity):
         self._sensor_key = sensor_key
         self._sensor_desc = sensor_desc
 
-        self._attr_unique_id = f"{device_id}_{sensor_key}"
+        self._attr_unique_id = f"{self.coordinator.entry_id}_{device_id}_{sensor_key}"
 
         # Set device class if provided
         if "device_class" in sensor_desc:
@@ -815,11 +816,11 @@ class AjaxDeviceSensor(CoordinatorEntity[AjaxDataCoordinator], SensorEntity):
             return None
 
         return DeviceInfo(
-            identifiers={(DOMAIN, self._device_id)},
+            identifiers={device_identifier(self.coordinator.entry_id, self._device_id)},
             name=device.name,
             manufacturer=MANUFACTURER,
             model=device.raw_type,
-            via_device=(DOMAIN, self._space_id),
+            via_device=device_identifier(self.coordinator.entry_id, self._space_id),
             sw_version=device.firmware_version,
             hw_version=device.hardware_version,
             suggested_area=device.room_name,
@@ -859,7 +860,7 @@ class AjaxVideoEdgeSensor(CoordinatorEntity[AjaxDataCoordinator], SensorEntity):
         self._sensor_desc = sensor_desc
 
         # Set unique ID
-        self._attr_unique_id = f"{video_edge_id}_{sensor_key}"
+        self._attr_unique_id = f"{self.coordinator.entry_id}_{video_edge_id}_{sensor_key}"
 
         # Set translation key
         self._attr_translation_key = sensor_desc.get("translation_key", sensor_key)
@@ -950,11 +951,11 @@ class AjaxVideoEdgeSensor(CoordinatorEntity[AjaxDataCoordinator], SensorEntity):
             via_device_id = nvr_id
 
         return DeviceInfo(
-            identifiers={(DOMAIN, self._video_edge_id)},
+            identifiers={device_identifier(self.coordinator.entry_id, self._video_edge_id)},
             name=video_edge.name,
             manufacturer=MANUFACTURER,
             model=model_name,
-            via_device=(DOMAIN, via_device_id),
+            via_device=device_identifier(self.coordinator.entry_id, via_device_id),
             sw_version=video_edge.firmware_version,
             suggested_area=video_edge.room_name,
         )
@@ -1098,7 +1099,7 @@ class AjaxHubSensor(CoordinatorEntity[AjaxDataCoordinator], SensorEntity):
         hub_id = space.hub_id if space else space_id
 
         # Set unique ID
-        self._attr_unique_id = f"{hub_id}_{sensor_key}"
+        self._attr_unique_id = f"{self.coordinator.entry_id}_{hub_id}_{sensor_key}"
 
         # Set device class if provided
         if "device_class" in sensor_desc:
@@ -1157,7 +1158,7 @@ class AjaxHubSensor(CoordinatorEntity[AjaxDataCoordinator], SensorEntity):
 
         # Link to the space device (hub)
         return DeviceInfo(
-            identifiers={(DOMAIN, self._space_id)},
+            identifiers={device_identifier(self.coordinator.entry_id, self._space_id)},
         )
 
 
@@ -1182,7 +1183,7 @@ class AjaxSmartLockSensor(CoordinatorEntity[AjaxDataCoordinator], SensorEntity):
         super().__init__(coordinator)
         self._space_id = space_id
         self._smart_lock_id = smart_lock_id
-        self._attr_unique_id = f"{smart_lock_id}_last_changed_by"
+        self._attr_unique_id = f"{self.coordinator.entry_id}_{smart_lock_id}_last_changed_by"
 
     @property
     def native_value(self) -> str | None:
@@ -1205,11 +1206,11 @@ class AjaxSmartLockSensor(CoordinatorEntity[AjaxDataCoordinator], SensorEntity):
             return None
 
         return DeviceInfo(
-            identifiers={(DOMAIN, self._smart_lock_id)},
+            identifiers={device_identifier(self.coordinator.entry_id, self._smart_lock_id)},
             name=smart_lock.name,
             manufacturer=MANUFACTURER,
             model="LockBridge Jeweller",
-            via_device=(DOMAIN, self._space_id),
+            via_device=device_identifier(self.coordinator.entry_id, self._space_id),
         )
 
     def _get_smart_lock(self) -> AjaxSmartLock | None:

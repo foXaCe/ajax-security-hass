@@ -24,6 +24,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import AjaxConfigEntry
 from ._discovery import connect_new_entity_signal
+from ._ids import device_identifier
 from .const import DOMAIN, MANUFACTURER, SIGNAL_NEW_DEVICE
 from .coordinator import AjaxDataCoordinator
 from .devices import is_dimmer_device
@@ -113,7 +114,7 @@ class AjaxDimmerLight(CoordinatorEntity[AjaxDataCoordinator], LightEntity):
         super().__init__(coordinator)
         self._space_id = space_id
         self._device_id = device_id
-        self._attr_unique_id = f"{device_id}_light"
+        self._attr_unique_id = f"{self.coordinator.entry_id}_{device_id}_light"
 
     def _get_device(self) -> AjaxDevice | None:
         """Get the device from coordinator data."""
@@ -129,12 +130,12 @@ class AjaxDimmerLight(CoordinatorEntity[AjaxDataCoordinator], LightEntity):
         if not device:
             return None
         return DeviceInfo(
-            identifiers={(DOMAIN, self._device_id)},
+            identifiers={device_identifier(self.coordinator.entry_id, self._device_id)},
             name=device.name,
             manufacturer=MANUFACTURER,
             model=device.raw_type or "LightSwitch Dimmer",
             sw_version=device.firmware_version,
-            via_device=(DOMAIN, self._space_id),
+            via_device=device_identifier(self.coordinator.entry_id, self._space_id),
         )
 
     @property

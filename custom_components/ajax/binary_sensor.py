@@ -23,7 +23,8 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import AjaxConfigEntry
 from ._discovery import connect_new_entity_signal
-from .const import DOMAIN, MANUFACTURER, SIGNAL_NEW_DEVICE, SIGNAL_NEW_SMART_LOCK, SIGNAL_NEW_VIDEO_EDGE
+from ._ids import device_identifier
+from .const import MANUFACTURER, SIGNAL_NEW_DEVICE, SIGNAL_NEW_SMART_LOCK, SIGNAL_NEW_VIDEO_EDGE
 from .coordinator import AjaxDataCoordinator
 from .devices import VideoEdgeHandler, get_device_handler
 from .devices.base import resolve_entity_category
@@ -286,7 +287,7 @@ class AjaxBinarySensor(CoordinatorEntity[AjaxDataCoordinator], BinarySensorEntit
         self._sensor_desc = sensor_desc
 
         # Set unique ID
-        self._attr_unique_id = f"{device_id}_{sensor_key}"
+        self._attr_unique_id = f"{self.coordinator.entry_id}_{device_id}_{sensor_key}"
 
         # Set device class if provided
         if "device_class" in sensor_desc:
@@ -363,7 +364,9 @@ class AjaxBinarySensor(CoordinatorEntity[AjaxDataCoordinator], BinarySensorEntit
             return
 
         device_registry = dr.async_get(self.hass)
-        device_entry = device_registry.async_get_device(identifiers={(DOMAIN, self._device_id)})
+        device_entry = device_registry.async_get_device(
+            identifiers={device_identifier(self.coordinator.entry_id, self._device_id)}
+        )
         if not device_entry:
             return
 
@@ -396,11 +399,11 @@ class AjaxBinarySensor(CoordinatorEntity[AjaxDataCoordinator], BinarySensorEntit
             model_name = f"{model_name} ({color})"
 
         return DeviceInfo(
-            identifiers={(DOMAIN, self._device_id)},
+            identifiers={device_identifier(self.coordinator.entry_id, self._device_id)},
             name=device.name,
             manufacturer=MANUFACTURER,
             model=model_name,
-            via_device=(DOMAIN, self._space_id),
+            via_device=device_identifier(self.coordinator.entry_id, self._space_id),
             sw_version=device.firmware_version,
             hw_version=device.hardware_version,
             suggested_area=device.room_name,
@@ -437,7 +440,7 @@ class AjaxVideoEdgeBinarySensor(CoordinatorEntity[AjaxDataCoordinator], BinarySe
         self._sensor_desc = sensor_desc
 
         # Set unique ID
-        self._attr_unique_id = f"{video_edge_id}_{sensor_key}"
+        self._attr_unique_id = f"{self.coordinator.entry_id}_{video_edge_id}_{sensor_key}"
 
         # Set translation key
         self._attr_translation_key = sensor_desc.get("translation_key", sensor_key)
@@ -504,11 +507,11 @@ class AjaxVideoEdgeBinarySensor(CoordinatorEntity[AjaxDataCoordinator], BinarySe
             via_device_id = nvr_id
 
         return DeviceInfo(
-            identifiers={(DOMAIN, self._video_edge_id)},
+            identifiers={device_identifier(self.coordinator.entry_id, self._video_edge_id)},
             name=video_edge.name,
             manufacturer=MANUFACTURER,
             model=model_name,
-            via_device=(DOMAIN, via_device_id),
+            via_device=device_identifier(self.coordinator.entry_id, via_device_id),
             sw_version=video_edge.firmware_version,
             suggested_area=video_edge.room_name,
         )
@@ -569,7 +572,7 @@ class AjaxHubBinarySensor(CoordinatorEntity[AjaxDataCoordinator], BinarySensorEn
         hub_id = space.hub_id if space else space_id
 
         # Set unique ID
-        self._attr_unique_id = f"{hub_id}_{sensor_key}"
+        self._attr_unique_id = f"{self.coordinator.entry_id}_{hub_id}_{sensor_key}"
 
         # Set device class
         if "device_class" in self._sensor_config:
@@ -614,7 +617,7 @@ class AjaxHubBinarySensor(CoordinatorEntity[AjaxDataCoordinator], BinarySensorEn
 
         # Link to the space device (hub)
         return DeviceInfo(
-            identifiers={(DOMAIN, self._space_id)},
+            identifiers={device_identifier(self.coordinator.entry_id, self._space_id)},
         )
 
 
@@ -634,7 +637,7 @@ class AjaxSmartLockBinarySensor(CoordinatorEntity[AjaxDataCoordinator], BinarySe
         super().__init__(coordinator)
         self._space_id = space_id
         self._smart_lock_id = smart_lock_id
-        self._attr_unique_id = f"{smart_lock_id}_door"
+        self._attr_unique_id = f"{self.coordinator.entry_id}_{smart_lock_id}_door"
         self._attr_translation_key = "smart_lock_door"
 
     @property
@@ -658,11 +661,11 @@ class AjaxSmartLockBinarySensor(CoordinatorEntity[AjaxDataCoordinator], BinarySe
             return None
 
         return DeviceInfo(
-            identifiers={(DOMAIN, self._smart_lock_id)},
+            identifiers={device_identifier(self.coordinator.entry_id, self._smart_lock_id)},
             name=smart_lock.name,
             manufacturer=MANUFACTURER,
             model="LockBridge Jeweller",
-            via_device=(DOMAIN, self._space_id),
+            via_device=device_identifier(self.coordinator.entry_id, self._space_id),
         )
 
     def _get_smart_lock(self) -> AjaxSmartLock | None:

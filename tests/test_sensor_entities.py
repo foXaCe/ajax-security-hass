@@ -165,6 +165,7 @@ def test_device_sensor_init_wires_descriptor_metadata() -> None:
     from homeassistant.const import UnitOfTemperature
 
     coord = MagicMock()
+    coord.entry_id = "entry_test"
     sensor = AjaxDeviceSensor(
         coordinator=coord,
         space_id="s1",
@@ -179,7 +180,7 @@ def test_device_sensor_init_wires_descriptor_metadata() -> None:
             "value_fn": lambda: 21.5,
         },
     )
-    assert sensor._attr_unique_id == "d1_temperature"
+    assert sensor._attr_unique_id == "entry_test_d1_temperature"
     assert sensor._attr_device_class is SensorDeviceClass.TEMPERATURE
     assert sensor._attr_native_unit_of_measurement == UnitOfTemperature.CELSIUS
     assert sensor._attr_state_class is SensorStateClass.MEASUREMENT

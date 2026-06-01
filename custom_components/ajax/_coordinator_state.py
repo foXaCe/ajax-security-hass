@@ -3,8 +3,7 @@
 Carves out three families of methods from the main coordinator:
 
 * **Parsers** that turn raw Ajax payloads into typed enums
-  (``_parse_security_state``, ``_parse_device_type``,
-  ``_parse_notification_type``).
+  (``_parse_security_state``, ``_parse_device_type``).
 * **Video-edge / smart-lock pollers** that reconcile the Ajax catalogue
   with the in-memory account (``_async_update_video_edges``,
   ``_async_update_smart_locks``) and the no-op notification updater.
@@ -23,13 +22,13 @@ from typing import TYPE_CHECKING, Any
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 
+from ._ids import device_identifier
 from .api import AjaxRestAuthError
-from .const import DOMAIN, SIGNAL_NEW_SMART_LOCK, SIGNAL_NEW_VIDEO_EDGE
+from .const import SIGNAL_NEW_SMART_LOCK, SIGNAL_NEW_VIDEO_EDGE
 from .models import (
     AjaxSmartLock,
     AjaxVideoEdge,
     DeviceType,
-    NotificationType,
     SecurityState,
     VideoEdgeType,
 )
@@ -270,6 +269,7 @@ class AjaxStateUpdaterMixin:
         account: AjaxAccount | None
         api: AjaxRestApi
         hass: HomeAssistant
+        entry_id: str
         _initial_load_done: bool
 
         def get_space(self, space_id: str) -> AjaxSpace | None: ...
@@ -425,7 +425,9 @@ class AjaxStateUpdaterMixin:
                         removed_ve = space.video_edges.get(ve_id)
                         ve_name = removed_ve.name if removed_ve else ve_id
 
-                        ha_device = device_registry.async_get_device(identifiers={(DOMAIN, ve_id)})
+                        ha_device = device_registry.async_get_device(
+                            identifiers={device_identifier(self.entry_id, ve_id)}
+                        )
                         if ha_device:
                             device_registry.async_remove_device(ha_device.id)
                             _LOGGER.info(
@@ -537,7 +539,9 @@ class AjaxStateUpdaterMixin:
 
                         sl_name = removed_sl.name if removed_sl else sl_id
 
-                        ha_device = device_registry.async_get_device(identifiers={(DOMAIN, sl_id)})
+                        ha_device = device_registry.async_get_device(
+                            identifiers={device_identifier(self.entry_id, sl_id)}
+                        )
                         if ha_device:
                             device_registry.async_remove_device(ha_device.id)
                             _LOGGER.info(
@@ -563,23 +567,6 @@ class AjaxStateUpdaterMixin:
     # ------------------------------------------------------------------
     # Parsers
     # ------------------------------------------------------------------
-
-    def _parse_notification_type(self, event_type: str | None) -> NotificationType:
-        """Classify a raw event_type into a NotificationType bucket."""
-        if not event_type:
-            return NotificationType.INFO
-
-        event_lower = event_type.lower()
-
-        if any(keyword in event_lower for keyword in ("alarm", "intrusion", "panic", "fire", "smoke", "leak", "gas")):
-            return NotificationType.ALARM
-        if any(keyword in event_lower for keyword in ("malfunction", "low", "tamper", "loss", "error", "fault")):
-            return NotificationType.WARNING
-        if any(keyword in event_lower for keyword in ("arm", "disarm", "motion", "door", "opened")):
-            return NotificationType.SECURITY_EVENT
-        if any(keyword in event_lower for keyword in ("update", "added", "changed", "test")):
-            return NotificationType.SYSTEM_EVENT
-        return NotificationType.INFO
 
     def _parse_security_state(self, state_value: Any) -> SecurityState:
         """Parse security state from an API response value."""

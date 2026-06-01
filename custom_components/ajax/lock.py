@@ -22,6 +22,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import AjaxConfigEntry
 from ._discovery import connect_new_entity_signal
+from ._ids import device_identifier
 from .const import DOMAIN, MANUFACTURER, SIGNAL_NEW_SMART_LOCK
 from .coordinator import AjaxDataCoordinator
 from .models import AjaxSmartLock
@@ -99,7 +100,7 @@ class AjaxLock(CoordinatorEntity[AjaxDataCoordinator], LockEntity):
         super().__init__(coordinator)
         self._space_id = space_id
         self._smart_lock_id = smart_lock_id
-        self._attr_unique_id = f"{smart_lock_id}_lock"
+        self._attr_unique_id = f"{self.coordinator.entry_id}_{smart_lock_id}_lock"
         self._attr_translation_key = "smart_lock"
         self._attr_name = None
 
@@ -153,11 +154,11 @@ class AjaxLock(CoordinatorEntity[AjaxDataCoordinator], LockEntity):
             return None
 
         return DeviceInfo(
-            identifiers={(DOMAIN, self._smart_lock_id)},
+            identifiers={device_identifier(self.coordinator.entry_id, self._smart_lock_id)},
             name=smart_lock.name,
             manufacturer=MANUFACTURER,
             model="LockBridge Jeweller",
-            via_device=(DOMAIN, self._space_id),
+            via_device=device_identifier(self.coordinator.entry_id, self._space_id),
         )
 
     def _get_smart_lock(self) -> AjaxSmartLock | None:

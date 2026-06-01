@@ -139,3 +139,36 @@ def test_handle_door_event_silent_on_missing_device() -> None:
     space = _space_with()
     # Must not raise.
     mgr._handle_door_event(space, "dooropened", source_name="X", source_id="unknown", transition="")
+
+
+# ---------------------------------------------------------------------------
+# External-contact events (issue #151) — extcontact* drives the External
+# Contact entity (external_contact_opened), NOT the reed Door entity.
+# ---------------------------------------------------------------------------
+
+
+def test_extcontact_opened_updates_external_contact_not_door() -> None:
+    mgr = _make_manager()
+    dev = _door()
+    space = _space_with(dev)
+    mgr._handle_door_event(space, event_tag="extcontactopened", source_name="Front Door", source_id="d1", transition="")
+    assert dev.attributes["external_contact_opened"] is True
+    assert "door_opened" not in dev.attributes  # the reed Door entity is left untouched
+
+
+def test_extcontact_closed_clears_external_contact() -> None:
+    mgr = _make_manager()
+    dev = _door()
+    dev.attributes["external_contact_opened"] = True
+    space = _space_with(dev)
+    mgr._handle_door_event(space, event_tag="extcontactclosed", source_name="Front Door", source_id="d1", transition="")
+    assert dev.attributes["external_contact_opened"] is False
+
+
+def test_door_event_does_not_touch_external_contact() -> None:
+    mgr = _make_manager()
+    dev = _door()
+    space = _space_with(dev)
+    mgr._handle_door_event(space, event_tag="dooropened", source_name="Front Door", source_id="d1", transition="")
+    assert dev.attributes["door_opened"] is True
+    assert "external_contact_opened" not in dev.attributes

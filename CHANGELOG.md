@@ -2,6 +2,27 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+An overhaul pass: latent bugs fixed, dead code removed, test coverage raised from **32 % to 97 %** (433 → 1821 tests), and entity/device identifiers namespaced per account. mypy `--strict` clean, ruff clean, validated on a live install.
+
+### ⚠️ To be aware of
+- **Entity & device identifiers are now namespaced per config entry (schema v1.2 → v1.3).** This makes it possible to run **multiple Ajax accounts** in one Home Assistant without entity/device collisions. Existing setups migrate **automatically** on upgrade: each `unique_id` is renamed *in place*, so your **`entity_id`s, history, dashboards and automations are preserved** — no action required. (Single-account setups see no functional change.)
+
+### Added
+- Comprehensive unit-test suite: coverage 32 % → 97 %, with a migration "guarantee" test pinning that the v1.3 migration reproduces the exact runtime `unique_id` format (so the in-place rename can never orphan an entity).
+
+### Fixed
+- **External Contact entity lagged ~30 s in proxy mode (#151).** `extcontactopened` / `extcontactclosed` real-time events were routed through the door handler and wrote `door_opened`, so the *External Contact* binary sensor only ever updated from the REST poll. They now write `external_contact_opened` (matching the REST poll and the sensor's value_fn) in both the SSE and SQS managers — real-time again.
+- **Smoke detector high-temperature alarm ignored real-time SSE.** The `high_temperature` binary sensor only read the REST `temperatureAlarmDetected` key and missed the SSE `temperature_alert` key, so a temperature alarm only showed up at the next poll. It now reads both.
+- **Dimmer switches bounced back after toggling.** `AjaxDimmerSettingsSwitch` and `AjaxDimmerBoolSwitch` applied an optimistic state without guarding it, so a poll landing within ~1 s reverted the toggle. The state is now reserved for 15 s and cleared on the error rollback (parity with the other switches).
+- **A malformed `model` payload could abort a whole refresh.** Device reconciliation now guards against a non-object `model` field instead of raising `TypeError` and halting the poll cycle.
+- **Hardening:** `get_nvr_recordings` no longer dereferences a not-yet-populated coordinator; the API client raises a clear "not logged in" error (instead of building a `user/None/…` URL) on the device/camera endpoints; the SSE "alarm triggered by motion" log now shows the previous state rather than the new one.
+- **Deprecation warnings cleared:** `TrackerEntity` is imported from its public path, and the firmware-update entity passes `hw_version` as a string — both silencing Home Assistant 2026.x deprecation notices.
+
+### Removed
+- Dead code: unused API client methods (`async_control_device`, `async_set_light_state`, `async_get_nvr_status`), an unreferenced notification parser, `sse_client.update_session_token`, `onvif_manager.get_client`, and abandoned poll-count instrumentation in the SQS client.
+
 ## [0.31.1] - 2026-05-29
 
 A full-codebase review pass: 25 runtime bugs, each adversarially verified before fixing, plus a lifecycle audit. mypy `--strict` clean, ruff clean, **429 tests** (was 411).

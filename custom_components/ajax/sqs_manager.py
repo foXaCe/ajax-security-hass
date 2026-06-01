@@ -682,21 +682,24 @@ class SQSManager(EventHandlerMixin):
         if event_data is None:
             return False
         action, is_open = event_data
+        is_external = event_tag.startswith("extcontact")
 
         # Use transition to determine actual state (fixes issue #9)
-        # RECOVERED means the alarm condition ended (door closed)
-        # TRIGGERED means the alarm condition started (door opened)
+        # RECOVERED means the alarm condition ended (closed)
+        # TRIGGERED means the alarm condition started (opened)
         if transition == "RECOVERED":
             is_open = False
-            action = "door_closed"
+            action = "ext_contact_closed" if is_external else "door_closed"
         elif transition == "TRIGGERED":
             is_open = True
-            action = "door_opened"
+            action = "ext_contact_opened" if is_external else "door_opened"
 
-        # Find and update the device
+        # Find and update the device. extcontact* events drive the External
+        # Contact entity, not the reed (Door) entity (issue #151).
         device = self._find_device(space, source_name, source_id)
         if device:
-            device.attributes["door_opened"] = is_open
+            attr_key = "external_contact_opened" if is_external else "door_opened"
+            device.attributes[attr_key] = is_open
             device.last_trigger_time = datetime.now(UTC) if is_open else None
             message = get_event_message(action, self._language)
             _LOGGER.info("SQS instant: %s -> %s", source_name, message)

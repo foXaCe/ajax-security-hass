@@ -593,8 +593,12 @@ class SSEManager(EventHandlerMixin):
 
         dev = self._find_device(space, source_name, source_id)
         if dev:
-            dev.attributes["door_opened"] = is_triggered
-            dev.attributes["door_opened_at"] = datetime.now(UTC).isoformat()
+            # extcontact* events drive the External Contact entity, not the reed
+            # (Door) entity — write the matching attribute so SSE updates it in
+            # real time instead of lagging on the next REST poll (issue #151).
+            attr_key = "external_contact_opened" if event_tag.startswith("extcontact") else "door_opened"
+            dev.attributes[attr_key] = is_triggered
+            dev.attributes[f"{attr_key}_at"] = datetime.now(UTC).isoformat()
             _LOGGER.info("SSE instant: %s -> %s", dev.name, action_key)
 
             # Parity with SQS: a door opening while the space is armed is an
@@ -628,11 +632,12 @@ class SSEManager(EventHandlerMixin):
                 SecurityState.NIGHT_MODE,
                 SecurityState.PARTIALLY_ARMED,
             ):
+                previous_state = space.security_state
                 space.security_state = SecurityState.TRIGGERED
                 _LOGGER.info(
                     "SSE: Alarm TRIGGERED by motion on %s (was %s)",
                     dev.name,
-                    space.security_state.value,
+                    previous_state.value,
                 )
                 # Parity with SQS: history entry + persistent alarm notification
                 self._record_alarm_event(space, action_key, dev.name)

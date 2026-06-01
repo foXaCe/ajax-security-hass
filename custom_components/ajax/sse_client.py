@@ -280,15 +280,6 @@ class AjaxSSEClient:
         except Exception as err:
             _LOGGER.error("SSE callback error: %s", err)
 
-    def update_session_token(self, new_token: str) -> None:
-        """Update session token (e.g., after token refresh).
-
-        Args:
-            new_token: New session token
-        """
-        self.session_token = new_token
-        _LOGGER.debug("SSE session token updated")
-
     @property
     def is_connected(self) -> bool:
         """Check if SSE is currently connected."""

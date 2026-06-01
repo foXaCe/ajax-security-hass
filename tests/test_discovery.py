@@ -56,7 +56,10 @@ def test_adds_only_unknown_entities(
     fake_hass,
     fake_entry,
 ) -> None:
-    builder = MagicMock(return_value=[("uid_new", "entity_new"), ("uid_seen", "entity_seen")])
+    # Dedup is on entity.unique_id, so fake entities must carry it.
+    ent_new = SimpleNamespace(unique_id="uid_new")
+    ent_seen = SimpleNamespace(unique_id="uid_seen")
+    builder = MagicMock(return_value=[("uid_new", ent_new), ("uid_seen", ent_seen)])
     mock_er.async_get.return_value = _registry("uid_seen")
 
     async_add = _connect(fake_hass, fake_entry, builder)
@@ -65,7 +68,7 @@ def test_adds_only_unknown_entities(
     handler("space-1", "obj-1")
 
     builder.assert_called_once_with("space-1", "obj-1")
-    async_add.assert_called_once_with(["entity_new"])  # uid_seen filtered out
+    async_add.assert_called_once_with([ent_new])  # uid_seen filtered out
 
 
 @patch.object(_discovery, "er")
@@ -96,7 +99,9 @@ def test_does_not_call_async_add_when_all_already_registered(
     fake_entry,
 ) -> None:
     """All candidates already in the registry → no add (avoid empty add)."""
-    builder = MagicMock(return_value=[("uid_a", "ent_a"), ("uid_b", "ent_b")])
+    builder = MagicMock(
+        return_value=[("uid_a", SimpleNamespace(unique_id="uid_a")), ("uid_b", SimpleNamespace(unique_id="uid_b"))]
+    )
     mock_er.async_get.return_value = _registry("uid_a", "uid_b")
 
     async_add = _connect(fake_hass, fake_entry, builder)
@@ -141,6 +146,6 @@ def test_passes_signal_and_domain_through(
     assert mock_dispatcher_connect.call_args.args[1] == "custom_signal"
     # And the registry lookup uses the platform domain we asked for.
     handler = mock_dispatcher_connect.call_args.args[2]
-    builder.return_value = [("uid", "ent")]
+    builder.return_value = [("uid", SimpleNamespace(unique_id="uid"))]
     handler("s", "o")
     mock_er.async_get.return_value.async_get_entity_id.assert_called_with("event", _discovery.DOMAIN, "uid")

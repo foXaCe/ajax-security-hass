@@ -101,7 +101,13 @@ class SmokeDetectorHandler(AjaxDeviceHandler):
                     "key": "high_temperature",
                     "translation_key": "high_temperature",
                     "device_class": BinarySensorDeviceClass.HEAT,
-                    "value_fn": lambda: self.device.attributes.get("temperatureAlarmDetected", False),
+                    # REST exposes ``temperatureAlarmDetected``; SSE writes the
+                    # transient ``temperature_alert`` key (see sse_manager). Read
+                    # both so the alarm shows in real time, not only after a poll.
+                    "value_fn": lambda: bool(
+                        self.device.attributes.get("temperatureAlarmDetected", False)
+                        or self.device.attributes.get("temperature_alert", False)
+                    ),
                     "enabled_by_default": True,
                 }
             )

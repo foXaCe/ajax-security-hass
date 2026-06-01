@@ -22,6 +22,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import AjaxConfigEntry
 from ._discovery import connect_new_entity_signal
+from ._ids import device_identifier
 from .const import DOMAIN, SIGNAL_NEW_DEVICE
 from .coordinator import AjaxDataCoordinator
 from .models import AjaxDevice, DeviceType, SecurityState
@@ -215,18 +216,29 @@ async def async_setup_entry(
 
         device_type_raw = device.raw_type or ""
         if device_type_raw in DEVICES_WITH_DOOR_PLUS_NUMBERS:
-            pairs.append((f"{device_id}_tilt_degrees", AjaxTiltDegreesNumber(coordinator, space_id, device_id)))
+            pairs.append(
+                (
+                    f"{coordinator.entry_id}_{device_id}_tilt_degrees",
+                    AjaxTiltDegreesNumber(coordinator, space_id, device_id),
+                )
+            )
 
         if device.type in DEVICES_WITH_CURRENT_THRESHOLD and "current_threshold" in device.attributes:
             pairs.append(
-                (f"{device_id}_current_threshold", AjaxCurrentThresholdNumber(coordinator, space_id, device_id))
+                (
+                    f"{coordinator.entry_id}_{device_id}_current_threshold",
+                    AjaxCurrentThresholdNumber(coordinator, space_id, device_id),
+                )
             )
 
         if device.type in DEVICES_WITH_CURRENT_THRESHOLD:
             brightness = device.attributes.get("indicationBrightness")
             if isinstance(brightness, int):
                 pairs.append(
-                    (f"{device_id}_led_brightness", AjaxLedBrightnessV2Number(coordinator, space_id, device_id))
+                    (
+                        f"{coordinator.entry_id}_{device_id}_led_brightness",
+                        AjaxLedBrightnessV2Number(coordinator, space_id, device_id),
+                    )
                 )
 
         if is_dimmer_device(device):
@@ -234,7 +246,7 @@ async def async_setup_entry(
                 if number_def["attr_key"] in device.attributes:
                     pairs.append(
                         (
-                            f"{device_id}_{number_def['key']}",
+                            f"{coordinator.entry_id}_{device_id}_{number_def['key']}",
                             AjaxDimmerNumber(coordinator, space_id, device_id, number_def),
                         )
                     )
@@ -242,7 +254,7 @@ async def async_setup_entry(
         if is_lightswitch_device(device) and "touchSensitivity" in device.attributes:
             pairs.append(
                 (
-                    f"{device_id}_touch_sensitivity",
+                    f"{coordinator.entry_id}_{device_id}_touch_sensitivity",
                     AjaxDimmerNumber(
                         coordinator=coordinator,
                         space_id=space_id,
@@ -298,7 +310,7 @@ class AjaxDoorPlusBaseNumber(CoordinatorEntity[AjaxDataCoordinator], NumberEntit
 
     @property
     def device_info(self) -> DeviceInfo:
-        return DeviceInfo(identifiers={(DOMAIN, self._device_id)})
+        return DeviceInfo(identifiers={device_identifier(self.coordinator.entry_id, self._device_id)})
 
     @callback
     def _handle_coordinator_update(self) -> None:
@@ -315,7 +327,7 @@ class AjaxTiltDegreesNumber(AjaxDoorPlusBaseNumber):
 
     def __init__(self, coordinator: AjaxDataCoordinator, space_id: str, device_id: str) -> None:
         super().__init__(coordinator, space_id, device_id)
-        self._attr_unique_id = f"{device_id}_tilt_degrees"
+        self._attr_unique_id = f"{self.coordinator.entry_id}_{device_id}_tilt_degrees"
         self._attr_translation_key = "tilt_degrees"
         self._attr_entity_category = EntityCategory.CONFIG
 
@@ -382,7 +394,7 @@ class AjaxCurrentThresholdNumber(CoordinatorEntity[AjaxDataCoordinator], NumberE
         super().__init__(coordinator)
         self._space_id = space_id
         self._device_id = device_id
-        self._attr_unique_id = f"{device_id}_current_threshold"
+        self._attr_unique_id = f"{self.coordinator.entry_id}_{device_id}_current_threshold"
         self._attr_translation_key = "current_threshold"
 
     def _get_device(self) -> AjaxDevice | None:
@@ -396,7 +408,7 @@ class AjaxCurrentThresholdNumber(CoordinatorEntity[AjaxDataCoordinator], NumberE
 
     @property
     def device_info(self) -> DeviceInfo:
-        return DeviceInfo(identifiers={(DOMAIN, self._device_id)})
+        return DeviceInfo(identifiers={device_identifier(self.coordinator.entry_id, self._device_id)})
 
     @property
     def native_value(self) -> float | None:
@@ -458,7 +470,7 @@ class AjaxLedBrightnessV2Number(CoordinatorEntity[AjaxDataCoordinator], NumberEn
         super().__init__(coordinator)
         self._space_id = space_id
         self._device_id = device_id
-        self._attr_unique_id = f"{device_id}_led_brightness"
+        self._attr_unique_id = f"{self.coordinator.entry_id}_{device_id}_led_brightness"
         self._attr_translation_key = "led_brightness_level"
 
     def _get_device(self) -> AjaxDevice | None:
@@ -475,7 +487,7 @@ class AjaxLedBrightnessV2Number(CoordinatorEntity[AjaxDataCoordinator], NumberEn
 
     @property
     def device_info(self) -> DeviceInfo:
-        return DeviceInfo(identifiers={(DOMAIN, self._device_id)})
+        return DeviceInfo(identifiers={device_identifier(self.coordinator.entry_id, self._device_id)})
 
     @property
     def native_value(self) -> float | None:
@@ -542,7 +554,7 @@ class AjaxDimmerNumber(CoordinatorEntity[AjaxDataCoordinator], NumberEntity):
         self._device_id = device_id
         self._number_def = number_def
 
-        self._attr_unique_id = f"{device_id}_{number_def['key']}"
+        self._attr_unique_id = f"{self.coordinator.entry_id}_{device_id}_{number_def['key']}"
         self._attr_translation_key = number_def["translation_key"]
         self._attr_native_min_value = number_def["min_value"]
         self._attr_native_max_value = number_def["max_value"]
@@ -568,7 +580,7 @@ class AjaxDimmerNumber(CoordinatorEntity[AjaxDataCoordinator], NumberEntity):
     @property
     def device_info(self) -> DeviceInfo:
         """Return device info."""
-        return DeviceInfo(identifiers={(DOMAIN, self._device_id)})
+        return DeviceInfo(identifiers={device_identifier(self.coordinator.entry_id, self._device_id)})
 
     @property
     def native_value(self) -> float | None:

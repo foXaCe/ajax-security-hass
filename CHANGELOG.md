@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.32.0] - 2026-06-01
+
 An overhaul pass: latent bugs fixed, dead code removed, test coverage raised from **32 % to 97 %** (433 → 1821 tests), and entity/device identifiers namespaced per account. mypy `--strict` clean, ruff clean, validated on a live install.
 
 ### ⚠️ To be aware of
@@ -29,6 +31,7 @@ An overhaul pass: latent bugs fixed, dead code removed, test coverage raised fro
 - **A malformed `model` payload could abort a whole refresh.** Device reconciliation now guards against a non-object `model` field instead of raising `TypeError` and halting the poll cycle.
 - **Hardening:** `get_nvr_recordings` no longer dereferences a not-yet-populated coordinator; the API client raises a clear "not logged in" error (instead of building a `user/None/…` URL) on the device/camera endpoints; the SSE "alarm triggered by motion" log now shows the previous state rather than the new one.
 - **Deprecation warnings cleared:** `TrackerEntity` is imported from its public path, and the firmware-update entity passes `hw_version` as a string — both silencing Home Assistant 2026.x deprecation notices.
+- **Real-time SQS events recovered after a deferred `aiobotocore` install.** When `aiobotocore` was pulled in lazily on first run, the SQS client failed to start and real-time events stayed off until a reload; it now connects automatically once the dependency is available.
 
 ### Changed
 - **Internal modularisation (no behaviour change, no `unique_id` change — verified against a live install).** The largest modules were split along clean responsibility lines so the codebase is easier to maintain:
@@ -39,6 +42,7 @@ An overhaul pass: latent bugs fixed, dead code removed, test coverage raised fro
   - `config_flow.py` → options flow extracted to `config_flow_options.py`.
   - `__init__.py` → service registration extracted to `_services.py`.
 - Test coverage raised **97 % → 98 %** (1833 tests), notably bringing `__init__` (setup entry) and `coordinator` (constructor) to ~100 %.
+- French translation polish: corrected an anglicism, added the missing French space before colons in the setup/options dialogs, and hyphenated the French e-mail term.
 
 ### Removed
 - Dead code: unused API client methods (`async_control_device`, `async_set_light_state`, `async_get_nvr_status`), an unreferenced notification parser, `sse_client.update_session_token`, `onvif_manager.get_client`, and abandoned poll-count instrumentation in the SQS client.

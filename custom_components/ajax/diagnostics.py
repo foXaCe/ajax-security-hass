@@ -184,9 +184,15 @@ async def get_ajax_raw_data(
     all_video_edges = []
     hub_count = 0
 
+    # Device identifiers are namespaced f"{entry_id}_{ajax_id}" (schema v1.3);
+    # strip the prefix so it matches the bare Ajax ids compared against below.
     target_device_id = (
         next(
-            (str(value) for domain, value in device.identifiers if domain == DOMAIN),
+            (
+                str(value).removeprefix(f"{coordinator.entry_id}_")
+                for domain, value in device.identifiers
+                if domain == DOMAIN
+            ),
             None,
         )
         if device is not None

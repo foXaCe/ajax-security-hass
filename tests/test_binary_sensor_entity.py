@@ -123,6 +123,7 @@ def test_available_false_when_device_removed() -> None:
 def test_init_wires_device_class_and_translation_key() -> None:
     coord = MagicMock()
     coord.last_update_success = True
+    coord.entry_id = "entry_test"
     sensor = AjaxBinarySensor(
         coordinator=coord,
         space_id="s1",
@@ -136,7 +137,7 @@ def test_init_wires_device_class_and_translation_key() -> None:
             "entity_category": "diagnostic",
         },
     )
-    assert sensor._attr_unique_id == "d1_door"
+    assert sensor._attr_unique_id == "entry_test_d1_door"
     assert sensor._attr_device_class is BinarySensorDeviceClass.OPENING
     assert sensor._attr_translation_key == "door_state"
     assert sensor._attr_entity_registry_enabled_default is False
@@ -147,6 +148,7 @@ def test_init_falls_back_to_sensor_key_when_no_device_class() -> None:
     """Without device_class, HA needs a translation_key — default to the sensor key."""
     coord = MagicMock()
     coord.last_update_success = True
+    coord.entry_id = "entry_test"
     sensor = AjaxBinarySensor(
         coordinator=coord,
         space_id="s1",
@@ -161,6 +163,7 @@ def test_init_keeps_explicit_name_when_provided() -> None:
     """A descriptor with `name=None` deliberately suppresses the entity name."""
     coord = MagicMock()
     coord.last_update_success = True
+    coord.entry_id = "entry_test"
     sensor = AjaxBinarySensor(
         coordinator=coord,
         space_id="s1",

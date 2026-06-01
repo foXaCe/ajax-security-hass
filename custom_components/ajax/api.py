@@ -1036,6 +1036,8 @@ class AjaxRestApi:
             if cached and (time.time() - cached[0]) < self._devices_cache_ttl:
                 return cached[1]
 
+        if not self.user_id:
+            raise AjaxRestApiError("No user_id available. Call async_login() first.")
         endpoint = f"user/{self.user_id}/hubs/{hub_id}/devices"
         if enrich:
             endpoint += "?enrich=true"
@@ -1053,6 +1055,8 @@ class AjaxRestApi:
         Returns:
             Device details dictionary
         """
+        if not self.user_id:
+            raise AjaxRestApiError("No user_id available. Call async_login() first.")
         return await self._request("GET", f"user/{self.user_id}/hubs/{hub_id}/devices/{device_id}")  # type: ignore[no-any-return]
 
     async def async_get_device_state(self, device_id: str) -> dict[str, Any]:
@@ -1065,22 +1069,6 @@ class AjaxRestApi:
             Device state dictionary
         """
         return await self._request("GET", f"devices/{device_id}/state")  # type: ignore[no-any-return]
-
-    # Device control methods (direct API mode)
-    async def async_control_device(self, device_id: str, command: dict[str, Any]) -> dict[str, Any]:
-        """Send control command to device (direct API mode only).
-
-        This endpoint is used for Socket/Relay/WallSwitch control in direct mode.
-        For proxy mode, use async_update_device with switchState instead.
-
-        Args:
-            device_id: Device ID
-            command: Command dictionary (e.g., {"state": "on"} or {"action": "pulse"})
-
-        Returns:
-            Device response
-        """
-        return await self._request("POST", f"devices/{device_id}/control", command)  # type: ignore[no-any-return]
 
     async def async_send_device_command(self, hub_id: str, device_id: str, command: str, device_type: str) -> None:
         """Send command to device (Socket/Relay/WallSwitch).
@@ -1199,6 +1187,8 @@ class AjaxRestApi:
         Returns:
             List of camera dictionaries
         """
+        if not self.user_id:
+            raise AjaxRestApiError("No user_id available. Call async_login() first.")
         return await self._request("GET", f"user/{self.user_id}/hubs/{hub_id}/cameras")  # type: ignore[no-any-return]
 
     async def async_get_camera(self, hub_id: str, camera_id: str) -> dict[str, Any]:
@@ -1211,6 +1201,8 @@ class AjaxRestApi:
         Returns:
             Camera details dictionary
         """
+        if not self.user_id:
+            raise AjaxRestApiError("No user_id available. Call async_login() first.")
         return await self._request("GET", f"user/{self.user_id}/hubs/{hub_id}/cameras/{camera_id}")  # type: ignore[no-any-return]
 
     async def async_get_camera_snapshot(self, hub_id: str, camera_id: str) -> bytes:
@@ -1427,27 +1419,6 @@ class AjaxRestApi:
         )
 
     # Light/Button methods
-    async def async_set_light_state(
-        self,
-        device_id: str,
-        state: bool,
-        brightness: int | None = None,
-    ) -> dict[str, Any]:
-        """Set light state.
-
-        Args:
-            device_id: Light device ID
-            state: True for on, False for off
-            brightness: Optional brightness (0-100)
-
-        Returns:
-            Updated light state
-        """
-        payload: dict[str, str | int] = {"state": "on" if state else "off"}
-        if brightness is not None:
-            payload["brightness"] = brightness
-        return await self._request("POST", f"devices/{device_id}/control", payload)  # type: ignore[no-any-return]
-
     async def async_set_dimmer_brightness(
         self,
         hub_id: str,
@@ -1522,17 +1493,6 @@ class AjaxRestApi:
         return await self._request("GET", f"hubs/{hub_id}/events?limit={limit}")  # type: ignore[no-any-return]
 
     # NVR methods
-    async def async_get_nvr_status(self, nvr_id: str) -> dict[str, Any]:
-        """Get NVR status.
-
-        Args:
-            nvr_id: NVR device ID
-
-        Returns:
-            NVR status dictionary
-        """
-        return await self._request("GET", f"devices/{nvr_id}/status")  # type: ignore[no-any-return]
-
     async def async_get_nvr_recordings(
         self,
         nvr_id: str,

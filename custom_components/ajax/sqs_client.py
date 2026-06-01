@@ -180,9 +180,8 @@ class AjaxSQSClient:
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
 
-        poll_count = 0
         try:
-            loop.run_until_complete(self._run_loop_async(lambda: poll_count))
+            loop.run_until_complete(self._run_loop_async())
         finally:
             try:
                 # Cancel pending tasks before closing the loop.
@@ -195,7 +194,7 @@ class AjaxSQSClient:
                 loop.close()
                 _LOGGER.info("SQS thread ended")
 
-    async def _run_loop_async(self, _poll_count_fn: Callable[[], int]) -> None:
+    async def _run_loop_async(self) -> None:
         """Run the poll/handle cycle with a persistent SQS client."""
         consecutive_errors = 0
         async with self._make_client() as client:

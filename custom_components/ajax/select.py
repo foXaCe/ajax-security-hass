@@ -21,6 +21,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import AjaxConfigEntry
 from ._discovery import connect_new_entity_signal
+from ._ids import device_identifier
 from .const import DOMAIN, SIGNAL_NEW_DEVICE
 from .coordinator import AjaxDataCoordinator
 from .devices.siren import SirenHandler
@@ -225,21 +226,34 @@ async def async_setup_entry(
         device_type = device.raw_type or ""
         if device_type in DEVICES_WITH_DOOR_PLUS_SELECTS:
             pairs.append(
-                (f"{device_id}_shock_sensitivity", AjaxShockSensitivitySelect(coordinator, space_id, device_id))
+                (
+                    f"{entry.entry_id}_{device_id}_shock_sensitivity",
+                    AjaxShockSensitivitySelect(coordinator, space_id, device_id),
+                )
             )
 
         if device.type == DeviceType.SOCKET and device.attributes.get("indicationBrightness") in ["MIN", "MAX"]:
-            pairs.append((f"{device_id}_led_brightness", AjaxLedBrightnessSelect(coordinator, space_id, device_id)))
+            pairs.append(
+                (
+                    f"{entry.entry_id}_{device_id}_led_brightness",
+                    AjaxLedBrightnessSelect(coordinator, space_id, device_id),
+                )
+            )
 
         if device.type == DeviceType.SOCKET and "indicationMode" in device.attributes:
-            pairs.append((f"{device_id}_indication_mode", AjaxIndicationModeSelect(coordinator, space_id, device_id)))
+            pairs.append(
+                (
+                    f"{entry.entry_id}_{device_id}_indication_mode",
+                    AjaxIndicationModeSelect(coordinator, space_id, device_id),
+                )
+            )
 
         if is_dimmer_device(device):
             for select_def in DIMMER_SELECT_DEFINITIONS:
                 if _get_dimmer_attr(device, select_def["attr_key"]) is not None:
                     pairs.append(
                         (
-                            f"{device_id}_{select_def['key']}",
+                            f"{entry.entry_id}_{device_id}_{select_def['key']}",
                             AjaxDimmerSelect(coordinator, space_id, device_id, select_def),
                         )
                     )
@@ -247,7 +261,7 @@ async def async_setup_entry(
         if is_lightswitch_device(device) and "touchMode" in device.attributes:
             pairs.append(
                 (
-                    f"{device_id}_{LIGHTSWITCH_TOUCH_MODE_SELECT['key']}",
+                    f"{entry.entry_id}_{device_id}_{LIGHTSWITCH_TOUCH_MODE_SELECT['key']}",
                     AjaxDimmerSelect(coordinator, space_id, device_id, LIGHTSWITCH_TOUCH_MODE_SELECT),
                 )
             )
@@ -259,7 +273,7 @@ async def async_setup_entry(
                 for select_desc in handler.get_selects():
                     pairs.append(
                         (
-                            f"{device_id}_{select_desc['key']}",
+                            f"{entry.entry_id}_{device_id}_{select_desc['key']}",
                             AjaxHandlerSelect(coordinator, space_id, device_id, select_desc),
                         )
                     )
@@ -300,7 +314,7 @@ class AjaxDoorPlusBaseSelect(CoordinatorEntity[AjaxDataCoordinator], SelectEntit
 
     @property
     def device_info(self) -> DeviceInfo:
-        return DeviceInfo(identifiers={(DOMAIN, self._device_id)})
+        return DeviceInfo(identifiers={device_identifier(self.coordinator.entry_id, self._device_id)})
 
     @callback
     def _handle_coordinator_update(self) -> None:
@@ -317,7 +331,7 @@ class AjaxShockSensitivitySelect(AjaxDoorPlusBaseSelect):
 
     def __init__(self, coordinator: AjaxDataCoordinator, space_id: str, device_id: str) -> None:
         super().__init__(coordinator, space_id, device_id)
-        self._attr_unique_id = f"{device_id}_shock_sensitivity"
+        self._attr_unique_id = f"{self.coordinator.entry_id}_{device_id}_shock_sensitivity"
         self._attr_translation_key = "shock_sensitivity"
 
     @property
@@ -382,7 +396,7 @@ class AjaxLedBrightnessSelect(CoordinatorEntity[AjaxDataCoordinator], SelectEnti
         super().__init__(coordinator)
         self._space_id = space_id
         self._device_id = device_id
-        self._attr_unique_id = f"{device_id}_led_brightness"
+        self._attr_unique_id = f"{self.coordinator.entry_id}_{device_id}_led_brightness"
         self._attr_translation_key = "led_brightness"
 
     def _get_device(self) -> AjaxDevice | None:
@@ -399,7 +413,7 @@ class AjaxLedBrightnessSelect(CoordinatorEntity[AjaxDataCoordinator], SelectEnti
 
     @property
     def device_info(self) -> DeviceInfo:
-        return DeviceInfo(identifiers={(DOMAIN, self._device_id)})
+        return DeviceInfo(identifiers={device_identifier(self.coordinator.entry_id, self._device_id)})
 
     @property
     def current_option(self) -> str | None:
@@ -463,7 +477,7 @@ class AjaxIndicationModeSelect(CoordinatorEntity[AjaxDataCoordinator], SelectEnt
         super().__init__(coordinator)
         self._space_id = space_id
         self._device_id = device_id
-        self._attr_unique_id = f"{device_id}_indication_mode"
+        self._attr_unique_id = f"{self.coordinator.entry_id}_{device_id}_indication_mode"
         self._attr_translation_key = "indication_mode"
 
     def _get_device(self) -> AjaxDevice | None:
@@ -477,7 +491,7 @@ class AjaxIndicationModeSelect(CoordinatorEntity[AjaxDataCoordinator], SelectEnt
 
     @property
     def device_info(self) -> DeviceInfo:
-        return DeviceInfo(identifiers={(DOMAIN, self._device_id)})
+        return DeviceInfo(identifiers={device_identifier(self.coordinator.entry_id, self._device_id)})
 
     @property
     def current_option(self) -> str | None:
@@ -542,7 +556,7 @@ class AjaxDimmerSelect(CoordinatorEntity[AjaxDataCoordinator], SelectEntity):
         self._device_id = device_id
         self._select_def = select_def
 
-        self._attr_unique_id = f"{device_id}_{select_def['key']}"
+        self._attr_unique_id = f"{self.coordinator.entry_id}_{device_id}_{select_def['key']}"
         self._attr_translation_key = select_def["translation_key"]
         self._attr_options = select_def["options"]
 
@@ -560,7 +574,7 @@ class AjaxDimmerSelect(CoordinatorEntity[AjaxDataCoordinator], SelectEntity):
     @property
     def device_info(self) -> DeviceInfo:
         """Return device info."""
-        return DeviceInfo(identifiers={(DOMAIN, self._device_id)})
+        return DeviceInfo(identifiers={device_identifier(self.coordinator.entry_id, self._device_id)})
 
     @property
     def current_option(self) -> str | None:
@@ -642,7 +656,7 @@ class AjaxHandlerSelect(CoordinatorEntity[AjaxDataCoordinator], SelectEntity):
         self._device_id = device_id
         self._select_desc = select_desc
 
-        self._attr_unique_id = f"{device_id}_{select_desc['key']}"
+        self._attr_unique_id = f"{self.coordinator.entry_id}_{device_id}_{select_desc['key']}"
         self._attr_translation_key = select_desc.get("translation_key", select_desc["key"])
         self._attr_options = select_desc.get("options", [])
 
@@ -657,7 +671,7 @@ class AjaxHandlerSelect(CoordinatorEntity[AjaxDataCoordinator], SelectEntity):
 
     @property
     def device_info(self) -> DeviceInfo:
-        return DeviceInfo(identifiers={(DOMAIN, self._device_id)})
+        return DeviceInfo(identifiers={device_identifier(self.coordinator.entry_id, self._device_id)})
 
     @property
     def current_option(self) -> str | None:

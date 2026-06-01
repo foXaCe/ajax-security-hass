@@ -62,7 +62,7 @@ class AjaxConfigFlow(ConfigFlow, domain=DOMAIN):
     """Handle a config flow for Ajax Security Systems."""
 
     VERSION = 1
-    MINOR_VERSION = 2
+    MINOR_VERSION = 3
 
     @staticmethod
     @callback

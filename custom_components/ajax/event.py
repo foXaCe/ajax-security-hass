@@ -17,7 +17,8 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import AjaxConfigEntry
 from ._discovery import connect_new_entity_signal
-from .const import DOMAIN, MANUFACTURER, SIGNAL_NEW_DEVICE, SIGNAL_NEW_SMART_LOCK, SIGNAL_NEW_VIDEO_EDGE
+from ._ids import device_identifier
+from .const import MANUFACTURER, SIGNAL_NEW_DEVICE, SIGNAL_NEW_SMART_LOCK, SIGNAL_NEW_VIDEO_EDGE
 from .coordinator import AjaxDataCoordinator
 from .devices import get_device_handler
 from .models import VIDEO_EDGE_MODEL_NAMES, VideoEdgeType
@@ -292,7 +293,7 @@ class AjaxEventEntity(CoordinatorEntity[AjaxDataCoordinator], EventEntity):
         self._event_key = event_key
         self._event_desc = event_desc
 
-        self._attr_unique_id = f"{device_id}_{event_key}"
+        self._attr_unique_id = f"{self.coordinator.entry_id}_{device_id}_{event_key}"
         self._attr_translation_key = event_desc.get("translation_key", event_key)
         self._attr_device_class = event_desc.get("device_class")
         self._attr_event_types = event_desc["event_types"]
@@ -300,17 +301,24 @@ class AjaxEventEntity(CoordinatorEntity[AjaxDataCoordinator], EventEntity):
         self._attr_name = event_desc.get("name")
         self._attr_entity_registry_enabled_default = event_desc.get("enabled_by_default", True)
 
+    @property
+    def _dispatch_key(self) -> str:
+        """Key under which the SSE/SQS managers look this entity up.
+
+        Kept as the *bare* ``{device_id}_{event_key}`` (NOT the entry-prefixed
+        unique_id): the dispatch map is per-coordinator, so it needs no
+        multi-account namespacing, and the managers fire by bare id.
+        """
+        return f"{self._device_id}_{self._event_key}"
+
     async def async_added_to_hass(self) -> None:
         """Register entity in coordinator dispatch map."""
         await super().async_added_to_hass()
-        # _attr_unique_id is set in __init__ and the framework guarantees it stays non-None.
-        assert self._attr_unique_id is not None
-        self.coordinator._event_entities[self._attr_unique_id] = self
+        self.coordinator._event_entities[self._dispatch_key] = self
 
     async def async_will_remove_from_hass(self) -> None:
         """Remove entity from coordinator dispatch map to avoid stale refs."""
-        if self._attr_unique_id is not None:
-            self.coordinator._event_entities.pop(self._attr_unique_id, None)
+        self.coordinator._event_entities.pop(self._dispatch_key, None)
         await super().async_will_remove_from_hass()
 
     @property
@@ -323,32 +331,32 @@ class AjaxEventEntity(CoordinatorEntity[AjaxDataCoordinator], EventEntity):
             device = space.devices.get(self._device_id)
             if device:
                 return DeviceInfo(
-                    identifiers={(DOMAIN, self._device_id)},
+                    identifiers={device_identifier(self.coordinator.entry_id, self._device_id)},
                     name=device.name,
                     manufacturer=MANUFACTURER,
                     model=device.type.value,
-                    via_device=(DOMAIN, space.id),
+                    via_device=device_identifier(self.coordinator.entry_id, space.id),
                 )
             # Check video_edges (for doorbell)
             video_edge = space.video_edges.get(self._device_id)
             if video_edge:
                 model_name = VIDEO_EDGE_MODEL_NAMES.get(video_edge.video_edge_type, "Video Edge")
                 return DeviceInfo(
-                    identifiers={(DOMAIN, self._device_id)},
+                    identifiers={device_identifier(self.coordinator.entry_id, self._device_id)},
                     name=video_edge.name,
                     manufacturer=MANUFACTURER,
                     model=model_name,
-                    via_device=(DOMAIN, space.id),
+                    via_device=device_identifier(self.coordinator.entry_id, space.id),
                 )
             # Check smart_locks
             smart_lock = space.smart_locks.get(self._device_id)
             if smart_lock:
                 return DeviceInfo(
-                    identifiers={(DOMAIN, self._device_id)},
+                    identifiers={device_identifier(self.coordinator.entry_id, self._device_id)},
                     name=smart_lock.name,
                     manufacturer=MANUFACTURER,
                     model="LockBridge Jeweller",
-                    via_device=(DOMAIN, space.id),
+                    via_device=device_identifier(self.coordinator.entry_id, space.id),
                 )
         return None
 

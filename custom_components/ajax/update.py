@@ -23,7 +23,8 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import AjaxConfigEntry
 from ._discovery import connect_new_entity_signal
-from .const import DOMAIN, MANUFACTURER, SIGNAL_NEW_VIDEO_EDGE
+from ._ids import device_identifier
+from .const import MANUFACTURER, SIGNAL_NEW_VIDEO_EDGE
 from .coordinator import AjaxDataCoordinator
 from .models import VIDEO_EDGE_MODEL_NAMES, AjaxSpace, AjaxVideoEdge
 
@@ -124,7 +125,7 @@ class AjaxVideoEdgeFirmwareUpdate(CoordinatorEntity[AjaxDataCoordinator], Update
         super().__init__(coordinator)
         self._video_edge_id = video_edge.id
         self._space_id = space_id
-        self._attr_unique_id = f"{video_edge.id}_firmware_update"
+        self._attr_unique_id = f"{self.coordinator.entry_id}_{video_edge.id}_firmware_update"
 
         # Get human-readable model name
         model_name = VIDEO_EDGE_MODEL_NAMES.get(video_edge.video_edge_type, "Video Edge")
@@ -133,7 +134,7 @@ class AjaxVideoEdgeFirmwareUpdate(CoordinatorEntity[AjaxDataCoordinator], Update
 
         # Device info
         self._attr_device_info = {
-            "identifiers": {(DOMAIN, video_edge.id)},
+            "identifiers": {device_identifier(self.coordinator.entry_id, video_edge.id)},
             "name": video_edge.name,
             "manufacturer": MANUFACTURER,
             "model": model_display,
@@ -252,7 +253,7 @@ class AjaxHubFirmwareUpdate(CoordinatorEntity[AjaxDataCoordinator], UpdateEntity
         super().__init__(coordinator)
         self._space_id = space.id
         # Use space.id (stable) rather than hub_id which may be None at first setup.
-        self._attr_unique_id = f"{space.id}_firmware_update"
+        self._attr_unique_id = f"{self.coordinator.entry_id}_{space.id}_firmware_update"
 
         # Get hub model name
         hub_subtype = space.hub_details.get("hubSubtype") if space.hub_details else None
@@ -276,7 +277,7 @@ class AjaxHubFirmwareUpdate(CoordinatorEntity[AjaxDataCoordinator], UpdateEntity
 
         # Device info - always keyed by space.id for stable registry entries.
         self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, self._space_id)},
+            identifiers={device_identifier(self.coordinator.entry_id, self._space_id)},
             name=space.name,
             manufacturer=MANUFACTURER,
             model=model_display,

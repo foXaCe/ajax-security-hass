@@ -218,9 +218,11 @@ def test_ve_init_builds_device_info_with_color() -> None:
         firmware_version="4.2",
         color="white",
     )
-    ent = AjaxVideoEdgeFirmwareUpdate(coordinator=MagicMock(), video_edge=ve, space_id="s1")
-    assert ent._attr_unique_id == "ve9_firmware_update"
-    assert ent._attr_device_info["identifiers"] == {("ajax", "ve9")}
+    coordinator = MagicMock()
+    coordinator.entry_id = "entry_test"
+    ent = AjaxVideoEdgeFirmwareUpdate(coordinator=coordinator, video_edge=ve, space_id="s1")
+    assert ent._attr_unique_id == "entry_test_ve9_firmware_update"
+    assert ent._attr_device_info["identifiers"] == {("ajax", "entry_test_ve9")}
     assert ent._attr_device_info["sw_version"] == "4.2"
     # color is title-cased and appended to the model name
     assert "(White)" in ent._attr_device_info["model"]
@@ -238,9 +240,11 @@ def test_hub_init_builds_device_info_and_space_keyed_unique_id() -> None:
             "hardwareVersions": {"pcb": 12},
         },
     )
-    ent = AjaxHubFirmwareUpdate(coordinator=MagicMock(), space=space)
+    coordinator = MagicMock()
+    coordinator.entry_id = "entry_test"
+    ent = AjaxHubFirmwareUpdate(coordinator=coordinator, space=space)
     # unique_id is keyed on the stable space id, not hub_id (which may be None at setup)
-    assert ent._attr_unique_id == "s1_firmware_update"
+    assert ent._attr_unique_id == "entry_test_s1_firmware_update"
     assert ent._attr_device_info["model"] == "Hub 2 Plus (Black)"
     assert ent._attr_device_info["sw_version"] == "9.5"
     # Formatted as a string (matching the alarm panel), never the raw int.

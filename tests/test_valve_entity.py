@@ -78,6 +78,7 @@ def test_available_false_when_device_missing() -> None:
 
 def test_init_wires_translation_key_and_default_enabled() -> None:
     coord = MagicMock()
+    coord.entry_id = "entry_test"
     valve = AjaxValve(
         coordinator=coord,
         space_id="s1",
@@ -90,6 +91,6 @@ def test_init_wires_translation_key_and_default_enabled() -> None:
             "enabled_by_default": False,
         },
     )
-    assert valve._attr_unique_id == "d1_valve"
+    assert valve._attr_unique_id == "entry_test_d1_valve"
     assert valve._attr_translation_key == "water_valve"
     assert valve._attr_entity_registry_enabled_default is False

@@ -199,6 +199,11 @@ class AjaxDataCoordinator(
         # stay compatible with Store[Any] implementations that predate migrate_func.
         self._smart_lock_store: Store[Any] = Store[Any](hass, SMART_LOCK_STORE_VERSION, f"{DOMAIN}_smart_locks")
 
+        # Exposed as a plain str so entities can namespace their unique_id and
+        # device identifiers per config entry (multi-account collision safety,
+        # schema v1.3) without the Optional dance on self.config_entry.
+        self.entry_id: str = entry.entry_id
+
         super().__init__(
             hass,
             _LOGGER,
@@ -394,7 +399,9 @@ class AjaxDataCoordinator(
 
                                 # With enrich=True, detailed data is in "model" sub-object
                                 device_data = dict(device_summary)
-                                if "model" in device_summary:
+                                # Guard against a non-dict ``model`` (null / list)
+                                # so a bad payload cannot crash the refresh cycle.
+                                if isinstance(device_summary.get("model"), dict):
                                     device_data.update(device_summary["model"])
 
                                 if device.type == DeviceType.DOOR_CONTACT:

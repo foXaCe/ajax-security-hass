@@ -14,6 +14,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import AjaxConfigEntry
+from ._ids import device_identifier
 from .const import DOMAIN, MANUFACTURER
 from .coordinator import AjaxDataCoordinator
 
@@ -105,7 +106,7 @@ class AjaxPanicButton(CoordinatorEntity[AjaxDataCoordinator], ButtonEntity):
             return None
 
         return DeviceInfo(
-            identifiers={(DOMAIN, self._space_id)},
+            identifiers={device_identifier(self.coordinator.entry_id, self._space_id)},
             name=space.name,
             manufacturer=MANUFACTURER,
             model="Security Hub",

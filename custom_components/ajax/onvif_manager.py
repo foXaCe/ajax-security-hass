@@ -66,10 +66,6 @@ class AjaxOnvifManager:
         """
         return len(self._target_ids)
 
-    def get_client(self, video_edge_id: str) -> AjaxOnvifClient | None:
-        """Get ONVIF client for a video edge device."""
-        return self._clients.get(video_edge_id)
-
     async def async_add_video_edge(self, video_edge: AjaxVideoEdge) -> bool:
         """Add a video edge device and start ONVIF connection.
 

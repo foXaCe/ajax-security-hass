@@ -229,7 +229,7 @@ def _coord_with_api_responses(devices=None, cameras=None, video_edges=None):
         recent_events=[],
     )
     account = SimpleNamespace(spaces={"sp1": space})
-    coord = SimpleNamespace(api=api, account=account)
+    coord = SimpleNamespace(api=api, account=account, entry_id="entry_test")
     entry = SimpleNamespace(runtime_data=coord)
     return entry, coord
 
@@ -270,7 +270,9 @@ async def test_get_ajax_raw_data_filters_to_target_device_when_set() -> None:
         cameras=[],
         video_edges=[],
     )
-    device = SimpleNamespace(identifiers={(diagnostics.DOMAIN, "d2")})
+    # Device identifiers are namespaced f"{entry_id}_{ajax_id}" (schema v1.3);
+    # diagnostics strips the prefix to recover the bare Ajax id "d2".
+    device = SimpleNamespace(identifiers={(diagnostics.DOMAIN, "entry_test_d2")})
 
     result = await diagnostics.get_ajax_raw_data(hass=MagicMock(), entry=entry, device=device)
     ids = [d["id"] for d in result["devices"]]

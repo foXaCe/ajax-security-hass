@@ -16,7 +16,8 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import AjaxConfigEntry
-from .const import DOMAIN, MANUFACTURER
+from ._ids import device_identifier
+from .const import MANUFACTURER
 from .coordinator import AjaxDataCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -70,7 +71,7 @@ class AjaxHubTracker(CoordinatorEntity[AjaxDataCoordinator], TrackerEntity):
         super().__init__(coordinator)
         self._space_id = space_id
 
-        self._attr_unique_id = f"{space_id}_location"
+        self._attr_unique_id = f"{self.coordinator.entry_id}_{space_id}_location"
         self._attr_translation_key = "position"
 
     @property
@@ -142,7 +143,7 @@ class AjaxHubTracker(CoordinatorEntity[AjaxDataCoordinator], TrackerEntity):
             return None
 
         return DeviceInfo(
-            identifiers={(DOMAIN, self._space_id)},
+            identifiers={device_identifier(self.coordinator.entry_id, self._space_id)},
             name="Ajax Hub" if space.name == "Hub" else space.name,
             manufacturer=MANUFACTURER,
         )

@@ -20,7 +20,8 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import AjaxConfigEntry
 from ._discovery import connect_new_entity_signal
-from .const import CONF_RTSP_PASSWORD, CONF_RTSP_USERNAME, DOMAIN, MANUFACTURER, SIGNAL_NEW_VIDEO_EDGE
+from ._ids import device_identifier
+from .const import CONF_RTSP_PASSWORD, CONF_RTSP_USERNAME, MANUFACTURER, SIGNAL_NEW_VIDEO_EDGE
 from .coordinator import AjaxDataCoordinator
 from .models import VIDEO_EDGE_MODEL_NAMES, AjaxVideoEdge, VideoEdgeType
 
@@ -194,9 +195,9 @@ class AjaxVideoEdgeCamera(CoordinatorEntity[AjaxDataCoordinator], Camera):
 
         # Build unique ID
         if channel_index is not None:
-            self._attr_unique_id = f"{video_edge.id}_camera_ch{channel_index}_{stream_type}"
+            self._attr_unique_id = f"{self.coordinator.entry_id}_{video_edge.id}_camera_ch{channel_index}_{stream_type}"
         else:
-            self._attr_unique_id = f"{video_edge.id}_camera_{stream_type}"
+            self._attr_unique_id = f"{self.coordinator.entry_id}_{video_edge.id}_camera_{stream_type}"
 
         # Camera name and default enabled state.
         # For sub-streams without an NVR we use translation_key so the
@@ -272,11 +273,11 @@ class AjaxVideoEdgeCamera(CoordinatorEntity[AjaxDataCoordinator], Camera):
             via_device_id = nvr_id
 
         return DeviceInfo(
-            identifiers={(DOMAIN, video_edge.id)},
+            identifiers={device_identifier(self.coordinator.entry_id, video_edge.id)},
             name=video_edge.name,
             manufacturer=MANUFACTURER,
             model=model_display,
-            via_device=(DOMAIN, via_device_id),
+            via_device=device_identifier(self.coordinator.entry_id, via_device_id),
             sw_version=video_edge.firmware_version,
         )
 

@@ -984,8 +984,13 @@ async def test_spaces_groups_auth_error_propagates() -> None:
 
 
 @pytest.mark.asyncio
-async def test_spaces_groups_skipped_on_light_tick_with_realtime() -> None:
-    """When SSE/SQS active and not a full refresh, groups are not fetched."""
+async def test_spaces_groups_fetched_on_light_tick_for_group_hub() -> None:
+    """Group-mode hubs refetch groups on light ticks too (issue #150).
+
+    The per-group arm state self-heals every poll instead of waiting for the
+    hourly metadata refresh, even while SSE/SQS is active — a real-time group
+    event may have been deduped/dropped or read back stale.
+    """
     mixin, account = _spaces_mixin()
     # Pre-create the space so light refresh path is taken (is_new_space False).
     await mixin._async_update_spaces_from_hubs(full_refresh=True)
@@ -993,6 +998,43 @@ async def test_spaces_groups_skipped_on_light_tick_with_realtime() -> None:
     mixin.sse_manager.is_state_protected = MagicMock(return_value=False)
     mixin.api.async_get_hub = AsyncMock(return_value={"state": "ARMED", "groupsEnabled": True})
     mixin.api.async_get_groups = AsyncMock(return_value=[{"id": "g1", "groupName": "G1", "state": "ARMED"}])
+    await mixin._async_update_spaces_from_hubs(full_refresh=False)
+    mixin.api.async_get_groups.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_spaces_groups_self_heal_stale_state_on_light_tick() -> None:
+    """A stale per-group state corrects on the next light tick (issue #150).
+
+    Simulates the bug: a group is shown DISARMED (a real-time arm event was
+    dropped), but the next state-only poll re-reads ARMED from /groups and
+    fixes the indicator without a full metadata refresh.
+    """
+    from custom_components.ajax.models import AjaxGroup
+
+    mixin, account = _spaces_mixin()
+    await mixin._async_update_spaces_from_hubs(full_refresh=True)
+    space = account.spaces["hub1"]
+    space.groups["g1"] = AjaxGroup(id="g1", name="G1", space_id="hub1", state=GroupState.DISARMED)
+    # Realtime active, no pending HA action -> REST is authoritative.
+    mixin.sse_manager = MagicMock()
+    mixin.sse_manager.is_state_protected = MagicMock(return_value=False)
+    mixin.has_pending_ha_action = MagicMock(return_value=False)
+    mixin.api.async_get_hub = AsyncMock(return_value={"state": "ARMED", "groupsEnabled": True})
+    mixin.api.async_get_groups = AsyncMock(return_value=[{"id": "g1", "groupName": "G1", "state": "ARMED"}])
+    await mixin._async_update_spaces_from_hubs(full_refresh=False)
+    assert account.spaces["hub1"].groups["g1"].state is GroupState.ARMED
+
+
+@pytest.mark.asyncio
+async def test_spaces_groups_not_fetched_for_non_group_hub_on_light_tick() -> None:
+    """Non-group hubs keep the light-tick optimisation: no /groups call."""
+    mixin, account = _spaces_mixin()
+    await mixin._async_update_spaces_from_hubs(full_refresh=True)
+    mixin.sse_manager = MagicMock()
+    mixin.sse_manager.is_state_protected = MagicMock(return_value=False)
+    mixin.api.async_get_hub = AsyncMock(return_value={"state": "ARMED", "groupsEnabled": False})
+    mixin.api.async_get_groups = AsyncMock(return_value=[])
     await mixin._async_update_spaces_from_hubs(full_refresh=False)
     mixin.api.async_get_groups.assert_not_called()
 

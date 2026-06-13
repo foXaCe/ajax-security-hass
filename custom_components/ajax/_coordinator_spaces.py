@@ -271,15 +271,28 @@ class AjaxSpacesMixin:
                 except AjaxRestApiError:
                     space.users = []
 
-            # Fetch groups on every poll by default. When SSE/SQS is active,
-            # group arm/disarm transitions are pushed in real time and a full
-            # metadata refresh is forced via _force_metadata_refresh after
-            # each security event — so we can skip the per-tick groups fetch
-            # on light cycles, which was a significant share of API calls.
+            # Fetch groups on every tick when group mode is enabled.
+            #
+            # The per-group arm state lives ONLY on the /groups endpoint. We
+            # used to skip this fetch on light (state-only) ticks while SSE/SQS
+            # was active, trusting the real-time group arm/disarm events to
+            # force a full metadata refresh. That assumption is unsafe (#150):
+            #   - two group transitions inside the SSE 5 s dedup window (or a
+            #     proxy event without the group id) collapse to one dedup key,
+            #     so the second group's event — and its forced refresh — is
+            #     dropped;
+            #   - the Ajax /groups endpoint can briefly report a stale
+            #     per-group state right after a transition.
+            # With light ticks skipping the fetch, a wrong per-group indicator
+            # then persisted until the hourly metadata refresh (most visibly:
+            # arming a second group, or disarming the last one, left it stuck).
+            # Fetching groups on every tick — for group-mode hubs only — lets a
+            # missed or stale real-time update self-heal within one poll cycle.
+            # Non-group hubs keep the light-tick optimisation (groups_enabled
+            # is False, so nothing is fetched).
             groups_enabled = hub_details.get("groupsEnabled", False)
             space.group_mode_enabled = groups_enabled
-            realtime_active = (self.sse_manager is not None) or (self.sqs_manager is not None)
-            should_fetch_groups = groups_enabled and (full_refresh or not realtime_active)
+            should_fetch_groups = groups_enabled
             if should_fetch_groups:
                 # Check if HA recently triggered an action (protect optimistic updates)
                 ha_action_pending = self.has_pending_ha_action(hub_id)

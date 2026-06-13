@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.32.1] - 2026-06-13
+
+### Fixed
+- **Per-group arm indicators could stay wrong until the next hourly refresh (#150).** The per-group arm state lives only on the `/groups` endpoint, and light (state-only) polls skipped that fetch while SSE/SQS was active — so a dropped or stale real-time group event left a group panel showing the wrong state (most visibly: arming a second group, or disarming the last one, stayed visibly wrong). Group-mode hubs now refetch group states on every poll, so the indicator self-heals within one poll cycle; non-group hubs keep skipping the fetch.
+
 ## [0.32.0] - 2026-06-01
 
 An overhaul pass: latent bugs fixed, dead code removed, test coverage raised from **32 % to 97 %** (433 → 1821 tests), and entity/device identifiers namespaced per account. mypy `--strict` clean, ruff clean, validated on a live install.

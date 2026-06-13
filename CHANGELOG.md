@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.32.2] - 2026-06-13
+
+### Fixed
+- **Intermittent "aiobotocore required" error at startup (real-time SQS disabled).** On a fresh install, or right after an update, Home Assistant provisions the `aiobotocore` requirement in the background; SQS setup could run before pip finished and then fall back to REST polling for the whole session until a manual restart. SQS setup now waits out the deferred install within a bounded window and starts automatically once the dependency lands — the repair issue is only raised if it never installs.
+
 ## [0.32.1] - 2026-06-13
 
 ### Fixed

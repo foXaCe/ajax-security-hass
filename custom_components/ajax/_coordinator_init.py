@@ -12,6 +12,7 @@ methods have moved.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import TYPE_CHECKING, Any
 
@@ -59,6 +60,16 @@ except ImportError:
 # when ``_async_migrate_smart_locks_store`` knows how to upgrade the
 # payload — see that method for the migration contract.
 SMART_LOCK_STORE_VERSION = 1
+
+# Home Assistant installs manifest ``requirements`` (here: ``aiobotocore``)
+# in the background on a fresh start. SQS init can run before pip finishes,
+# so the client raises ImportError("aiobotocore required"). Rather than give
+# up for the whole session (real-time events off until a manual restart), the
+# SQS bootstrap waits out a bounded window for the dependency to land. Module
+# constants so tests can shrink the wait. 18 × 10 s ≈ 3 min covers a slow
+# first install on low-end hardware; REST polling covers the gap meanwhile.
+SQS_AIOBOTOCORE_WAIT_ATTEMPTS = 18
+SQS_AIOBOTOCORE_WAIT_INTERVAL = 10  # seconds between import retries
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -213,12 +224,47 @@ class AjaxBootstrapMixin:
 
             assert _AjaxSQSClient is not None  # Validated by SQS_AVAILABLE above.
             assert _SQSManager is not None
-            sqs_client = _AjaxSQSClient(
-                aws_access_key_id=self._aws_access_key_id,
-                aws_secret_access_key=self._aws_secret_access_key,
-                queue_name=self._queue_name,
-                hass_loop=self.hass.loop,
-            )
+
+            # Build the client, waiting out a deferred ``aiobotocore`` install.
+            # On a fresh start HA provisions the manifest requirement in the
+            # background, so the constructor raises ImportError("aiobotocore
+            # required") until pip lands it. Retry within a bounded window so
+            # real-time events self-recover without a manual restart instead of
+            # staying off for the whole session (intermittent "aiobotocore
+            # required" at startup). REST polling covers the gap meanwhile.
+            sqs_client = None
+            for attempt in range(SQS_AIOBOTOCORE_WAIT_ATTEMPTS):
+                try:
+                    sqs_client = _AjaxSQSClient(
+                        aws_access_key_id=self._aws_access_key_id,
+                        aws_secret_access_key=self._aws_secret_access_key,
+                        queue_name=self._queue_name,
+                        hass_loop=self.hass.loop,
+                    )
+                    break
+                except ImportError:
+                    if attempt == 0:
+                        _LOGGER.info(
+                            "aiobotocore not installed yet — Home Assistant is still "
+                            "provisioning it; deferring SQS startup (REST polling meanwhile)"
+                        )
+                    await asyncio.sleep(SQS_AIOBOTOCORE_WAIT_INTERVAL)
+
+            if sqs_client is None:
+                _LOGGER.warning(
+                    "aiobotocore unavailable after ~%d s — real-time SQS disabled, using REST API polling only",
+                    SQS_AIOBOTOCORE_WAIT_ATTEMPTS * SQS_AIOBOTOCORE_WAIT_INTERVAL,
+                )
+                ir.async_create_issue(
+                    self.hass,
+                    DOMAIN,
+                    sqs_issue,
+                    is_fixable=False,
+                    severity=ir.IssueSeverity.WARNING,
+                    translation_key="sqs_init_failed",
+                    translation_placeholders={"error": "aiobotocore required"},
+                )
+                return
 
             self.sqs_manager = _SQSManager(
                 coordinator=self,

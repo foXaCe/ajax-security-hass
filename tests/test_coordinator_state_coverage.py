@@ -720,6 +720,56 @@ async def test_init_sqs_no_config_entry_uses_unknown() -> None:
     assert mixin.sqs_manager is manager
 
 
+@pytest.mark.asyncio
+async def test_init_sqs_recovers_after_deferred_aiobotocore() -> None:
+    """A deferred aiobotocore install is waited out, then SQS starts (no restart)."""
+    mixin = _sqs_mixin()
+    manager = MagicMock()
+    manager.set_language = MagicMock()
+    manager.start = AsyncMock(return_value=True)
+    # First construction fails (aiobotocore not on disk yet), second succeeds.
+    client_factory = MagicMock(side_effect=[ImportError("aiobotocore required"), MagicMock()])
+    with (
+        patch.object(init_mod, "SQS_AVAILABLE", True),
+        patch.object(init_mod, "_AjaxSQSClient", client_factory),
+        patch.object(init_mod, "_SQSManager", MagicMock(return_value=manager)),
+        patch.object(init_mod, "SQS_AIOBOTOCORE_WAIT_INTERVAL", 0),
+        patch.object(init_mod, "ir") as ir_mod,
+    ):
+        await mixin._async_init_sqs()
+
+    assert client_factory.call_count == 2  # retried after the deferred install
+    assert mixin.sqs_manager is manager
+    ir_mod.async_delete_issue.assert_called_once()
+    ir_mod.async_create_issue.assert_not_called()
+    assert mixin._sqs_initialized is True
+
+
+@pytest.mark.asyncio
+async def test_init_sqs_aiobotocore_never_installs_creates_issue() -> None:
+    """If aiobotocore never lands, SQS gives up after the window and raises the issue."""
+    mixin = _sqs_mixin()
+    client_factory = MagicMock(side_effect=ImportError("aiobotocore required"))
+    sqs_manager_factory = MagicMock()
+    with (
+        patch.object(init_mod, "SQS_AVAILABLE", True),
+        patch.object(init_mod, "_AjaxSQSClient", client_factory),
+        patch.object(init_mod, "_SQSManager", sqs_manager_factory),
+        patch.object(init_mod, "SQS_AIOBOTOCORE_WAIT_ATTEMPTS", 3),
+        patch.object(init_mod, "SQS_AIOBOTOCORE_WAIT_INTERVAL", 0),
+        patch.object(init_mod, "ir") as ir_mod,
+    ):
+        await mixin._async_init_sqs()
+
+    assert client_factory.call_count == 3  # tried the full window
+    sqs_manager_factory.assert_not_called()  # never reached manager start
+    assert mixin.sqs_manager is None
+    ir_mod.async_create_issue.assert_called_once()
+    # Surfaced with the dependency-missing reason.
+    assert ir_mod.async_create_issue.call_args.kwargs["translation_placeholders"]["error"] == "aiobotocore required"
+    assert mixin._sqs_initialized is True
+
+
 # ---------------------------------------------------------------------------
 # _coordinator_init.py — SSE bootstrap
 # ---------------------------------------------------------------------------

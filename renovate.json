@@ -2,5 +2,19 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
     "config:recommended"
+  ],
+  "packageRules": [
+    {
+      "description": "Maintain Home Assistant compatibility: only allow patch updates for grpcio and protobuf (block major and minor), matching the previous Dependabot ignore rule",
+      "matchPackageNames": [
+        "grpcio",
+        "protobuf"
+      ],
+      "matchUpdateTypes": [
+        "major",
+        "minor"
+      ],
+      "enabled": false
+    }
   ]
 }

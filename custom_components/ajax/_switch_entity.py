@@ -100,7 +100,7 @@ class AjaxSwitch(CoordinatorEntity[AjaxDataCoordinator], SwitchEntity):
         device = self._get_device()
         if not device:
             return False
-        return device.online
+        return self.coordinator.last_update_success and device.online
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn the switch on."""
@@ -278,8 +278,10 @@ class AjaxSwitch(CoordinatorEntity[AjaxDataCoordinator], SwitchEntity):
                 self._device_id,
                 err,
             )
-            # Revert optimistic update on error
+            # Revert optimistic update on error and clear the guard so the next
+            # poll can correct the restored value immediately.
             device.attributes[attr_key] = old_value
+            device.attributes.get("_optimistic_attrs", {}).pop(attr_key, None)
             self.async_write_ha_state()
             await self.coordinator.async_request_refresh()
             raise HomeAssistantError(
@@ -322,6 +324,7 @@ class AjaxSwitch(CoordinatorEntity[AjaxDataCoordinator], SwitchEntity):
         except Exception as err:
             _LOGGER.error("Failed to set sirenTriggers: %s", err)
             device.attributes["siren_triggers"] = old_triggers
+            device.attributes.get("_optimistic_attrs", {}).pop("siren_triggers", None)
             self.async_write_ha_state()
             await self.coordinator.async_request_refresh()
             raise HomeAssistantError(
@@ -359,6 +362,7 @@ class AjaxSwitch(CoordinatorEntity[AjaxDataCoordinator], SwitchEntity):
         except Exception as err:
             _LOGGER.error("Failed to set settingsSwitch: %s", err)
             device.attributes["settingsSwitch"] = old_settings
+            device.attributes.get("_optimistic_attrs", {}).pop("settingsSwitch", None)
             self.async_write_ha_state()
             await self.coordinator.async_request_refresh()
             raise HomeAssistantError(

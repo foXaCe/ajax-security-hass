@@ -34,7 +34,7 @@ Ajax cloud ──REST──▶ api.AjaxRestApi ──▶ coordinator.AjaxDataCoo
 | `_coordinator_arm.py` | Arm / disarm / night / panic / group services + per-space locks + HA-action tracking. |
 | `_coordinator_events.py` | SSE/SQS event-filter options, persistent-notification dispatch. |
 | `_coordinator_onvif.py` | ONVIF orchestration across spaces, partial-cameras repair issue. |
-| `api.py` | `AjaxRestApi` — auth (login/2FA/refresh/recover), transport (`_request` with retry/backoff/401-reauth), endpoint wrappers. |
+| `api/` | `AjaxRestApi` REST client, split by domain into a package (see [API client](#api-client-api-package)). `_base.py` holds `AjaxRestClientBase` (auth login/2FA/refresh/recover, transport `_request`/`_request_no_response` with retry/backoff/401-reauth, rate-limit, session, in-memory caches, typed exceptions); domain mixins `_hubs.py` / `_devices.py` / `_cameras.py` / `_video.py` / `_arm.py` carry the endpoint wrappers. |
 | `models.py` | Dataclasses: `AjaxAccount`, `AjaxSpace`, `AjaxDevice`, `AjaxVideoEdge`, `AjaxSmartLock`, enums; optimistic-update helpers (`mark_optimistic` / `is_optimistic`). |
 | `sse_client.py` / `sse_manager.py` | SSE transport + event handlers (proxy mode). |
 | `sqs_client.py` / `sqs_manager.py` | AWS SQS transport (daemon thread) + event handlers (direct mode). |
@@ -62,6 +62,38 @@ prefix: `_async_cleanup_stale_devices`, `async_remove_config_entry_device` and
 The `_event_entities` dispatch map is intentionally keyed by the **bare**
 `{device_id}_{event_key}` (it is per-coordinator, so needs no namespacing, and
 the SSE/SQS managers fire by bare id).
+
+## API client (`api/` package)
+
+`AjaxRestApi` is assembled by multiple inheritance from one shared base and five
+domain mixins:
+
+```
+AjaxRestApi(_HubsMixin, _DevicesMixin, _CamerasMixin, _VideoMixin, _ArmMixin)
+                 └────────────── each subclasses ──────────────┘
+                                AjaxRestClientBase   (api/_base.py)
+```
+
+- `api/__init__.py` builds the class and **re-exports** the public surface
+  (`AjaxRestApi` + the five `AjaxRest*Error` exceptions + the module constants),
+  so `from .api import AjaxRestApi, AjaxRestAuthError` keeps working unchanged.
+- Every mixin subclasses `AjaxRestClientBase`, so each endpoint method sees
+  `self._request` / `self.user_id` at type-check time; the C3 MRO collapses the
+  base once, so `__init__` runs exactly once. There are **no cross-mixin
+  self-calls** — a method only calls base helpers or peers in its own mixin.
+- **Test patches** of `asyncio.sleep` / `aiohttp.ClientSession` / `TCPConnector`
+  must target `custom_components.ajax.api._base.*` (the session + backoff live in
+  `_base.py`), not `...api.*`.
+
+### How to add an endpoint
+
+1. Add the `async def async_*` method to the mixin matching its domain (or
+   `_base.py` if it is transport/auth). Call `self._request(...)` /
+   `self._request_no_response(...)`; never open a session directly.
+2. If it raises, use a typed exception from `_base` (`AjaxRestAuthError` must
+   propagate so the coordinator counts it toward reauth).
+3. Add tests in `tests/test_api_*` using the `_api()` helper (real client with
+   `_request` mocked).
 
 ## How to add a new device type
 

@@ -38,7 +38,7 @@ def _make_switch(switch_desc: dict, *, device: AjaxDevice | None = None) -> Ajax
     sw._switch_key = switch_desc["key"]
     sw._switch_desc = switch_desc
     space = SimpleNamespace(devices={"d1": device} if device else {})
-    sw.coordinator = SimpleNamespace(get_space=lambda sid: space)
+    sw.coordinator = SimpleNamespace(get_space=lambda sid: space, last_update_success=True)
     return sw
 
 
@@ -88,6 +88,22 @@ def test_available_false_for_offline_device() -> None:
 def test_available_false_when_device_missing() -> None:
     """A removed device must surface as unavailable, not crash."""
     assert _make_switch({"key": "x", "value_fn": lambda: True}, device=None).available is False
+
+
+def test_available_false_when_coordinator_update_failed() -> None:
+    """A failed coordinator poll must surface even an online device as unavailable."""
+    sw = _make_switch({"key": "x", "value_fn": lambda: True}, device=_device(online=True))
+    sw.coordinator.last_update_success = False
+    assert sw.available is False
+
+
+def test_get_device_none_when_space_missing() -> None:
+    """No space on the coordinator (e.g. hub removed) → _get_device returns None."""
+    sw = object.__new__(AjaxSwitch)
+    sw._space_id = "s1"
+    sw._device_id = "d1"
+    sw.coordinator = SimpleNamespace(get_space=lambda sid: None)
+    assert sw._get_device() is None
 
 
 # ---------------------------------------------------------------------------

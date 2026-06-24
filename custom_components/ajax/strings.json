@@ -427,7 +427,7 @@
           "event_type": {
             "state": {
               "door_left_open": "Door left open",
-              "doorbell_pressed": "Doorbell pressed"
+              "ring": "Doorbell pressed"
             }
           }
         }

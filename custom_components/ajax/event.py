@@ -131,7 +131,11 @@ async def async_setup_entry(
                 "key": "smart_lock_event",
                 "translation_key": "smart_lock_event",
                 "device_class": EventDeviceClass.DOORBELL,
-                "event_types": ["doorbell_pressed", "door_left_open"],
+                # A DOORBELL event entity must expose "ring" — Home Assistant
+                # warns from 2026.x and drops support in 2027.4 otherwise. The
+                # doorbell button fires "ring"; door_left_open rides along as an
+                # extra (HA only requires "ring" to be present).
+                "event_types": ["ring", "door_left_open"],
                 "enabled_by_default": True,
             }
             unique_id = f"{sl_id}_smart_lock_event"
@@ -235,7 +239,9 @@ async def async_setup_entry(
                         "key": "smart_lock_event",
                         "translation_key": "smart_lock_event",
                         "device_class": EventDeviceClass.DOORBELL,
-                        "event_types": ["doorbell_pressed", "door_left_open"],
+                        # DOORBELL entities must expose "ring" (HA 2027.4) — see
+                        # the static setup above.
+                        "event_types": ["ring", "door_left_open"],
                         "enabled_by_default": True,
                     },
                 ),

@@ -1086,7 +1086,9 @@ class SQSManager(EventHandlerMixin):
                 },
             )
             if event_entity:
-                event_entity.fire("doorbell_pressed")
+                # "ring" is the HA-standard doorbell event type (the entity is
+                # device_class DOORBELL); see event.py.
+                event_entity.fire("ring")
             _LOGGER.info("SQS instant: Smart lock %s -> doorbell pressed", smart_lock.name)
         elif event_tag in LOCK_DOOR_EVENTS:
             # Door open/close/left open — use event code mapping

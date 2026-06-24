@@ -832,7 +832,7 @@ def test_lock_event_doorbell_button_fires_bus_and_entity() -> None:
     mgr.coordinator._event_entities["lock1_smart_lock_event"] = entity
     mgr._handle_lock_event(space, "smartlockdoorbellbuttonpressed", "Lock", "lock1", "", {})
     mgr.coordinator.hass.bus.async_fire.assert_called_once()
-    entity.fire.assert_called_once_with("doorbell_pressed")
+    entity.fire.assert_called_once_with("ring")
 
 
 def test_lock_event_found_by_name() -> None:

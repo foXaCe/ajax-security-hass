@@ -389,7 +389,7 @@ async def test_build_smart_lock_closure() -> None:
     uid, entity = pairs[0]
     assert uid == "lock1_smart_lock_event"
     assert isinstance(entity, AjaxEventEntity)
-    assert entity._attr_event_types == ["doorbell_pressed", "door_left_open"]
+    assert entity._attr_event_types == ["ring", "door_left_open"]
 
 
 # ===========================================================================

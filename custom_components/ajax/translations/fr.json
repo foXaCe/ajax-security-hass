@@ -438,7 +438,7 @@
           "event_type": {
             "state": {
               "door_left_open": "Porte laissée ouverte",
-              "doorbell_pressed": "Sonnette pressée"
+              "ring": "Sonnette pressée"
             }
           }
         }

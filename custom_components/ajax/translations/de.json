@@ -438,7 +438,7 @@
           "event_type": {
             "state": {
               "door_left_open": "Tür offen gelassen",
-              "doorbell_pressed": "Türklingel gedrückt"
+              "ring": "Türklingel gedrückt"
             }
           }
         }

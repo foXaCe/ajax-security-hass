@@ -5,7 +5,19 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Fixed
+- **CO and high-temperature alarms showed up as *smoke* in direct (SQS) mode.** FireProtect CO-detected / over-temperature / rapid-temperature-rise events were all routed to the smoke attribute over SQS, so a CO or heat alarm lit the **smoke** binary sensor (a false smoke alarm) while the dedicated CO / high-temperature sensors never fired. Each event now writes the attribute its own sensor reads (`co_detected` / `temperature_alert`), matching the SSE/proxy behaviour. *(SSE/proxy mode was already correct.)*
+- **Mains-power loss/restore was ignored in direct (SQS) mode.** `externalpowerdisconnected` / `externalpowerrestored` events had no handler, so the External Power sensor on a Socket / StreetSiren only updated at the next REST poll. They now update it in real time (parity with SSE).
+- **The External Power sensor could briefly flip to "powered" during a real outage.** A REST poll landing inside the optimistic window after a real-time power-loss event overwrote the fresh value; the poller now honours the optimistic reservation for `externally_powered` (parity with the other real-time attributes).
+- **A failed config-switch toggle could leave the entity stuck for up to 15 s.** The generic config-switch / siren-trigger / settings-switch error rollback reverted the displayed value but kept the optimistic guard armed, so the next polls skipped re-syncing that attribute. The guard is now cleared on rollback (parity with the relay / dimmer / valve switches).
+- **Config switches stayed "available" during a full polling outage.** `AjaxSwitch.available` ignored `last_update_success`, unlike every other entity; it now reports unavailable when the coordinator's polling is failing.
+- **Button mode / brightness / false-press-filter sensors could error on an unexpected value.** These `ENUM` sensors now fall back to *unknown* for a null or firmware-added value instead of raising.
 - **The smart-lock "Event" entity will keep working in Home Assistant 2027.4.** The LockBridge / smart-lock event entity is a doorbell (`device_class: doorbell`) but did not expose the `ring` event type that Home Assistant now requires, so it logged a deprecation warning that turns into a hard break in 2027.4 (`event.<lock> is a doorbell event entity but does not support the 'ring' event type`). The doorbell-button press now fires the standard `ring` event. *Automations triggered on the previous `doorbell_pressed` type should switch to `ring`; `door_left_open` is unchanged.*
+
+### Changed
+- **The REST API client (`api.py`, ~1900 lines) was split into a modular `api/` package** — `_base` (transport / auth core) plus `_hubs` / `_devices` / `_cameras` / `_video` / `_arm` domain mixins. Pure refactor: no behaviour, endpoint or entity change, and the public import surface (`AjaxRestApi`, the `AjaxRest*Error` exceptions) is unchanged.
+
+### Added
+- Test coverage raised to **99 %** (1837 → 1884 tests): the split API package is covered to ~100 %, and the real-time fixes above are pinned by regression tests.
 
 ## [0.32.2] - 2026-06-13
 

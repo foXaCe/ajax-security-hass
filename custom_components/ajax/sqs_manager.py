@@ -582,7 +582,20 @@ class SQSManager(EventHandlerMixin):
                     action, is_alarm = events_dict[event_tag]
                     break
 
-            device.attributes[f"{alarm_type}_alarm"] = is_alarm
+            # SMOKE_EVENTS bundles smoke, CO and high-/rapid-temperature alarms.
+            # Route each to the attribute its sensor actually reads (mirrors
+            # sse_manager._handle_smoke_event); a blanket ``smoke_alarm`` would
+            # light the smoke sensor on a CO/temperature event and leave the CO /
+            # high-temperature sensors dark over SQS.
+            if alarm_type == "smoke":
+                if "smoke" in action:
+                    device.attributes["smoke_alarm"] = is_alarm
+                elif "temp" in action:
+                    device.attributes["temperature_alert"] = is_alarm
+                elif "co" in action:
+                    device.attributes["co_detected"] = is_alarm
+            else:
+                device.attributes[f"{alarm_type}_alarm"] = is_alarm
             device.last_trigger_time = datetime.now(UTC) if is_alarm else None
 
             message = get_event_message(action, self._language)
@@ -815,6 +828,12 @@ class SQSManager(EventHandlerMixin):
                 device.attributes["low_battery"] = True
             elif event_tag == "batterycharged":
                 device.attributes["low_battery"] = False
+            elif event_tag in ("externalpowerdisconnected", "externalpowerrestored"):
+                # Mirror sse_manager: ``externally_powered`` True = mains present.
+                # The tag reports loss/restore, so derive the boolean and reserve
+                # it against the next REST poll overwriting it.
+                device.attributes["externally_powered"] = event_tag == "externalpowerrestored"
+                device.mark_optimistic("externally_powered", 15.0)
 
         message = get_event_message(action, self._language)
         _LOGGER.info("SQS instant: %s - %s", source_name, message)

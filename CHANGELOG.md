@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.33.0] - 2026-06-24
+
 ### Fixed
 - **CO and high-temperature alarms showed up as *smoke* in direct (SQS) mode.** FireProtect CO-detected / over-temperature / rapid-temperature-rise events were all routed to the smoke attribute over SQS, so a CO or heat alarm lit the **smoke** binary sensor (a false smoke alarm) while the dedicated CO / high-temperature sensors never fired. Each event now writes the attribute its own sensor reads (`co_detected` / `temperature_alert`), matching the SSE/proxy behaviour. *(SSE/proxy mode was already correct.)*
 - **Mains-power loss/restore was ignored in direct (SQS) mode.** `externalpowerdisconnected` / `externalpowerrestored` events had no handler, so the External Power sensor on a Socket / StreetSiren only updated at the next REST poll. They now update it in real time (parity with SSE).

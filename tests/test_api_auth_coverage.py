@@ -154,7 +154,7 @@ def _api(
 @pytest.fixture(autouse=True)
 def _no_sleep():
     """Neutralise backoff sleeps so retries run instantly."""
-    with patch("custom_components.ajax.api.asyncio.sleep", new=AsyncMock()):
+    with patch("custom_components.ajax.api._base.asyncio.sleep", new=AsyncMock()):
         yield
 
 
@@ -573,7 +573,7 @@ async def test_recover_auth_waits_for_login_cooldown() -> None:
     api._last_login_time = _t.monotonic()  # just logged in → must wait
     api.async_login = AsyncMock(return_value="S")  # type: ignore[method-assign]
     sleep_mock = AsyncMock()
-    with patch("custom_components.ajax.api.asyncio.sleep", new=sleep_mock):
+    with patch("custom_components.ajax.api._base.asyncio.sleep", new=sleep_mock):
         await api._recover_auth()
     sleep_mock.assert_awaited()  # cooldown sleep happened
     api.async_login.assert_awaited_once()
@@ -919,7 +919,7 @@ async def test_proactive_refresh_rechecks_freshness_after_lock() -> None:
 async def test_get_session_creates_session_when_none() -> None:
     api = AjaxRestApi(api_key="k", email="u@example.com", password="p")
     created = object()
-    with patch("custom_components.ajax.api.aiohttp.ClientSession", return_value=created) as mk:
+    with patch("custom_components.ajax.api._base.aiohttp.ClientSession", return_value=created) as mk:
         session = await api._get_session()
     assert session is created
     assert api._owns_session is True
@@ -930,8 +930,8 @@ async def test_get_session_creates_session_when_none() -> None:
 async def test_get_session_creates_insecure_connector_when_ssl_disabled() -> None:
     api = AjaxRestApi(api_key="k", email="u@example.com", password="p", verify_ssl=False)
     with (
-        patch("custom_components.ajax.api.aiohttp.ClientSession", return_value=object()),
-        patch("custom_components.ajax.api.aiohttp.TCPConnector") as connector,
+        patch("custom_components.ajax.api._base.aiohttp.ClientSession", return_value=object()),
+        patch("custom_components.ajax.api._base.aiohttp.TCPConnector") as connector,
     ):
         await api._get_session()
     # ssl=False is passed for the insecure path.

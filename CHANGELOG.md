@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+- **The smart-lock "Event" entity will keep working in Home Assistant 2027.4.** The LockBridge / smart-lock event entity is a doorbell (`device_class: doorbell`) but did not expose the `ring` event type that Home Assistant now requires, so it logged a deprecation warning that turns into a hard break in 2027.4 (`event.<lock> is a doorbell event entity but does not support the 'ring' event type`). The doorbell-button press now fires the standard `ring` event. *Automations triggered on the previous `doorbell_pressed` type should switch to `ring`; `door_left_open` is unchanged.*
+
 ## [0.32.2] - 2026-06-13
 
 ### Fixed

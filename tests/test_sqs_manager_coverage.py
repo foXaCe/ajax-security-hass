@@ -881,7 +881,7 @@ async def test_handle_lock_event_doorbell_pressed() -> None:
     mgr.coordinator._event_entities = {"lock1_smart_lock_event": event_entity}
     await mgr._handle_lock_event(space, "smartlockdoorbellbuttonpressed", "Front Lock", "lock1", "", {})
     mgr.coordinator.hass.bus.async_fire.assert_called_once()
-    event_entity.fire.assert_called_once_with("doorbell_pressed")
+    event_entity.fire.assert_called_once_with("ring")
 
 
 async def test_handle_lock_event_autocreate_from_event() -> None:

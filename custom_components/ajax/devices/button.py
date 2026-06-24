@@ -16,6 +16,17 @@ from homeassistant.components.sensor import SensorDeviceClass
 from .base import AjaxDeviceHandler
 
 
+def _enum_or_none(raw: Any, options: list[str]) -> str | None:
+    """Lowercase an Ajax enum token, returning None when missing or unmapped.
+
+    A ``SensorDeviceClass.ENUM`` sensor errors on any value outside ``options``;
+    Ajax may send a null (or a firmware-added) token for a present key, so snap
+    anything not declared to None (HA renders it as ``unknown``).
+    """
+    value = (raw or "").lower()
+    return value if value in options else None
+
+
 class ButtonHandler(AjaxDeviceHandler):
     """Handler for Ajax Button devices."""
 
@@ -48,7 +59,10 @@ class ButtonHandler(AjaxDeviceHandler):
                     "translation_key": "button_mode",
                     "device_class": SensorDeviceClass.ENUM,
                     "options": ["panic_button", "smart_button", "interconnect_delay"],
-                    "value_fn": lambda: (self.device.attributes.get("button_mode") or "").lower(),
+                    "value_fn": lambda: _enum_or_none(
+                        self.device.attributes.get("button_mode"),
+                        ["panic_button", "smart_button", "interconnect_delay"],
+                    ),
                     "enabled_by_default": True,
                 }
             )
@@ -61,7 +75,7 @@ class ButtonHandler(AjaxDeviceHandler):
                     "translation_key": "button_brightness",
                     "device_class": SensorDeviceClass.ENUM,
                     "options": ["off", "low", "high"],
-                    "value_fn": lambda: (self.device.attributes.get("brightness") or "").lower(),
+                    "value_fn": lambda: _enum_or_none(self.device.attributes.get("brightness"), ["off", "low", "high"]),
                     "enabled_by_default": True,
                 }
             )
@@ -74,7 +88,10 @@ class ButtonHandler(AjaxDeviceHandler):
                     "translation_key": "false_press_filter",
                     "device_class": SensorDeviceClass.ENUM,
                     "options": ["long_push", "double_click", "disabled"],
-                    "value_fn": lambda: (self.device.attributes.get("false_press_filter") or "").lower(),
+                    "value_fn": lambda: _enum_or_none(
+                        self.device.attributes.get("false_press_filter"),
+                        ["long_push", "double_click", "disabled"],
+                    ),
                     "enabled_by_default": True,
                 }
             )

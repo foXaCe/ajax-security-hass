@@ -560,6 +560,41 @@ async def test_handle_alarm_event_missing_device() -> None:
     assert await mgr._handle_alarm_event(_space(), "smoke", "smokedetected", "Ghost", "zzzzzzzz") is False
 
 
+async def test_handle_alarm_event_co_routes_to_co_detected() -> None:
+    """A CO event must set co_detected (NOT smoke_alarm): smoke and CO are routed
+    through SMOKE_EVENTS but must light their own sensor."""
+    mgr = _make_manager()
+    space = _space(SecurityState.DISARMED)
+    dev = _device(dtype=DeviceType.SMOKE_DETECTOR)
+    space.devices["d1"] = dev
+    await mgr._handle_alarm_event(space, "smoke", "codetected", "Hallway", "d1")
+    assert dev.attributes["co_detected"] is True
+    assert "smoke_alarm" not in dev.attributes  # no false smoke alarm
+    assert space.security_state == SecurityState.TRIGGERED  # CO is life-safety
+
+
+async def test_handle_alarm_event_high_temp_routes_to_temperature_alert() -> None:
+    """A high-temperature event must set temperature_alert, not smoke_alarm."""
+    mgr = _make_manager()
+    space = _space(SecurityState.DISARMED)
+    dev = _device(dtype=DeviceType.SMOKE_DETECTOR)
+    space.devices["d1"] = dev
+    await mgr._handle_alarm_event(space, "smoke", "temperatureabovethreshold", "Hallway", "d1")
+    assert dev.attributes["temperature_alert"] is True
+    assert "smoke_alarm" not in dev.attributes
+
+
+async def test_handle_alarm_event_co_clear_resets() -> None:
+    """colevelok clears co_detected without touching smoke_alarm."""
+    mgr = _make_manager()
+    space = _space(SecurityState.DISARMED)
+    dev = _device(dtype=DeviceType.SMOKE_DETECTOR)
+    space.devices["d1"] = dev
+    await mgr._handle_alarm_event(space, "smoke", "colevelok", "Hallway", "d1")
+    assert dev.attributes["co_detected"] is False
+    assert space.security_state == SecurityState.DISARMED
+
+
 # ---------------------------------------------------------------------------
 # _handle_relay_event
 # ---------------------------------------------------------------------------
@@ -770,6 +805,28 @@ async def test_handle_device_status_battery_charged() -> None:
     space.devices["d1"] = dev
     await mgr._handle_device_status_event(space, "batterycharged", "Front Door", "d1")
     assert dev.attributes["low_battery"] is False
+
+
+async def test_handle_device_status_external_power_lost() -> None:
+    """SQS mains-loss sets externally_powered False and reserves it against the poll."""
+    mgr = _make_manager()
+    space = _space()
+    dev = _device(dtype=DeviceType.SOCKET)
+    space.devices["d1"] = dev
+    assert await mgr._handle_device_status_event(space, "externalpowerdisconnected", "Sock", "d1") is True
+    assert dev.attributes["externally_powered"] is False
+    assert dev.is_optimistic("externally_powered")
+
+
+async def test_handle_device_status_external_power_restored() -> None:
+    """SQS mains-restore sets externally_powered True (optimistic)."""
+    mgr = _make_manager()
+    space = _space()
+    dev = _device(dtype=DeviceType.SOCKET)
+    space.devices["d1"] = dev
+    assert await mgr._handle_device_status_event(space, "externalpowerrestored", "Sock", "d1") is True
+    assert dev.attributes["externally_powered"] is True
+    assert dev.is_optimistic("externally_powered")
 
 
 async def test_handle_device_status_tamper() -> None:

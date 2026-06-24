@@ -411,7 +411,7 @@ class AjaxDevicesMixin(AjaxDeviceNormalizeMixin):
             # StreetSiren specific
             if "alertIfMoved" in device_data:
                 device.attributes["alert_if_moved"] = device_data.get("alertIfMoved")
-            if "externallyPowered" in device_data:
+            if "externallyPowered" in device_data and not device.is_optimistic("externally_powered"):
                 device.attributes["externally_powered"] = device_data.get("externallyPowered")
             # Siren advanced settings
             if "postAlarmIndicationMode" in device_data:

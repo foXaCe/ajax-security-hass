@@ -3,6 +3,7 @@
   "extends": [
     "config:recommended"
   ],
+  "rangeStrategy": "bump",
   "packageRules": [
     {
       "description": "Maintain Home Assistant compatibility: only allow patch updates for grpcio and protobuf (block major and minor), matching the previous Dependabot ignore rule",

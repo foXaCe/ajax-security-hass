@@ -4,6 +4,8 @@
     "config:recommended"
   ],
   "rangeStrategy": "bump",
+  "platformAutomerge": false,
+  "automergeStrategy": "squash",
   "packageRules": [
     {
       "description": "Maintain Home Assistant compatibility: only allow patch updates for grpcio and protobuf (block major and minor), matching the previous Dependabot ignore rule",
@@ -16,6 +18,16 @@
         "minor"
       ],
       "enabled": false
+    },
+    {
+      "description": "Auto-merge non-major updates once CI is green; major updates stay manual for review",
+      "matchUpdateTypes": [
+        "minor",
+        "patch",
+        "digest",
+        "pin"
+      ],
+      "automerge": true
     }
   ]
 }

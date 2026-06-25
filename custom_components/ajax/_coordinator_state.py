@@ -208,6 +208,10 @@ _DEVICE_TYPE_MAP: dict[str, DeviceType] = {
     "repeater": DeviceType.REPEATER,
     "rex": DeviceType.REPEATER,
     "range_extender": DeviceType.REPEATER,
+    # Explicit raw Ajax types (Rex 1 / Rex 2) so they match exactly instead of
+    # relying on the "extender" substring fallback — see issue #167.
+    "rangeextender": DeviceType.REPEATER,
+    "rangeextender2": DeviceType.REPEATER,
     "extender": DeviceType.REPEATER,
     # Wired Input Modules
     "wire_input_mt": DeviceType.WIRE_INPUT,

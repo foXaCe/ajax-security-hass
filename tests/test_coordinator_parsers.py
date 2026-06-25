@@ -69,6 +69,12 @@ def test_parse_device_type_resolves_known_alias(parser: AjaxStateUpdaterMixin) -
     assert parser._parse_device_type("MotionProtect") is DeviceType.MOTION_DETECTOR
 
 
+def test_parse_device_type_resolves_range_extender_variants(parser: AjaxStateUpdaterMixin) -> None:
+    """Rex 1 / Rex 2 raw types map explicitly, not via the 'extender' substring fallback (#167)."""
+    assert parser._parse_device_type("RangeExtender") is DeviceType.REPEATER
+    assert parser._parse_device_type("RangeExtender2") is DeviceType.REPEATER
+
+
 def test_parse_device_type_strips_trailing_braces(parser: AjaxStateUpdaterMixin) -> None:
     """The Ajax API occasionally ships values like 'wire_input_mt {\\n}\\n' — must still resolve."""
     assert parser._parse_device_type("wire_input_mt {\n}\n") is DeviceType.WIRE_INPUT

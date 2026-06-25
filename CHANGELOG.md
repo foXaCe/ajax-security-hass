@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.33.1] - 2026-06-25
+
 ### Fixed
 - **RangeExtender 2 (Rex 2) had no explicit device-type mapping (#167).** The raw Ajax types `RangeExtender` (Rex 1) and `RangeExtender2` (Rex 2) only resolved to a repeater by accident, via the `"extender"` substring fallback — so a future unrelated device whose raw name happened to contain `extender` could have been silently misclassified instead of surfacing as `UNKNOWN` with a warning. Both types now map explicitly.
 

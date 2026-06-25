@@ -19,7 +19,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
-          python-version: "3.14"
+          python-version: "3.14.6"
 
       - name: Install dependencies
         run: pip install ruff bandit codespell
@@ -54,7 +54,7 @@ jobs:
           # 3.14 matches the project's runtime: the test harness
           # (pytest-homeassistant-custom-component) and recent Home Assistant
           # releases require it, and mypy must parse HA's 3.14 source.
-          python-version: "3.14"
+          python-version: "3.14.6"
 
       - name: Install dependencies
         # mypy only needs itself + homeassistant for stubs — NOT the pytest
@@ -81,7 +81,7 @@ jobs:
           # 3.14 matches the project's runtime: pytest-homeassistant-custom-component
           # and the pinned homeassistant in requirements_test.txt require it. The old
           # job pinned 3.12 and failed to install before a single test ran.
-          python-version: "3.14"
+          python-version: "3.14.6"
 
       - name: Install dependencies
         # No editable install: there is no [project]/setup.py to build, and the suite

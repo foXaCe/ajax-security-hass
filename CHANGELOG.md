@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+- **Smart-lock "object added" lifecycle events no longer spam the log with a warning (#88).** Ajax `LIFECYCLE` notices (e.g. `ObjectAdded` when a LockBridge / smart lock is paired) were logged as `SSE/SQS event not handled` warnings. They carry no per-device state — the periodic poll reconciles the device list — so they are now logged at debug level instead.
+
 ## [0.33.1] - 2026-06-25
 
 ### Fixed

@@ -275,6 +275,16 @@ class SQSManager(EventHandlerMixin):
                 await self._handle_lock_event(space, event_tag, source_name, source_id, event_code, event)
             elif event_tag in HUB_EVENTS:
                 _LOGGER.info("SQS: Hub event: %s (%s)", event_tag, source_name)
+            elif event_type == "LIFECYCLE":
+                # Device add/remove/(de)activate notices carry no per-device
+                # state; the poll reconciles devices, so log at debug instead of
+                # an "unhandled" warning (parity with sse_manager, #88).
+                _LOGGER.debug(
+                    "SQS: lifecycle event %s (%s, id=%s) - ignored",
+                    event_tag,
+                    source_name,
+                    source_id,
+                )
             else:
                 _LOGGER.warning(
                     "SQS event not handled: tag=%s, type=%s, source=%s (id=%s). Raw: %s",

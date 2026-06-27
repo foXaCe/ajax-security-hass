@@ -333,6 +333,16 @@ class SSEManager(EventHandlerMixin):
                 self._handle_lock_event(space, event_tag, source_name, source_id, event_code, event)
             elif event_tag in HUB_EVENTS:
                 _LOGGER.info("SSE: Hub event: %s (%s)", event_tag, source_name)
+            elif event_type_v2 == "LIFECYCLE":
+                # Device add/remove/(de)activate notices (e.g. ObjectAdded) carry
+                # no per-device state; the periodic poll reconciles the device
+                # list, so log at debug instead of an "unhandled" warning (#88).
+                _LOGGER.debug(
+                    "SSE: lifecycle event %s (%s, id=%s) - ignored",
+                    event_tag,
+                    source_name,
+                    source_id,
+                )
             else:
                 _LOGGER.warning(
                     "SSE event not handled: tag=%s, type=%s, typeV2=%s, source=%s (id=%s). Raw: %s",

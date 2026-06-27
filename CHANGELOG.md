@@ -4,8 +4,13 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.33.2] - 2026-06-27
+
 ### Fixed
 - **Smart-lock "object added" lifecycle events no longer spam the log with a warning (#88).** Ajax `LIFECYCLE` notices (e.g. `ObjectAdded` when a LockBridge / smart lock is paired) were logged as `SSE/SQS event not handled` warnings. They carry no per-device state — the periodic poll reconciles the device list — so they are now logged at debug level instead.
+
+### Changed
+- Updated runtime dependencies: **`aiobotocore` to 3.x** and **`onvif-zeep-async` to 4.x** (the ONVIF library used for camera control).
 
 ## [0.33.1] - 2026-06-25
 

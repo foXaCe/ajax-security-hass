@@ -18,6 +18,7 @@ These tests build a manager via ``object.__new__`` and wire a fake coordinator
 from __future__ import annotations
 
 import asyncio
+import logging
 import time
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
@@ -132,6 +133,22 @@ def _event(**overrides) -> dict:
     }
     event.update(overrides)
     return {"event": event}
+
+
+# ---------------------------------------------------------------------------
+# _handle_event dispatch
+# ---------------------------------------------------------------------------
+
+
+async def test_handle_event_lifecycle_ignored_without_warning(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """LIFECYCLE notices (e.g. ObjectAdded) route to debug, not an 'unhandled' warning (#88)."""
+    mgr = _make_manager()
+    _with_space(mgr, _space())
+    with caplog.at_level(logging.WARNING, logger="custom_components.ajax.sqs_manager"):
+        await mgr._handle_event(_event(eventTag="ObjectAdded", eventTypeV2="LIFECYCLE"))
+    assert "not handled" not in caplog.text
 
 
 # ---------------------------------------------------------------------------

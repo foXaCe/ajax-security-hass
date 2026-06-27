@@ -13,6 +13,7 @@ coordinator so no network round-trip or full HA harness is needed.
 from __future__ import annotations
 
 import asyncio
+import logging
 import time
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
@@ -219,6 +220,24 @@ async def test_handle_event_unknown_hub_returns_early() -> None:
     _attach(mgr, _space())  # hub_id = hub1
     await mgr._handle_event({"eventTag": "dooropened", "hubId": "OTHER"})
     mgr.coordinator.async_set_updated_data.assert_not_called()
+
+
+async def test_handle_event_lifecycle_ignored_without_warning(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """LIFECYCLE notices (e.g. ObjectAdded) route to debug, not an 'unhandled' warning (#88)."""
+    mgr = _make_manager()
+    _attach(mgr, _space())  # hub_id = hub1
+    with caplog.at_level(logging.WARNING, logger="custom_components.ajax.sse_manager"):
+        await mgr._handle_event(
+            {
+                "eventTag": "ObjectAdded",
+                "eventTypeV2": "LIFECYCLE",
+                "hubId": "hub1",
+                "sourceObjectId": "lock1",
+            }
+        )
+    assert "not handled" not in caplog.text
 
 
 async def test_handle_event_nested_format_dispatches_door() -> None:

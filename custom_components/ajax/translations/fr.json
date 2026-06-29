@@ -1539,7 +1539,7 @@
       "message": "Cible invalide pour le service."
     },
     "lock_not_supported": {
-      "message": "Le verrouillage/déverrouillage à distance n'est pas pris en charge par les serrures intelligentes Ajax."
+      "message": "Le verrouillage à distance n'est pas pris en charge par les serrures intelligentes Ajax."
     },
     "no_api_key": {
       "message": "Aucune clé API configurée pour cette entité."

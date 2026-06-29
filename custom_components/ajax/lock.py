@@ -1,8 +1,9 @@
 """Ajax lock platform for Home Assistant.
 
 This module creates lock entities for Ajax LockBridge Jeweller devices.
-Lock entities are READ-ONLY: state comes from SSE/SQS events only.
-There is no API to lock/unlock remotely.
+State comes from the enriched device record (lockStatus / doorStatus) and
+real-time SSE/SQS events. Ajax exposes an ``UNLOCK_DEVICE`` command (but no
+lock command), so ``unlock`` is supported best-effort while ``lock`` is not.
 
 Note: Yale cloud locks are automatically filtered out in the coordinator
 since they don't send SSE events and only return minimal API data.
@@ -121,12 +122,35 @@ class AjaxLock(CoordinatorEntity[AjaxDataCoordinator], LockEntity):
         return self._get_smart_lock() is not None
 
     async def async_lock(self, **kwargs: Any) -> None:
-        """Lock the lock. Not supported — read-only entity."""
+        """Lock the lock — not supported (Ajax exposes no lock command)."""
         raise HomeAssistantError(translation_domain=DOMAIN, translation_key="lock_not_supported")
 
     async def async_unlock(self, **kwargs: Any) -> None:
-        """Unlock the lock. Not supported — read-only entity."""
-        raise HomeAssistantError(translation_domain=DOMAIN, translation_key="lock_not_supported")
+        """Unlock the lock via the Ajax ``UNLOCK_DEVICE`` command.
+
+        Best-effort: Ajax exposes ``UNLOCK_DEVICE`` (but no lock command). The
+        real state catches up on the next poll / event, so no optimistic update.
+        """
+        space = self.coordinator.get_space(self._space_id)
+        smart_lock = self._get_smart_lock()
+        if not space or not smart_lock:
+            raise HomeAssistantError(translation_domain=DOMAIN, translation_key="device_not_found")
+        if not space.hub_id:
+            raise HomeAssistantError(translation_domain=DOMAIN, translation_key="hub_not_found")
+
+        device_type = smart_lock.raw_data.get("deviceType") or "SmartLock"
+        try:
+            await self.coordinator.api.async_send_device_command(
+                space.hub_id, self._smart_lock_id, "UNLOCK_DEVICE", device_type
+            )
+        except Exception as err:
+            _LOGGER.error("Failed to unlock %s: %s", smart_lock.name, err)
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="failed_to_change",
+                translation_placeholders={"entity": smart_lock.name, "error": str(err)},
+            ) from err
+        await self.coordinator.async_request_refresh()
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:

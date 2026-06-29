@@ -13,6 +13,7 @@ instead of silently no-op'ing.
 from __future__ import annotations
 
 from types import SimpleNamespace
+from unittest.mock import AsyncMock
 
 import pytest
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
@@ -29,12 +30,16 @@ from custom_components.ajax.select import (
 # ---------------------------------------------------------------------------
 
 
-def _make_lock(smart_lock: AjaxSmartLock | None) -> AjaxLock:
+def _make_lock(smart_lock: AjaxSmartLock | None, *, hub_id: str | None = "hub1") -> AjaxLock:
     lock = object.__new__(AjaxLock)
     lock._space_id = "s1"
     lock._smart_lock_id = "sl1"
-    space = SimpleNamespace(smart_locks={"sl1": smart_lock} if smart_lock else {})
-    lock.coordinator = SimpleNamespace(get_space=lambda sid: space)
+    space = SimpleNamespace(smart_locks={"sl1": smart_lock} if smart_lock else {}, hub_id=hub_id)
+    lock.coordinator = SimpleNamespace(
+        get_space=lambda sid: space,
+        api=SimpleNamespace(async_send_device_command=AsyncMock()),
+        async_request_refresh=AsyncMock(),
+    )
     return lock
 
 
@@ -69,10 +74,40 @@ async def test_lock_async_lock_raises_translated_error() -> None:
 
 
 @pytest.mark.asyncio
-async def test_lock_async_unlock_raises_translated_error() -> None:
-    """Read-only entity — must reject unlock command with a translated message."""
+async def test_lock_async_unlock_sends_unlock_device_command() -> None:
+    """Unlock issues the Ajax UNLOCK_DEVICE command and refreshes."""
+    sl = AjaxSmartLock(id="sl1", name="Front Door", space_id="s1", raw_data={"deviceType": "SmartLockYale"})
+    lock = _make_lock(sl)
+    await lock.async_unlock()
+    lock.coordinator.api.async_send_device_command.assert_awaited_once_with(
+        "hub1", "sl1", "UNLOCK_DEVICE", "SmartLockYale"
+    )
+    lock.coordinator.async_request_refresh.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_lock_async_unlock_defaults_device_type() -> None:
+    """Falls back to a generic deviceType when the record has none."""
+    lock = _make_lock(AjaxSmartLock(id="sl1", name="X", space_id="s1"))
+    await lock.async_unlock()
+    *_, device_type = lock.coordinator.api.async_send_device_command.await_args[0]
+    assert device_type == "SmartLock"
+
+
+@pytest.mark.asyncio
+async def test_lock_async_unlock_no_hub_raises() -> None:
+    lock = _make_lock(AjaxSmartLock(id="sl1", name="X", space_id="s1"), hub_id=None)
     with pytest.raises(HomeAssistantError):
-        await _make_lock(AjaxSmartLock(id="sl1", name="X", space_id="s1")).async_unlock()
+        await lock.async_unlock()
+
+
+@pytest.mark.asyncio
+async def test_lock_async_unlock_api_error_raises() -> None:
+    """A failed UNLOCK_DEVICE surfaces a translated HomeAssistantError."""
+    lock = _make_lock(AjaxSmartLock(id="sl1", name="X", space_id="s1"))
+    lock.coordinator.api.async_send_device_command = AsyncMock(side_effect=RuntimeError("boom"))
+    with pytest.raises(HomeAssistantError):
+        await lock.async_unlock()
 
 
 # ---------------------------------------------------------------------------

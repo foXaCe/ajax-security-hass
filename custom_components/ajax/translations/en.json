@@ -1539,7 +1539,7 @@
       "message": "Invalid target for service."
     },
     "lock_not_supported": {
-      "message": "Remote lock/unlock is not supported by Ajax smart locks."
+      "message": "Remote locking is not supported by Ajax smart locks."
     },
     "no_api_key": {
       "message": "No API key configured for this entity."

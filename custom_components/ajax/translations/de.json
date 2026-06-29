@@ -1539,7 +1539,7 @@
       "message": "Ungültiges Ziel für den Dienst."
     },
     "lock_not_supported": {
-      "message": "Ferngesteuertes Ver-/Entriegeln wird von Ajax Smart Locks nicht unterstützt."
+      "message": "Ferngesteuertes Verriegeln wird von Ajax Smart Locks nicht unterstützt."
     },
     "no_api_key": {
       "message": "Kein API-Schlüssel für diese Entität konfiguriert."

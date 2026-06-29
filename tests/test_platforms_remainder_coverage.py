@@ -327,10 +327,13 @@ async def test_lock_async_lock_not_supported() -> None:
 
 
 @pytest.mark.asyncio
-async def test_lock_async_unlock_not_supported() -> None:
+async def test_lock_async_unlock_device_not_found() -> None:
+    """async_unlock now sends UNLOCK_DEVICE; with no space it guards with device_not_found."""
+    lk = _lock_entity()
+    lk.coordinator = SimpleNamespace(get_space=lambda sid: None)
     with pytest.raises(HomeAssistantError) as err:
-        await _lock_entity().async_unlock()
-    assert err.value.translation_key == "lock_not_supported"
+        await lk.async_unlock()
+    assert err.value.translation_key == "device_not_found"
 
 
 # ===========================================================================

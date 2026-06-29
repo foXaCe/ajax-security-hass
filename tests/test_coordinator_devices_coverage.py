@@ -29,6 +29,7 @@ from custom_components.ajax.models import (
     AjaxAccount,
     AjaxDevice,
     AjaxRoom,
+    AjaxSmartLock,
     AjaxSpace,
     DeviceType,
 )
@@ -1253,3 +1254,60 @@ async def test_update_devices_removed_device_unregistered_from_ha() -> None:
     registry.async_get_device.assert_called_once_with(identifiers={device_identifier("entry_test", "ghost")})
     registry.async_remove_device.assert_called_once_with("ha-ghost")
     assert "ghost" not in space.devices
+
+
+# ---------------------------------------------------------------------------
+# _apply_smart_lock_rest_state (#88 — REST polling state for event-less locks)
+# ---------------------------------------------------------------------------
+
+
+def _lock_mixin() -> AjaxDevicesMixin:
+    return object.__new__(AjaxDevicesMixin)
+
+
+def test_apply_smart_lock_rest_state_from_record() -> None:
+    mixin = _lock_mixin()
+    space = _make_space()
+    lock = AjaxSmartLock(id="lock1", name="Doorman", space_id="s1")
+    space.smart_locks["lock1"] = lock
+    mixin._apply_smart_lock_rest_state(space, "lock1", {"lockStatus": "LOCKED", "doorStatus": "OPEN"})
+    assert lock.is_locked is True
+    assert lock.is_door_open is True
+    mixin._apply_smart_lock_rest_state(space, "lock1", {"lockStatus": "UNLOCKED", "doorStatus": "CLOSED"})
+    assert lock.is_locked is False
+    assert lock.is_door_open is False
+
+
+def test_apply_smart_lock_rest_state_missing_lock_is_noop() -> None:
+    # Lock not discovered yet → no entry, must not raise.
+    _lock_mixin()._apply_smart_lock_rest_state(_make_space(), "ghost", {"lockStatus": "LOCKED"})
+
+
+def test_apply_smart_lock_rest_state_ignores_unknown_status() -> None:
+    mixin = _lock_mixin()
+    space = _make_space()
+    lock = AjaxSmartLock(id="lock1", name="Doorman", space_id="s1")
+    space.smart_locks["lock1"] = lock
+    mixin._apply_smart_lock_rest_state(space, "lock1", {})
+    assert lock.is_locked is None  # nothing in the record → stays unknown
+
+
+def test_apply_smart_lock_rest_state_skips_recent_event() -> None:
+    """A real-time event within 30 s wins over the slower poll."""
+    mixin = _lock_mixin()
+    space = _make_space()
+    lock = AjaxSmartLock(id="lock1", name="Doorman", space_id="s1", is_locked=False)
+    lock.last_event_time = datetime.now(UTC)
+    space.smart_locks["lock1"] = lock
+    mixin._apply_smart_lock_rest_state(space, "lock1", {"lockStatus": "LOCKED"})
+    assert lock.is_locked is False  # event value preserved
+
+
+def test_apply_smart_lock_rest_state_applies_after_stale_event() -> None:
+    mixin = _lock_mixin()
+    space = _make_space()
+    lock = AjaxSmartLock(id="lock1", name="Doorman", space_id="s1", is_locked=False)
+    lock.last_event_time = datetime.now(UTC) - timedelta(minutes=5)
+    space.smart_locks["lock1"] = lock
+    mixin._apply_smart_lock_rest_state(space, "lock1", {"lockStatus": "LOCKED"})
+    assert lock.is_locked is True  # stale event → poll updates

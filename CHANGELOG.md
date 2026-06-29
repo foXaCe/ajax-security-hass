@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+- **Smart-lock state now updates by polling, even when the lock sends no real-time events (#88).** A bridged lock (e.g. a Yale Doorman behind a LockBridge) can be discovered but never emit `smartlock*` SSE/SQS events, leaving its lock/door state stuck on *unknown*. The state (`lockStatus` / `doorStatus`) is now read from the enriched hub-device record on every poll; a recent real-time event still takes precedence over the slower poll.
+
 ## [0.33.2] - 2026-06-27
 
 ### Fixed

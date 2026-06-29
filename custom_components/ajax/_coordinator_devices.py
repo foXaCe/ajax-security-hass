@@ -21,7 +21,8 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import TYPE_CHECKING
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING, Any
 
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.dispatcher import async_dispatcher_send
@@ -35,7 +36,7 @@ if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
 
     from .api import AjaxRestApi
-    from .models import AjaxAccount
+    from .models import AjaxAccount, AjaxSpace
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -108,6 +109,26 @@ class AjaxDevicesMixin(AjaxDeviceNormalizeMixin):
                 len(stale_devices),
             )
 
+    def _apply_smart_lock_rest_state(self, space: AjaxSpace, device_id: str, device_data: dict[str, Any]) -> None:
+        """Apply a smart lock's state from its enriched hub-device record.
+
+        The dedicated smart-locks endpoint exposes no lock state, and
+        Yale-bridged locks emit no ``smartlock*`` events, so the device record's
+        ``lockStatus`` / ``doorStatus`` is the only state source for them (#88).
+        A real-time event is fresher than the poll, so a recent one wins.
+        """
+        lock = space.smart_locks.get(device_id)
+        if lock is None:
+            return  # not discovered yet; applied on a later poll cycle
+        if lock.last_event_time is not None and (datetime.now(UTC) - lock.last_event_time).total_seconds() < 30:
+            return
+        lock_status = device_data.get("lockStatus")
+        if lock_status in ("LOCKED", "UNLOCKED"):
+            lock.is_locked = lock_status == "LOCKED"
+        door_status = device_data.get("doorStatus")
+        if door_status in ("OPEN", "CLOSED"):
+            lock.is_door_open = door_status == "OPEN"
+
     async def _async_update_devices(self, space_id: str) -> None:
         """Update devices for a specific space."""
         if self.account is None:
@@ -163,12 +184,14 @@ class AjaxDevicesMixin(AjaxDeviceNormalizeMixin):
             raw_device_type = device_data.get("deviceType", device_data.get("type", "unknown"))
             device_type = self._parse_device_type(raw_device_type)
 
-            # Skip smart locks in normal device flow (handled via smart-locks endpoint)
+            # Smart locks get their own entities (see _async_update_smart_locks),
+            # so they are skipped from the regular device flow — but this enriched
+            # hub-device record is the ONLY place the lock state (lockStatus /
+            # doorStatus) is exposed; the dedicated smart-locks endpoint returns
+            # just the id, and Yale-bridged locks emit no smartlock* events, so
+            # REST polling is their only state source (#88).
             if device_type == DeviceType.SMART_LOCK:
-                _LOGGER.debug(
-                    "Skipping smart lock %s in device flow (handled separately)",
-                    device_id,
-                )
+                self._apply_smart_lock_rest_state(space, device_id, device_data)
                 continue
 
             # Get room_id and room_name

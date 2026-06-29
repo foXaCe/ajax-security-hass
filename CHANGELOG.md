@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+- **Smart-lock remote unlock (#88).** Lock entities now expose an `unlock` action that sends Ajax's `UNLOCK_DEVICE` command, so the lock is no longer read-only. Ajax provides no remote *lock* command, so locking stays unsupported. *Best-effort — feedback on whether it works with real LockBridge hardware is welcome.*
+
 ## [0.33.4] - 2026-06-29
 
 ### Fixed

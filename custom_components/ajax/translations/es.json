@@ -1539,7 +1539,7 @@
       "message": "Objetivo no válido para el servicio."
     },
     "lock_not_supported": {
-      "message": "El bloqueo/desbloqueo remoto no es compatible con los smart locks Ajax."
+      "message": "El bloqueo remoto no es compatible con los smart locks Ajax."
     },
     "no_api_key": {
       "message": "No hay clave API configurada para esta entidad."

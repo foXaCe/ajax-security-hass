@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.33.4] - 2026-06-29
+
 ### Fixed
 - **The smart-lock icon now reflects the lock state (#88).** A static `mdi:lock` icon in `icons.json` overrode Home Assistant's native state-based lock icon, so the padlock always looked locked (only the colour changed). The icon now switches between locked and unlocked (`mdi:lock` / `mdi:lock-open-variant`).
 

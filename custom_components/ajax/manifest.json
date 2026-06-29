@@ -24,5 +24,5 @@
     "aiobotocore>=3.7.0",
     "onvif-zeep-async>=4.2.0"
   ],
-  "version": "0.33.3"
+  "version": "0.33.4"
 }

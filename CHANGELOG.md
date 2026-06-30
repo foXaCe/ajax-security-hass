@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.34.1] - 2026-06-30
+
 ### Fixed
 - **Smart lock showed a closed-padlock icon while its state was still unknown (#88).** Before the first poll/event the lock state is unknown, but the icon fell back to `mdi:lock` (a *locked* padlock), making the lock look locked. The unknown state now uses a distinct `mdi:lock-question` icon; the `locked` / `unlocked` icons are unchanged.
 

@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.34.2] - 2026-07-01
+
 ### Fixed
 - **Real-time SQS could stay off for the whole session after a slow start (intermittent "aiobotocore required").** If `aiobotocore` — which Home Assistant installs in the background — took longer than the ~3-minute startup window to land (more likely right after an update that also pulls a large dependency), SQS gave up permanently and only the slower REST polling ran until a manual restart. SQS now retries on later poll cycles and **self-heals automatically** once the dependency is installed.
 

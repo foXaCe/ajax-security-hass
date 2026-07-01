@@ -945,3 +945,51 @@ async def test_get_session_reuses_open_session() -> None:
     api.session = existing  # type: ignore[assignment]
     session = await api._get_session()
     assert session is existing
+
+
+# ---------------------------------------------------------------------------
+# _request — bypass_cache must survive backoff retries (overhaul 2026-07)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_request_5xx_retry_preserves_bypass_cache() -> None:
+    """The no-cache header must survive a 5xx backoff retry.
+
+    ``bypass_cache_next()`` only opens a 2 s window; a retry lands after the
+    backoff, so only the explicit ``bypass_cache`` argument can keep the
+    post-arm/disarm freshness guarantee. It used to be dropped on the 5xx /
+    ClientError / TimeoutError retry paths.
+    """
+    api = _api(
+        proxy_mode=AUTH_MODE_PROXY_SECURE,
+        proxy_url="https://proxy.local",
+        responses=[
+            _FakeResponse(500, {}),
+            _FakeResponse(200, {"ok": True}),
+        ],
+    )
+    result = await api._request("GET", "endpoint", bypass_cache=True)
+    assert result == {"ok": True}
+    session = api.session
+    assert len(session.calls) == 2
+    for _method, _url, kwargs in session.calls:
+        assert kwargs["headers"].get("X-Cache-Control") == "no-cache"
+
+
+@pytest.mark.asyncio
+async def test_request_timeout_retry_preserves_bypass_cache() -> None:
+    """Same guarantee on the TimeoutError retry path."""
+    api = _api(
+        proxy_mode=AUTH_MODE_PROXY_SECURE,
+        proxy_url="https://proxy.local",
+        responses=[
+            TimeoutError(),
+            _FakeResponse(200, {"ok": True}),
+        ],
+    )
+    result = await api._request("GET", "endpoint", bypass_cache=True)
+    assert result == {"ok": True}
+    session = api.session
+    assert len(session.calls) == 2
+    assert session.calls[1][2]["headers"].get("X-Cache-Control") == "no-cache"

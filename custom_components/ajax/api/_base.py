@@ -847,7 +847,9 @@ class AjaxRestClientBase:
                             MAX_RETRIES,
                         )
                         await asyncio.sleep(delay)
-                        return await self._request(method, endpoint, data, _retry_on_auth_error, _retry_count + 1)
+                        return await self._request(
+                            method, endpoint, data, _retry_on_auth_error, _retry_count + 1, bypass_cache
+                        )
                     _LOGGER.error(
                         "Server error %s on %s after %d retries",
                         response.status,
@@ -901,7 +903,7 @@ class AjaxRestClientBase:
                     MAX_RETRIES,
                 )
                 await asyncio.sleep(delay)
-                return await self._request(method, endpoint, data, _retry_on_auth_error, _retry_count + 1)
+                return await self._request(method, endpoint, data, _retry_on_auth_error, _retry_count + 1, bypass_cache)
             _LOGGER.error("API request to %s failed after %d retries: %s", endpoint, MAX_RETRIES, err)
             raise AjaxRestConnectionError(f"Connection failed: {err}") from err
         except TimeoutError as err:
@@ -916,7 +918,7 @@ class AjaxRestClientBase:
                     MAX_RETRIES,
                 )
                 await asyncio.sleep(delay)
-                return await self._request(method, endpoint, data, _retry_on_auth_error, _retry_count + 1)
+                return await self._request(method, endpoint, data, _retry_on_auth_error, _retry_count + 1, bypass_cache)
             _LOGGER.error("API request to %s timed out after %d retries", endpoint, MAX_RETRIES)
             raise AjaxRestConnectionError("Request timeout") from err
 

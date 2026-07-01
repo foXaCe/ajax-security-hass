@@ -46,7 +46,7 @@ def _make_space_sensor(
     sensor.entity_description = description
     sensor._space_id = "s1"
     sensor._entry = SimpleNamespace(entry_id="entry1")
-    coordinator = SimpleNamespace(get_space=lambda sid: space)
+    coordinator = SimpleNamespace(last_update_success=True, get_space=lambda sid: space)
     sensor.coordinator = coordinator
     return sensor
 
@@ -315,7 +315,7 @@ def _make_hub_sensor(sensor_desc: dict, *, hub_details: dict | None) -> AjaxHubS
     sensor._sensor_key = sensor_desc["key"]
     sensor._sensor_desc = sensor_desc
     space = SimpleNamespace(hub_details=hub_details) if hub_details is not None else SimpleNamespace(hub_details=None)
-    sensor.coordinator = SimpleNamespace(get_space=lambda sid: space)
+    sensor.coordinator = SimpleNamespace(last_update_success=True, get_space=lambda sid: space)
     return sensor
 
 
@@ -351,7 +351,7 @@ def _make_smart_lock_sensor(lock: object | None) -> AjaxSmartLockSensor:
     sensor._space_id = "s1"
     sensor._smart_lock_id = "lock1"
     space = SimpleNamespace(smart_locks={"lock1": lock} if lock else {})
-    sensor.coordinator = SimpleNamespace(get_space=lambda sid: space)
+    sensor.coordinator = SimpleNamespace(last_update_success=True, get_space=lambda sid: space)
     return sensor
 
 

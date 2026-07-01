@@ -199,7 +199,7 @@ def test_space_sensor_device_info_with_firmware_and_subtype() -> None:
     sensor = object.__new__(AjaxSpaceSensor)
     sensor._space_id = "s1"
     sensor.entity_description = AjaxSpaceSensorDescription(key="x", value_fn=lambda s: 0)
-    sensor.coordinator = SimpleNamespace(get_space=lambda sid: space, entry_id="entry_test")
+    sensor.coordinator = SimpleNamespace(last_update_success=True, get_space=lambda sid: space, entry_id="entry_test")
 
     info = sensor.device_info
     assert info["identifiers"] == {("ajax", "entry_test_s1")}
@@ -214,7 +214,7 @@ def test_space_sensor_device_info_renames_bare_hub_and_defaults_model() -> None:
     sensor = object.__new__(AjaxSpaceSensor)
     sensor._space_id = "s1"
     sensor.entity_description = AjaxSpaceSensorDescription(key="x", value_fn=lambda s: 0)
-    sensor.coordinator = SimpleNamespace(get_space=lambda sid: space, entry_id="entry_test")
+    sensor.coordinator = SimpleNamespace(last_update_success=True, get_space=lambda sid: space, entry_id="entry_test")
 
     info = sensor.device_info
     assert info["name"] == "Ajax Hub"
@@ -226,7 +226,7 @@ def test_space_sensor_device_info_none_when_space_missing() -> None:
     sensor = object.__new__(AjaxSpaceSensor)
     sensor._space_id = "s1"
     sensor.entity_description = AjaxSpaceSensorDescription(key="x", value_fn=lambda s: 0)
-    sensor.coordinator = SimpleNamespace(get_space=lambda sid: None)
+    sensor.coordinator = SimpleNamespace(last_update_success=True, get_space=lambda sid: None)
     assert sensor.device_info is None
 
 
@@ -388,14 +388,14 @@ def test_hub_sensor_device_info_links_to_space() -> None:
     space = _hub_space()
     sensor = object.__new__(AjaxHubSensor)
     sensor._space_id = "s1"
-    sensor.coordinator = SimpleNamespace(get_space=lambda sid: space, entry_id="entry_test")
+    sensor.coordinator = SimpleNamespace(last_update_success=True, get_space=lambda sid: space, entry_id="entry_test")
     assert sensor.device_info["identifiers"] == {("ajax", "entry_test_s1")}
 
 
 def test_hub_sensor_device_info_none_when_space_missing() -> None:
     sensor = object.__new__(AjaxHubSensor)
     sensor._space_id = "s1"
-    sensor.coordinator = SimpleNamespace(get_space=lambda sid: None)
+    sensor.coordinator = SimpleNamespace(last_update_success=True, get_space=lambda sid: None)
     assert sensor.device_info is None
 
 
@@ -410,7 +410,7 @@ def test_smart_lock_sensor_device_info() -> None:
     sensor._space_id = "s1"
     sensor._smart_lock_id = "lock1"
     space = SimpleNamespace(smart_locks={"lock1": lock})
-    sensor.coordinator = SimpleNamespace(get_space=lambda sid: space, entry_id="entry_test")
+    sensor.coordinator = SimpleNamespace(last_update_success=True, get_space=lambda sid: space, entry_id="entry_test")
     info = sensor.device_info
     assert info["identifiers"] == {("ajax", "entry_test_lock1")}
     assert info["model"] == "LockBridge Jeweller"
@@ -421,7 +421,9 @@ def test_smart_lock_sensor_device_info_none_when_missing() -> None:
     sensor = object.__new__(AjaxSmartLockSensor)
     sensor._space_id = "s1"
     sensor._smart_lock_id = "lock1"
-    sensor.coordinator = SimpleNamespace(get_space=lambda sid: SimpleNamespace(smart_locks={}))
+    sensor.coordinator = SimpleNamespace(
+        last_update_success=True, get_space=lambda sid: SimpleNamespace(smart_locks={})
+    )
     assert sensor.device_info is None
 
 
@@ -594,7 +596,7 @@ def _hub_binary(sensor_key: str, hub_details: dict | None) -> AjaxHubBinarySenso
     sensor._space_id = "s1"
     sensor._sensor_key = sensor_key
     sensor._sensor_config = AjaxHubBinarySensor.HUB_BINARY_SENSORS.get(sensor_key, {})
-    sensor.coordinator = SimpleNamespace(get_space=lambda sid: space, entry_id="entry_test")
+    sensor.coordinator = SimpleNamespace(last_update_success=True, get_space=lambda sid: space, entry_id="entry_test")
     return sensor
 
 
@@ -664,7 +666,7 @@ def test_hub_binary_available_and_device_info() -> None:
 def test_hub_binary_device_info_none_when_space_missing() -> None:
     sensor = object.__new__(AjaxHubBinarySensor)
     sensor._space_id = "s1"
-    sensor.coordinator = SimpleNamespace(get_space=lambda sid: None)
+    sensor.coordinator = SimpleNamespace(last_update_success=True, get_space=lambda sid: None)
     assert sensor.device_info is None
 
 
@@ -678,7 +680,7 @@ def _sl_binary(lock: object | None) -> AjaxSmartLockBinarySensor:
     sensor._space_id = "s1"
     sensor._smart_lock_id = "lock1"
     space = SimpleNamespace(smart_locks={"lock1": lock} if lock else {})
-    sensor.coordinator = SimpleNamespace(get_space=lambda sid: space, entry_id="entry_test")
+    sensor.coordinator = SimpleNamespace(last_update_success=True, get_space=lambda sid: space, entry_id="entry_test")
     return sensor
 
 
@@ -761,7 +763,7 @@ async def test_sensor_async_setup_entry_creates_entities() -> None:
     assert "AjaxSpaceSensor" in class_names
     assert "AjaxSmartLockSensor" in class_names
     # Discovery signals are connected once per signal type.
-    assert connect.call_count == 3
+    assert connect.call_count == 4
 
 
 async def test_sensor_async_setup_entry_no_account_warns_and_returns() -> None:
@@ -790,7 +792,7 @@ async def test_binary_async_setup_entry_creates_entities() -> None:
     class_names = {type(e).__name__ for e in added}
     assert "AjaxSmartLockBinarySensor" in class_names
     assert "AjaxHubBinarySensor" in class_names
-    assert connect.call_count == 3
+    assert connect.call_count == 4
 
 
 async def test_binary_async_setup_entry_no_account_returns() -> None:

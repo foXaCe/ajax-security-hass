@@ -15,11 +15,14 @@ import logging
 import time
 from typing import TYPE_CHECKING, Any
 
+from .const import EVENT_AJAX_CAMERA_DETECTION
+from .event_maps import DEVICE_STATUS_EVENTS, TAMPER_EVENTS
+
 if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
 
     from .coordinator import AjaxDataCoordinator  # noqa: F401
-    from .models import AjaxSpace, AjaxVideoEdge
+    from .models import AjaxDevice, AjaxSpace, AjaxVideoEdge
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -71,6 +74,43 @@ class EventHandlerMixin:
 
     coordinator: AjaxDataCoordinator
     _last_discovery_refresh: float = 0.0
+
+    @staticmethod
+    def _apply_tamper_state(device: AjaxDevice, event_tag: str, transition: str) -> str:
+        """Mutate ``device`` for a tamper event; return the action key.
+
+        Single source of truth for BOTH transports. The tag alone is
+        ambiguous — Ajax reuses ``tamperopened`` for the lid opening AND
+        closing — so the ``transition`` field (TRIGGERED/RECOVERED)
+        overrides the static tuple, exactly like the door handlers.
+        """
+        action_key, is_triggered = TAMPER_EVENTS[event_tag]
+        if transition == "RECOVERED":
+            is_triggered = False
+        elif transition == "TRIGGERED":
+            is_triggered = True
+        device.attributes["tampered"] = is_triggered
+        return action_key
+
+    @staticmethod
+    def _apply_device_status(device: AjaxDevice, event_tag: str) -> str:
+        """Mutate ``device`` for a status event; return the action key.
+
+        Single source of truth for BOTH transports: online/offline,
+        battery, and external power (the one key the REST poller also
+        writes, hence the optimistic reservation).
+        """
+        action_key, is_problem = DEVICE_STATUS_EVENTS[event_tag]
+        if event_tag in ("online", "offline"):
+            device.online = not is_problem
+        elif event_tag in ("lowbattery", "batterycharged"):
+            device.attributes["low_battery"] = is_problem
+        elif event_tag in ("externalpowerdisconnected", "externalpowerrestored"):
+            # ``externally_powered`` True = mains present. Reserve it against
+            # the next REST poll overwriting the fresher realtime value.
+            device.attributes["externally_powered"] = not is_problem
+            device.mark_optimistic("externally_powered", 15.0)
+        return action_key
 
     def _request_discovery_refresh(self, source_id: str) -> None:
         """Ask the coordinator to refresh when an unknown device appears.
@@ -190,7 +230,7 @@ class EventHandlerMixin:
         if camera_entity_id:
             bus_data["camera_entity_id"] = camera_entity_id
             bus_data["snapshot_url"] = f"/api/camera_proxy/{camera_entity_id}"
-        self.coordinator.hass.bus.async_fire("ajax_camera_detection", bus_data)
+        self.coordinator.hass.bus.async_fire(EVENT_AJAX_CAMERA_DETECTION, bus_data)
 
     def _reset_doorbell_ring(self, space_id: str, device_id: str) -> None:
         """Clear the transient ``doorbell_ring`` flag for a device."""

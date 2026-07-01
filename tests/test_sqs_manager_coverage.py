@@ -271,24 +271,6 @@ def test_is_state_protected_false_never_updated() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_is_enabled_property() -> None:
-    mgr = _make_manager()
-    assert mgr.is_enabled is True
-    mgr._enabled = False
-    assert mgr.is_enabled is False
-
-
-def test_last_event_time_property() -> None:
-    mgr = _make_manager()
-    mgr._last_event_time = 42.0
-    assert mgr.last_event_time == 42.0
-
-
-# ---------------------------------------------------------------------------
-# _create_event_record
-# ---------------------------------------------------------------------------
-
-
 def test_create_event_record_with_parsed_code() -> None:
     """A valid M_XX_YY code drives action/message/is_alarm/category."""
     mgr = _make_manager()
@@ -417,7 +399,6 @@ async def test_handle_door_event_opened() -> None:
     space.devices["d1"] = dev
     assert await mgr._handle_door_event(space, "dooropened", "Front Door", "d1", "") is True
     assert dev.attributes["door_opened"] is True
-    assert dev.last_trigger_time is not None
 
 
 async def test_handle_extcontact_opened_updates_external_contact_not_door() -> None:
@@ -449,7 +430,6 @@ async def test_handle_door_event_recovered_transition_closes() -> None:
     space.devices["d1"] = dev
     await mgr._handle_door_event(space, "dooropened", "Front Door", "d1", "RECOVERED")
     assert dev.attributes["door_opened"] is False
-    assert dev.last_trigger_time is None
 
 
 async def test_handle_door_event_triggered_transition_opens() -> None:
@@ -504,7 +484,6 @@ async def test_handle_motion_event_cleared() -> None:
     space.devices["d1"] = dev
     await mgr._handle_motion_event(space, "nomotiondetected", "Front Door", "d1")
     assert dev.attributes["motion_detected"] is False
-    assert dev.last_trigger_time is None
 
 
 async def test_handle_motion_event_unknown_tag() -> None:
@@ -569,7 +548,6 @@ async def test_handle_alarm_event_clear_resets_trigger_time() -> None:
     space.devices["d1"] = dev
     await mgr._handle_alarm_event(space, "smoke", "nosmokedetected", "Front Door", "d1")
     assert dev.attributes["smoke_alarm"] is False
-    assert dev.last_trigger_time is None
 
 
 async def test_handle_alarm_event_missing_device() -> None:
@@ -657,7 +635,6 @@ async def test_handle_wire_input_event_triggered() -> None:
     space.devices["d1"] = dev
     assert await mgr._handle_wire_input_event(space, "intrusionalarm", "Front Door", "d1", "TRIGGERED") is True
     assert dev.attributes["door_opened"] is True
-    assert dev.last_trigger_time is not None
 
 
 async def test_handle_wire_input_event_recovered() -> None:
@@ -667,7 +644,6 @@ async def test_handle_wire_input_event_recovered() -> None:
     space.devices["d1"] = dev
     await mgr._handle_wire_input_event(space, "s1alarm", "Front Door", "d1", "RECOVERED")
     assert dev.attributes["door_opened"] is False
-    assert dev.last_trigger_time is None
 
 
 async def test_handle_wire_input_event_unknown_tag() -> None:
@@ -791,7 +767,7 @@ async def test_handle_device_status_offline() -> None:
     dev = _device()
     dev.online = True
     space.devices["d1"] = dev
-    assert await mgr._handle_device_status_event(space, "offline", "Front Door", "d1") is True
+    assert await mgr._handle_device_status_event(space, "offline", "Front Door", "d1", "") is True
     assert dev.online is False
 
 
@@ -801,7 +777,7 @@ async def test_handle_device_status_online() -> None:
     dev = _device()
     dev.online = False
     space.devices["d1"] = dev
-    await mgr._handle_device_status_event(space, "online", "Front Door", "d1")
+    await mgr._handle_device_status_event(space, "online", "Front Door", "d1", "")
     assert dev.online is True
 
 
@@ -810,7 +786,7 @@ async def test_handle_device_status_low_battery() -> None:
     space = _space()
     dev = _device()
     space.devices["d1"] = dev
-    await mgr._handle_device_status_event(space, "lowbattery", "Front Door", "d1")
+    await mgr._handle_device_status_event(space, "lowbattery", "Front Door", "d1", "")
     assert dev.attributes["low_battery"] is True
 
 
@@ -820,7 +796,7 @@ async def test_handle_device_status_battery_charged() -> None:
     dev = _device()
     dev.attributes["low_battery"] = True
     space.devices["d1"] = dev
-    await mgr._handle_device_status_event(space, "batterycharged", "Front Door", "d1")
+    await mgr._handle_device_status_event(space, "batterycharged", "Front Door", "d1", "")
     assert dev.attributes["low_battery"] is False
 
 
@@ -830,7 +806,7 @@ async def test_handle_device_status_external_power_lost() -> None:
     space = _space()
     dev = _device(dtype=DeviceType.SOCKET)
     space.devices["d1"] = dev
-    assert await mgr._handle_device_status_event(space, "externalpowerdisconnected", "Sock", "d1") is True
+    assert await mgr._handle_device_status_event(space, "externalpowerdisconnected", "Sock", "d1", "") is True
     assert dev.attributes["externally_powered"] is False
     assert dev.is_optimistic("externally_powered")
 
@@ -841,7 +817,7 @@ async def test_handle_device_status_external_power_restored() -> None:
     space = _space()
     dev = _device(dtype=DeviceType.SOCKET)
     space.devices["d1"] = dev
-    assert await mgr._handle_device_status_event(space, "externalpowerrestored", "Sock", "d1") is True
+    assert await mgr._handle_device_status_event(space, "externalpowerrestored", "Sock", "d1", "") is True
     assert dev.attributes["externally_powered"] is True
     assert dev.is_optimistic("externally_powered")
 
@@ -851,13 +827,13 @@ async def test_handle_device_status_tamper() -> None:
     space = _space()
     dev = _device()
     space.devices["d1"] = dev
-    await mgr._handle_device_status_event(space, "lidopen", "Front Door", "d1")
+    await mgr._handle_device_status_event(space, "lidopen", "Front Door", "d1", "")
     assert dev.attributes["tampered"] is True
 
 
 async def test_handle_device_status_missing_device() -> None:
     mgr = _make_manager()
-    assert await mgr._handle_device_status_event(_space(), "offline", "Ghost", "zzzzzzzz") is False
+    assert await mgr._handle_device_status_event(_space(), "offline", "Ghost", "zzzzzzzz", "") is False
 
 
 # ---------------------------------------------------------------------------

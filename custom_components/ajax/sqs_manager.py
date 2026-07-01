@@ -28,7 +28,13 @@ from typing import TYPE_CHECKING, Any
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 
 from ._event_helpers import EventHandlerMixin
-from .const import SIGNAL_NEW_SMART_LOCK
+from .const import (
+    EVENT_AJAX_BUTTON_PRESSED,
+    EVENT_AJAX_DOORBELL_RING,
+    EVENT_AJAX_SCENARIO_TRIGGERED,
+    EVENT_AJAX_SMART_LOCK_DOORBELL,
+    SIGNAL_NEW_SMART_LOCK,
+)
 from .event_codes import (
     DEFAULT_LANGUAGE,
     get_event_message,
@@ -151,7 +157,7 @@ class SQSManager(EventHandlerMixin):
             handle.cancel()
         self._pending_timers.clear()
         try:
-            await self.sqs_client.stop_receiving()
+            # close() stops the receive loop itself before releasing the client.
             await self.sqs_client.close()
             _LOGGER.info("SQS Manager stopped")
         except Exception as err:
@@ -268,7 +274,7 @@ class SQSManager(EventHandlerMixin):
             elif event_tag in WIRE_INPUT_EVENTS:
                 await self._handle_wire_input_event(space, event_tag, source_name, source_id, transition)
             elif event_tag in TAMPER_EVENTS or event_tag in DEVICE_STATUS_EVENTS:
-                await self._handle_device_status_event(space, event_tag, source_name, source_id)
+                await self._handle_device_status_event(space, event_tag, source_name, source_id, transition)
             elif event_tag in VIDEO_EVENTS or event_type in VIDEO_EVENT_TYPES:
                 await self._handle_video_event(space, event_tag, event_type, source_name, source_id)
             elif event_tag in LOCK_EVENTS or event_tag in LOCK_DOOR_EVENTS:
@@ -539,7 +545,6 @@ class SQSManager(EventHandlerMixin):
         if device:
             attr_key = "external_contact_opened" if is_external else "door_opened"
             device.attributes[attr_key] = is_open
-            device.last_trigger_time = datetime.now(UTC) if is_open else None
             message = get_event_message(action, self._language)
             _LOGGER.info("SQS instant: %s -> %s", source_name, message)
             return True
@@ -561,7 +566,6 @@ class SQSManager(EventHandlerMixin):
             device.attributes["motion_detected"] = is_motion
             if is_motion:
                 device.attributes["motion_detected_at"] = datetime.now(UTC).isoformat()
-            device.last_trigger_time = datetime.now(UTC) if is_motion else None
             message = get_event_message(action, self._language)
             _LOGGER.info("SQS instant: %s -> %s", source_name, message)
 
@@ -606,7 +610,6 @@ class SQSManager(EventHandlerMixin):
                     device.attributes["co_detected"] = is_alarm
             else:
                 device.attributes[f"{alarm_type}_alarm"] = is_alarm
-            device.last_trigger_time = datetime.now(UTC) if is_alarm else None
 
             message = get_event_message(action, self._language)
             _LOGGER.info("SQS instant: %s - %s", source_name, message)
@@ -672,7 +675,6 @@ class SQSManager(EventHandlerMixin):
         if device:
             # Update door_opened state (same as door events)
             device.attributes["door_opened"] = is_triggered
-            device.last_trigger_time = datetime.now(UTC) if is_triggered else None
 
             message = get_event_message(action, self._language)
             _LOGGER.info("SQS instant: %s -> %s (wire input)", source_name, message)
@@ -692,11 +694,10 @@ class SQSManager(EventHandlerMixin):
         if device:
             # Store[Any] the last action in device attributes
             device.attributes["last_action"] = action
-            device.last_trigger_time = datetime.now(UTC)
 
             # Fire a Home Assistant event for automations (legacy bus event)
             self.coordinator.hass.bus.async_fire(
-                "ajax_button_pressed",
+                EVENT_AJAX_BUTTON_PRESSED,
                 {
                     "device_id": device.id,
                     "device_name": device.name,
@@ -732,7 +733,6 @@ class SQSManager(EventHandlerMixin):
             device_id = device.id
             device_name = device.name
             device.attributes["last_ring"] = datetime.now(UTC).isoformat()
-            device.last_trigger_time = datetime.now(UTC)
             device.attributes["doorbell_ring"] = True
 
             # Schedule auto-reset of doorbell_ring state after 10 seconds
@@ -752,7 +752,7 @@ class SQSManager(EventHandlerMixin):
         if device_id:
             # Fire a Home Assistant event for automations (legacy bus event)
             self.coordinator.hass.bus.async_fire(
-                "ajax_doorbell_ring",
+                EVENT_AJAX_DOORBELL_RING,
                 {
                     "device_id": device_id,
                     "device_name": device_name,
@@ -803,7 +803,7 @@ class SQSManager(EventHandlerMixin):
         # Fire a Home Assistant event for automations
         # This allows users to trigger automations based on scenario execution
         self.coordinator.hass.bus.async_fire(
-            "ajax_scenario_triggered",
+            EVENT_AJAX_SCENARIO_TRIGGERED,
             {
                 "scenario_name": initiator_name,
                 "initiator_type": initiator_type,
@@ -816,7 +816,7 @@ class SQSManager(EventHandlerMixin):
         return True
 
     async def _handle_device_status_event(
-        self, space: AjaxSpace, event_tag: str, source_name: str, source_id: str
+        self, space: AjaxSpace, event_tag: str, source_name: str, source_id: str, transition: str
     ) -> bool:
         """Handle device status events (online/offline, battery, tamper)."""
         device = self._find_device(space, source_name, source_id)
@@ -826,24 +826,11 @@ class SQSManager(EventHandlerMixin):
 
         action = event_tag
         if event_tag in TAMPER_EVENTS:
-            action, is_tampered = TAMPER_EVENTS[event_tag]
-            device.attributes["tampered"] = is_tampered
+            # Shared helper: honours ``transition`` (Ajax reuses ``tamperopened``
+            # for open AND close), exactly like the SSE path.
+            action = self._apply_tamper_state(device, event_tag, transition)
         elif event_tag in DEVICE_STATUS_EVENTS:
-            action, _ = DEVICE_STATUS_EVENTS[event_tag]
-            if event_tag == "online":
-                device.online = True
-            elif event_tag == "offline":
-                device.online = False
-            elif event_tag == "lowbattery":
-                device.attributes["low_battery"] = True
-            elif event_tag == "batterycharged":
-                device.attributes["low_battery"] = False
-            elif event_tag in ("externalpowerdisconnected", "externalpowerrestored"):
-                # Mirror sse_manager: ``externally_powered`` True = mains present.
-                # The tag reports loss/restore, so derive the boolean and reserve
-                # it against the next REST poll overwriting it.
-                device.attributes["externally_powered"] = event_tag == "externalpowerrestored"
-                device.mark_optimistic("externally_powered", 15.0)
+            action = self._apply_device_status(device, event_tag)
 
         message = get_event_message(action, self._language)
         _LOGGER.info("SQS instant: %s - %s", source_name, message)
@@ -1088,7 +1075,7 @@ class SQSManager(EventHandlerMixin):
         if event_tag == "smartlockdoorbellbuttonpressed":
             # Doorbell button on smart lock — fire HA event
             self.coordinator.hass.bus.async_fire(
-                "ajax_smart_lock_doorbell",
+                EVENT_AJAX_SMART_LOCK_DOORBELL,
                 {
                     "device_id": smart_lock.id,
                     "device_name": smart_lock.name,
@@ -1176,11 +1163,3 @@ class SQSManager(EventHandlerMixin):
         if is_protected:
             _LOGGER.debug("Hub %s state protected (%.1fs since SQS update)", hub_id, elapsed)
         return is_protected
-
-    @property
-    def is_enabled(self) -> bool:
-        return self._enabled
-
-    @property
-    def last_event_time(self) -> float:
-        return self._last_event_time

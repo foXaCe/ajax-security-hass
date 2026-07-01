@@ -21,8 +21,14 @@ from typing import TYPE_CHECKING, Any
 
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 
-from .const import SIGNAL_NEW_SMART_LOCK
-from .event_codes import DEFAULT_LANGUAGE, parse_event_code
+from .const import (
+    EVENT_AJAX_BUTTON_PRESSED,
+    EVENT_AJAX_DOORBELL_RING,
+    EVENT_AJAX_SCENARIO_TRIGGERED,
+    EVENT_AJAX_SMART_LOCK_DOORBELL,
+    SIGNAL_NEW_SMART_LOCK,
+)
+from .event_codes import DEFAULT_LANGUAGE, get_event_message, parse_event_code, resolve_event_language
 from .event_maps import (  # Single source of truth for event mappings
     BUTTON_EVENTS,
     DEVICE_STATUS_EVENTS,
@@ -46,7 +52,7 @@ from .event_maps import (  # Single source of truth for event mappings
     VIDEO_EVENTS,
     WIRE_INPUT_EVENTS,
 )
-from .models import AjaxDevice, AjaxSmartLock, AjaxSpace
+from .models import AjaxDevice, AjaxSmartLock, AjaxSpace, SecurityState
 
 if TYPE_CHECKING:
     from .coordinator import AjaxDataCoordinator
@@ -59,6 +65,11 @@ _LOGGER = logging.getLogger(__name__)
 
 class SSEManager(EventHandlerMixin):
     """Manages SSE events from Ajax proxy."""
+
+    # Don't let REST overwrite SSE state for this many seconds
+    STATE_PROTECTION_SECONDS = 5.0
+    # Deduplication window in seconds (ignore duplicate events within this window)
+    DEDUP_WINDOW_SECONDS = 5.0
 
     def __init__(
         self,
@@ -76,7 +87,7 @@ class SSEManager(EventHandlerMixin):
         self._language = DEFAULT_LANGUAGE
         self._last_state_update: dict[str, float] = {}  # hub_id -> timestamp
         self._recent_events: dict[str, float] = {}  # event_key -> timestamp
-        self._dedup_window = 5  # seconds to ignore duplicate events
+        self._dedup_window = self.DEDUP_WINDOW_SECONDS
         # Track scheduled call_later handles so we can cancel them on stop()
         # and strong-ref background tasks so they are not GC'd mid-flight.
         self._pending_timers: set[asyncio.TimerHandle] = set()
@@ -157,7 +168,7 @@ class SSEManager(EventHandlerMixin):
             True if state was updated via SSE in the last 5 seconds
         """
         last_update = self._last_state_update.get(hub_id, 0)
-        return (time.time() - last_update) < 5
+        return (time.time() - last_update) < self.STATE_PROTECTION_SECONDS
 
     async def _handle_event(self, event_data: dict[str, Any]) -> None:
         """Handle an SSE event.
@@ -385,8 +396,8 @@ class SSEManager(EventHandlerMixin):
         )
 
         # Check if this was triggered by Home Assistant.
-        # Use the non-consuming peek (has_pending_ha_action) — NOT the
-        # consuming get_pending_ha_action — so that when Ajax emits two
+        # Use the non-consuming peek (has_pending_ha_action) — NOT a
+        # consume-on-read variant — so that when Ajax emits two
         # state-mapped events for a single HA-initiated arm/disarm (e.g.
         # 'arm' then 'armwithmalfunctions', or a per-group event followed
         # by the system event) BOTH stay attributed to Home Assistant.
@@ -519,11 +530,7 @@ class SSEManager(EventHandlerMixin):
             source_name: Device/user name reported by the event (may be PII).
             room_name: Room name, when known.
         """
-        from .event_codes import get_event_message
-
-        ha_language = self.coordinator.hass.config.language or "en"
-        lang_map = {"fr": "fr", "es": "es", "en": "en"}
-        language = lang_map.get(ha_language[:2], "en")
+        language = resolve_event_language(self.coordinator.hass.config.language)
         message = get_event_message(action_key, language)
 
         # Mirror SQS _add_event_to_history: insert most-recent-first, cap at 10.
@@ -591,8 +598,6 @@ class SSEManager(EventHandlerMixin):
         self, space: AjaxSpace, event_tag: str, source_name: str, source_id: str, transition: str
     ) -> None:
         """Handle door opened/closed events."""
-        from .models import SecurityState
-
         action_key, is_triggered = DOOR_EVENTS[event_tag]
 
         # Use transition to determine actual state
@@ -626,8 +631,6 @@ class SSEManager(EventHandlerMixin):
 
     def _handle_motion_event(self, space: AjaxSpace, event_tag: str, source_name: str, source_id: str) -> None:
         """Handle motion detected events."""
-        from .models import SecurityState
-
         action_key, is_triggered = MOTION_EVENTS[event_tag]
 
         dev = self._find_device(space, source_name, source_id)
@@ -656,8 +659,6 @@ class SSEManager(EventHandlerMixin):
 
     def _handle_smoke_event(self, space: AjaxSpace, event_tag: str, source_name: str, source_id: str) -> None:
         """Handle smoke/fire detector events."""
-        from .models import SecurityState
-
         action_key, is_triggered = SMOKE_EVENTS[event_tag]
 
         dev = self._find_device(space, source_name, source_id)
@@ -682,8 +683,6 @@ class SSEManager(EventHandlerMixin):
 
     def _handle_flood_event(self, space: AjaxSpace, event_tag: str, source_name: str, source_id: str) -> None:
         """Handle flood/leak detector events."""
-        from .models import SecurityState
-
         action_key, is_triggered = FLOOD_EVENTS[event_tag]
 
         dev = self._find_device(space, source_name, source_id)
@@ -703,8 +702,6 @@ class SSEManager(EventHandlerMixin):
 
     def _handle_glass_event(self, space: AjaxSpace, event_tag: str, source_name: str, source_id: str) -> None:
         """Handle glass break events."""
-        from .models import SecurityState
-
         action_key, is_triggered = GLASS_EVENTS[event_tag]
 
         dev = self._find_device(space, source_name, source_id)
@@ -729,17 +726,9 @@ class SSEManager(EventHandlerMixin):
         self, space: AjaxSpace, event_tag: str, source_name: str, source_id: str, transition: str
     ) -> None:
         """Handle tamper events."""
-        action_key, is_triggered = TAMPER_EVENTS[event_tag]
-
-        # Use transition to determine actual state (like door events)
-        if transition == "RECOVERED":
-            is_triggered = False
-        elif transition == "TRIGGERED":
-            is_triggered = True
-
         dev = self._find_device(space, source_name, source_id)
         if dev:
-            dev.attributes["tampered"] = is_triggered
+            action_key = self._apply_tamper_state(dev, event_tag, transition)
             _LOGGER.info(
                 "SSE instant: %s -> %s (transition=%s)",
                 dev.name,
@@ -755,21 +744,9 @@ class SSEManager(EventHandlerMixin):
 
     def _handle_device_status_event(self, space: AjaxSpace, event_tag: str, source_name: str, source_id: str) -> None:
         """Handle device status events (online/offline, battery)."""
-        action_key, is_problem = DEVICE_STATUS_EVENTS[event_tag]
-
         dev = self._find_device(space, source_name, source_id)
         if dev:
-            if "online" in action_key or "offline" in action_key:
-                dev.online = not is_problem
-            elif "battery" in action_key:
-                dev.attributes["low_battery"] = is_problem
-            elif "power" in action_key:
-                # ``externally_powered`` is the key the REST poller and the
-                # socket / siren handlers read (True = mains present). SSE reports
-                # the inverse (is_problem = power lost), so invert and reserve it
-                # against the next poll overwriting it.
-                dev.attributes["externally_powered"] = not is_problem
-                dev.mark_optimistic("externally_powered", 15.0)
+            action_key = self._apply_device_status(dev, event_tag)
             _LOGGER.info("SSE instant: %s -> %s", dev.name, action_key)
         else:
             _LOGGER.warning(
@@ -802,7 +779,6 @@ class SSEManager(EventHandlerMixin):
             device_id = dev.id
             device_name = dev.name
             dev.attributes["last_ring"] = datetime.now(UTC).isoformat()
-            dev.last_trigger_time = datetime.now(UTC)
             dev.attributes["doorbell_ring"] = True
 
             self._schedule_later(
@@ -819,7 +795,7 @@ class SSEManager(EventHandlerMixin):
 
         if device_id:
             self.coordinator.hass.bus.async_fire(
-                "ajax_doorbell_ring",
+                EVENT_AJAX_DOORBELL_RING,
                 {
                     "device_id": device_id,
                     "device_name": device_name,
@@ -848,10 +824,9 @@ class SSEManager(EventHandlerMixin):
             return
 
         dev.attributes["last_action"] = action
-        dev.last_trigger_time = datetime.now(UTC)
 
         self.coordinator.hass.bus.async_fire(
-            "ajax_button_pressed",
+            EVENT_AJAX_BUTTON_PRESSED,
             {
                 "device_id": dev.id,
                 "device_name": dev.name,
@@ -891,7 +866,6 @@ class SSEManager(EventHandlerMixin):
             return
 
         dev.attributes["door_opened"] = is_triggered
-        dev.last_trigger_time = datetime.now(UTC) if is_triggered else None
 
         _LOGGER.info("SSE instant: %s -> %s (wire input)", source_name, action)
 
@@ -958,7 +932,7 @@ class SSEManager(EventHandlerMixin):
 
         if event_tag == "smartlockdoorbellbuttonpressed":
             self.coordinator.hass.bus.async_fire(
-                "ajax_smart_lock_doorbell",
+                EVENT_AJAX_SMART_LOCK_DOORBELL,
                 {
                     "device_id": smart_lock.id,
                     "device_name": smart_lock.name,
@@ -1029,7 +1003,7 @@ class SSEManager(EventHandlerMixin):
 
         # Fire a Home Assistant event for automations
         self.coordinator.hass.bus.async_fire(
-            "ajax_scenario_triggered",
+            EVENT_AJAX_SCENARIO_TRIGGERED,
             {
                 "scenario_name": initiator_name,
                 "initiator_type": initiator_type,

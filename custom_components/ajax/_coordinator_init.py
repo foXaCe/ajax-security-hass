@@ -19,6 +19,7 @@ from typing import TYPE_CHECKING, Any
 from homeassistant.helpers import issue_registry as ir
 
 from .const import DOMAIN
+from .event_codes import resolve_event_language
 from .models import AjaxAccount, AjaxSmartLock
 
 if TYPE_CHECKING:
@@ -196,7 +197,7 @@ class AjaxBootstrapMixin:
     # AWS SQS (direct mode)
     # ------------------------------------------------------------------
 
-    async def _async_init_sqs(self) -> None:
+    async def _async_init_sqs(self, wait_for_dependency: bool = True) -> None:
         """Initialise AWS SQS for real-time events (optional).
 
         SQS provides real-time event notifications (<1 s latency) that
@@ -206,6 +207,12 @@ class AjaxBootstrapMixin:
 
         Requires ``aiobotocore`` + AWS credentials. On failure the
         integration falls back to REST-only mode without raising.
+
+        ``wait_for_dependency``: the initial-load attempt waits out a
+        deferred ``aiobotocore`` pip install (bounded window). Periodic
+        retries pass False — single quiet attempt per poll cycle, so a
+        genuinely missing dependency does not re-log a warning every few
+        minutes for the whole session.
         """
         if self._sqs_init_in_progress:
             return  # a startup/retry attempt is already running — don't overlap
@@ -225,7 +232,8 @@ class AjaxBootstrapMixin:
 
         self._sqs_init_in_progress = True
         try:
-            _LOGGER.info("Initializing AWS SQS for real-time events...")
+            if wait_for_dependency:
+                _LOGGER.info("Initializing AWS SQS for real-time events...")
 
             assert _AjaxSQSClient is not None  # Validated by SQS_AVAILABLE above.
             assert _SQSManager is not None
@@ -238,7 +246,8 @@ class AjaxBootstrapMixin:
             # staying off for the whole session (intermittent "aiobotocore
             # required" at startup). REST polling covers the gap meanwhile.
             sqs_client = None
-            for attempt in range(SQS_AIOBOTOCORE_WAIT_ATTEMPTS):
+            attempts = SQS_AIOBOTOCORE_WAIT_ATTEMPTS if wait_for_dependency else 1
+            for attempt in range(attempts):
                 try:
                     sqs_client = _AjaxSQSClient(
                         aws_access_key_id=self._aws_access_key_id,
@@ -248,28 +257,34 @@ class AjaxBootstrapMixin:
                     )
                     break
                 except ImportError:
-                    if attempt == 0:
+                    if attempt == 0 and wait_for_dependency:
                         _LOGGER.info(
                             "aiobotocore not installed yet — Home Assistant is still "
                             "provisioning it; deferring SQS startup (REST polling meanwhile)"
                         )
-                    await asyncio.sleep(SQS_AIOBOTOCORE_WAIT_INTERVAL)
+                    if wait_for_dependency:
+                        await asyncio.sleep(SQS_AIOBOTOCORE_WAIT_INTERVAL)
 
             if sqs_client is None:
-                _LOGGER.warning(
-                    "aiobotocore unavailable after ~%d s — real-time SQS deferred, using REST API "
-                    "polling meanwhile; will retry automatically once the dependency is installed",
-                    SQS_AIOBOTOCORE_WAIT_ATTEMPTS * SQS_AIOBOTOCORE_WAIT_INTERVAL,
-                )
-                ir.async_create_issue(
-                    self.hass,
-                    DOMAIN,
-                    sqs_issue,
-                    is_fixable=False,
-                    severity=ir.IssueSeverity.WARNING,
-                    translation_key="sqs_init_failed",
-                    translation_placeholders={"error": "aiobotocore required"},
-                )
+                if wait_for_dependency:
+                    _LOGGER.warning(
+                        "aiobotocore unavailable after ~%d s — real-time SQS deferred, using REST API "
+                        "polling meanwhile; will retry automatically once the dependency is installed",
+                        SQS_AIOBOTOCORE_WAIT_ATTEMPTS * SQS_AIOBOTOCORE_WAIT_INTERVAL,
+                    )
+                    ir.async_create_issue(
+                        self.hass,
+                        DOMAIN,
+                        sqs_issue,
+                        is_fixable=False,
+                        severity=ir.IssueSeverity.WARNING,
+                        translation_key="sqs_init_failed",
+                        translation_placeholders={"error": "aiobotocore required"},
+                    )
+                else:
+                    # Periodic retry: stay quiet — the initial attempt already
+                    # warned and raised the repair issue.
+                    _LOGGER.debug("aiobotocore still unavailable — SQS retry deferred to the next poll cycle")
                 # Leave _sqs_initialized False (transient): a later poll retries
                 # via the periodic-update branch, so SQS self-heals without a
                 # manual restart once pip finishes installing aiobotocore.
@@ -280,9 +295,7 @@ class AjaxBootstrapMixin:
                 sqs_client=sqs_client,
             )
 
-            ha_language = self.hass.config.language or "en"
-            lang_map = {"fr": "fr", "es": "es", "en": "en"}
-            sqs_language = lang_map.get(ha_language[:2], "en")
+            sqs_language = resolve_event_language(self.hass.config.language)
             self.sqs_manager.set_language(sqs_language)
 
             success = await self.sqs_manager.start()
@@ -373,9 +386,7 @@ class AjaxBootstrapMixin:
                 sse_client=sse_client,
             )
 
-            ha_language = self.hass.config.language or "en"
-            lang_map = {"fr": "fr", "es": "es", "en": "en"}
-            sse_language = lang_map.get(ha_language[:2], "en")
+            sse_language = resolve_event_language(self.hass.config.language)
             self.sse_manager.set_language(sse_language)
 
             success = await self.sse_manager.start()

@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import sys
 import threading
 import time
 from collections.abc import Callable
@@ -44,7 +45,17 @@ def _ensure_aiobotocore() -> bool:
     try:
         from aiobotocore.session import get_session as _get_session
         from botocore.exceptions import ClientError as _ClientError
-    except ImportError:
+    except Exception as err:  # noqa: BLE001 — a half-installed package can raise anything
+        # An import racing pip (fresh install or upgrade of aiobotocore and its
+        # large botocore dependency) can leave HALF-INITIALISED modules cached
+        # in ``sys.modules``. Those poison every later import attempt in this
+        # process — observed as SQS stuck on "aiobotocore required" for 25 min
+        # after pip had finished, healed only by a restart. Purge both module
+        # families so the next attempt re-imports from a clean slate once the
+        # files are actually on disk.
+        _LOGGER.debug("aiobotocore import failed (%s) — purging cached modules for a clean retry", err)
+        for name in [mod for mod in sys.modules if mod.split(".", 1)[0] in ("aiobotocore", "botocore")]:
+            sys.modules.pop(name, None)
         return False
     get_session = _get_session
     ClientError = _ClientError

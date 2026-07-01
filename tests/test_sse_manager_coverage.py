@@ -693,7 +693,6 @@ def test_wire_input_triggered_sets_door_opened() -> None:
     space.devices[dev.id] = dev
     mgr._handle_wire_input_event(space, "intrusionalarm", "Dev", "d1", transition="TRIGGERED")
     assert dev.attributes["door_opened"] is True
-    assert dev.last_trigger_time is not None
 
 
 def test_wire_input_recovered_clears() -> None:
@@ -703,7 +702,6 @@ def test_wire_input_recovered_clears() -> None:
     space.devices[dev.id] = dev
     mgr._handle_wire_input_event(space, "intrusionalarm", "Dev", "d1", transition="RECOVERED")
     assert dev.attributes["door_opened"] is False
-    assert dev.last_trigger_time is None
 
 
 def test_wire_input_unknown_tag_returns() -> None:

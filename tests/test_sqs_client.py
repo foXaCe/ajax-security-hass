@@ -79,3 +79,28 @@ def test_client_init_succeeds_when_aiobotocore_available(monkeypatch: pytest.Mon
         queue_name="q",
     )
     assert client._session is sentinel_session
+
+
+def test_ensure_aiobotocore_purges_poisoned_modules(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A pip install racing the import can leave half-initialised modules in
+    ``sys.modules`` that poison EVERY later import attempt in the process
+    (observed: SQS stuck on "aiobotocore required" for 25 min after pip had
+    finished). The failure path must purge both module families so the next
+    attempt re-imports from a clean slate.
+    """
+    from unittest.mock import patch as mock_patch
+
+    monkeypatch.setattr(sqs_client, "HAS_AIOBOTOCORE", False)
+    with mock_patch.dict(sys.modules):
+        # Poison: parent packages present, submodule import blocked.
+        sys.modules["aiobotocore"] = ModuleType("aiobotocore")
+        sys.modules["aiobotocore.session"] = None  # forces ImportError
+        sys.modules["botocore"] = ModuleType("botocore")
+        sys.modules["botocore.exceptions"] = ModuleType("botocore.exceptions")
+
+        assert sqs_client._ensure_aiobotocore() is False
+
+        # Both families were purged — the next attempt starts clean.
+        leftovers = [m for m in sys.modules if m.split(".", 1)[0] in ("aiobotocore", "botocore")]
+        assert leftovers == []
+    assert sqs_client.HAS_AIOBOTOCORE is False

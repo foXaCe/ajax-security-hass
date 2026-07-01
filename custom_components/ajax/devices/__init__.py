@@ -66,13 +66,17 @@ DEVICE_HANDLERS: dict[DeviceType, type[AjaxDeviceHandler]] = {
     DeviceType.LIFE_QUALITY: LifeQualityHandler,
 }
 
-DIMMER_RAW_TYPES = {"lightswitchdimmer", "light_switch_dimmer"}
-
 
 def is_dimmer_device(device: AjaxDevice) -> bool:
-    """Check if device is a LightSwitchDimmer."""
-    raw_type = (device.raw_type or "").lower().replace("_", "")
-    return raw_type in DIMMER_RAW_TYPES or "dimmer" in raw_type
+    """Check if device is a LightSwitchDimmer (any dimmer variant)."""
+    raw_type = (device.raw_type or "").lower().replace("_", "").replace(" ", "")
+    return "dimmer" in raw_type
+
+
+def is_lightswitch_device(device: AjaxDevice) -> bool:
+    """Check if device is a LightSwitch (non-dimmer)."""
+    raw_type = (device.raw_type or "").lower().replace("_", "").replace(" ", "")
+    return "lightswitch" in raw_type and "dimmer" not in raw_type
 
 
 def get_device_handler(device: AjaxDevice) -> type[AjaxDeviceHandler] | None:
@@ -90,7 +94,6 @@ __all__ = [
     "AjaxDeviceHandler",
     "ButtonHandler",
     "DEVICE_HANDLERS",
-    "DIMMER_RAW_TYPES",
     "DimmerHandler",
     "DoorbellHandler",
     "DoorContactHandler",
@@ -111,4 +114,5 @@ __all__ = [
     "WireInputHandler",
     "get_device_handler",
     "is_dimmer_device",
+    "is_lightswitch_device",
 ]

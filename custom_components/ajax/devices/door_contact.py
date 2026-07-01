@@ -14,6 +14,14 @@ from homeassistant.components.binary_sensor import BinarySensorDeviceClass
 
 from .base import AjaxDeviceHandler
 
+# DoorProtect Plus variants exposing shock/tilt configuration (shared by the
+# select and number platforms — single source of truth).
+DOOR_PLUS_DEVICE_TYPES = (
+    "DoorProtectPlus",
+    "DoorProtectPlusFibra",
+    "DoorProtectSPlus",
+)
+
 
 class DoorContactHandler(AjaxDeviceHandler):
     """Handler for Ajax DoorProtect door/window contact sensors."""

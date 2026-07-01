@@ -33,13 +33,7 @@ class DimmerHandler(AjaxDeviceHandler):
         """Return binary sensor entities for dimmer."""
         # Note: LightSwitchDimmer has no tamper sensor
         sensors = [
-            {
-                "key": "problem",
-                "translation_key": "problem",
-                "device_class": BinarySensorDeviceClass.PROBLEM,
-                "value_fn": lambda: bool(self.device.malfunctions),
-                "enabled_by_default": True,
-            },
+            self._problem_binary_sensor(),
         ]
 
         # Current limit protection

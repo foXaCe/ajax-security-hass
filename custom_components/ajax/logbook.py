@@ -7,7 +7,19 @@ from collections.abc import Callable
 from homeassistant.components.logbook import LOGBOOK_ENTRY_ICON, LOGBOOK_ENTRY_MESSAGE, LOGBOOK_ENTRY_NAME
 from homeassistant.core import Event, HomeAssistant, callback
 
-from .const import DOMAIN
+from .const import (
+    DOMAIN,
+    EVENT_AJAX_ARMED,
+    EVENT_AJAX_ARMED_HOME,
+    EVENT_AJAX_ARMED_NIGHT,
+    EVENT_AJAX_BUTTON_PRESSED,
+    EVENT_AJAX_CAMERA_DETECTION,
+    EVENT_AJAX_DISARMED,
+    EVENT_AJAX_DOORBELL_RING,
+    EVENT_AJAX_SCENARIO_TRIGGERED,
+    EVENT_AJAX_SECURITY_STATE_CHANGED,
+    EVENT_AJAX_SMART_LOCK_DOORBELL,
+)
 
 # Minimal translation table keyed by HA language (2-letter code).
 # We keep it inline here because Home Assistant's logbook API does not
@@ -175,19 +187,6 @@ def _tr(hass: HomeAssistant, key: str, **kwargs: str) -> str:
         except KeyError:
             return template
     return template
-
-
-# Event types fired by the integration
-EVENT_AJAX_ARMED = "ajax_armed"
-EVENT_AJAX_DISARMED = "ajax_disarmed"
-EVENT_AJAX_ARMED_NIGHT = "ajax_armed_night"
-EVENT_AJAX_ARMED_HOME = "ajax_armed_home"
-EVENT_AJAX_SECURITY_STATE_CHANGED = "ajax_security_state_changed"
-EVENT_AJAX_BUTTON_PRESSED = "ajax_button_pressed"
-EVENT_AJAX_DOORBELL_RING = "ajax_doorbell_ring"
-EVENT_AJAX_SMART_LOCK_DOORBELL = "ajax_smart_lock_doorbell"
-EVENT_AJAX_SCENARIO_TRIGGERED = "ajax_scenario_triggered"
-EVENT_AJAX_CAMERA_DETECTION = "ajax_camera_detection"
 
 
 @callback

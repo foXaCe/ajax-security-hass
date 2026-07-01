@@ -8,9 +8,11 @@ id would collide in the registries — entities fail to register and devices
 get merged across accounts.
 
 Both the entity ``unique_id`` and the device ``identifiers`` are therefore
-namespaced with the config entry id. This module is the single source of
-truth for that format so the runtime code and the v1.2 -> v1.3 migration
-(`async_migrate_entry`) stay byte-for-byte identical.
+namespaced with the config entry id. Entities build their ``unique_id``
+inline as ``f"{entry_id}_{...}"``; this module is the single source of
+truth for the device-registry side of that format so the runtime code and
+the v1.2 -> v1.3 migration (`async_migrate_entry`) stay byte-for-byte
+identical.
 """
 
 from __future__ import annotations
@@ -24,12 +26,3 @@ def device_identifier(entry_id: str, raw_id: str) -> tuple[str, str]:
     ``raw_id`` is the bare Ajax id (hub/space/device/video-edge/smart-lock).
     """
     return (DOMAIN, f"{entry_id}_{raw_id}")
-
-
-def entity_unique_id(entry_id: str, *parts: str) -> str:
-    """Return a config-entry-scoped entity ``unique_id``.
-
-    The first segment is always the entry id; the migration prepends exactly
-    ``f"{entry_id}_"`` to legacy ids, so this must match that format.
-    """
-    return "_".join((entry_id, *parts))

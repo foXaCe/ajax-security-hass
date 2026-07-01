@@ -35,12 +35,7 @@ class ManualCallPointHandler(AjaxDeviceHandler):
                 "enabled_by_default": True,
             },
             # Tamper sensor
-            {
-                "key": "tamper",
-                "device_class": BinarySensorDeviceClass.TAMPER,
-                "value_fn": lambda: self.device.attributes.get("tampered", False),
-                "enabled_by_default": True,
-            },
+            self._tamper_binary_sensor(),
         ]
 
         return sensors

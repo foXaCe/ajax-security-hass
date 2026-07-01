@@ -1681,6 +1681,15 @@ ACTION_CATEGORIES = {
 # Default language fallback order
 DEFAULT_LANGUAGE = "en"
 
+# Languages the EVENT_MESSAGES tables actually carry.
+SUPPORTED_LANGUAGES = frozenset({"en", "fr", "es"})
+
+
+def resolve_event_language(ha_language: str | None) -> str:
+    """Map an HA locale (e.g. ``fr-CA``) to a supported message language."""
+    prefix = (ha_language or DEFAULT_LANGUAGE)[:2]
+    return prefix if prefix in SUPPORTED_LANGUAGES else DEFAULT_LANGUAGE
+
 
 def get_event_message(action_key: str, language: str = DEFAULT_LANGUAGE) -> str:
     """Get the translated message for an action key.

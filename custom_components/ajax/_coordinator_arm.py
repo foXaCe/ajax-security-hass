@@ -61,14 +61,6 @@ class AjaxArmServiceMixin:
         timestamp = self._pending_ha_actions.get(hub_id, 0)
         return time.time() - timestamp < 10
 
-    def get_pending_ha_action(self, hub_id: str) -> bool:
-        """Like ``has_pending_ha_action`` but consumes the flag on hit."""
-        timestamp = self._pending_ha_actions.get(hub_id, 0)
-        if time.time() - timestamp < 10:
-            del self._pending_ha_actions[hub_id]
-            return True
-        return False
-
     # ------------------------------------------------------------------
     # Per-space locking
     # ------------------------------------------------------------------

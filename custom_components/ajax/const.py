@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Final
 
 if TYPE_CHECKING:
     from homeassistant.config_entries import ConfigEntry
@@ -94,3 +94,18 @@ SIGNAL_NEW_VIDEO_EDGE = f"{DOMAIN}_new_video_edge"
 SIGNAL_NEW_SMART_LOCK = f"{DOMAIN}_new_smart_lock"
 SIGNAL_NEW_SPACE = f"{DOMAIN}_new_space"
 SIGNAL_NEW_GROUP = f"{DOMAIN}_new_group"
+
+# Battery percentage at or below which ``AjaxDevice.is_low_battery`` reports True.
+BATTERY_LOW_THRESHOLD: Final = 20
+
+# Bus event types fired by the integration (also described in logbook.py).
+EVENT_AJAX_ARMED: Final = "ajax_armed"
+EVENT_AJAX_DISARMED: Final = "ajax_disarmed"
+EVENT_AJAX_ARMED_NIGHT: Final = "ajax_armed_night"
+EVENT_AJAX_ARMED_HOME: Final = "ajax_armed_home"
+EVENT_AJAX_SECURITY_STATE_CHANGED: Final = "ajax_security_state_changed"
+EVENT_AJAX_BUTTON_PRESSED: Final = "ajax_button_pressed"
+EVENT_AJAX_DOORBELL_RING: Final = "ajax_doorbell_ring"
+EVENT_AJAX_SMART_LOCK_DOORBELL: Final = "ajax_smart_lock_doorbell"
+EVENT_AJAX_SCENARIO_TRIGGERED: Final = "ajax_scenario_triggered"
+EVENT_AJAX_CAMERA_DETECTION: Final = "ajax_camera_detection"

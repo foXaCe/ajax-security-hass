@@ -33,12 +33,7 @@ class MotionDetectorHandler(AjaxDeviceHandler):
                 "name": None,
             },
             # Note: "armed_in_night_mode" is now a switch, not a binary sensor
-            {
-                "key": "tamper",
-                "device_class": BinarySensorDeviceClass.TAMPER,
-                "value_fn": lambda: self.device.attributes.get("tampered", False),
-                "enabled_by_default": True,
-            },
+            self._tamper_binary_sensor(),
         ]
 
         # CombiProtect also has glass break detection

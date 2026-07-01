@@ -67,30 +67,6 @@ def test_has_pending_ha_action_does_not_consume_flag() -> None:
     assert "hub1" in mixin._pending_ha_actions
 
 
-def test_get_pending_ha_action_consumes_the_flag_on_hit() -> None:
-    """The consuming variant must clear the entry after returning True."""
-    mixin = _make_mixin()
-    mixin._pending_ha_actions["hub1"] = time.time()
-    assert mixin.get_pending_ha_action("hub1") is True
-    assert "hub1" not in mixin._pending_ha_actions
-    # Second call returns False — the flag was consumed.
-    assert mixin.get_pending_ha_action("hub1") is False
-
-
-def test_get_pending_ha_action_does_not_consume_on_miss() -> None:
-    """Expired flag must NOT be re-cleared (already gone or never set)."""
-    mixin = _make_mixin()
-    mixin._pending_ha_actions["hub1"] = time.time() - 30
-    assert mixin.get_pending_ha_action("hub1") is False
-    # The expired flag stays until the next register — no spurious del.
-    assert "hub1" in mixin._pending_ha_actions
-
-
-# ---------------------------------------------------------------------------
-# Per-space lock cache
-# ---------------------------------------------------------------------------
-
-
 def test_arm_lock_for_returns_same_lock_per_space() -> None:
     """Subsequent calls must hand back the SAME lock — otherwise concurrent
     arm calls race past each other.

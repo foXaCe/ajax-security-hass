@@ -38,20 +38,9 @@ class HubHandler(AjaxDeviceHandler):
                 "value_fn": lambda: self.device.attributes.get("online", False),
                 "enabled_by_default": True,
             },
-            {
-                "key": "problem",
-                "translation_key": "problem",
-                "device_class": BinarySensorDeviceClass.PROBLEM,
-                "value_fn": lambda: bool(self.device.malfunctions),
-                "enabled_by_default": True,
-            },
+            self._problem_binary_sensor(),
             # Note: No translation_key needed - HA provides automatic translation for TAMPER device_class
-            {
-                "key": "tamper",
-                "device_class": BinarySensorDeviceClass.TAMPER,
-                "value_fn": lambda: self.device.attributes.get("tampered", False),
-                "enabled_by_default": True,
-            },
+            self._tamper_binary_sensor(),
         ]
 
         # External power status

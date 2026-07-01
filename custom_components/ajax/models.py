@@ -15,6 +15,8 @@ from datetime import datetime
 from enum import Enum
 from typing import Any
 
+from .const import BATTERY_LOW_THRESHOLD
+
 
 class SecurityState(Enum):
     """Security states for Ajax spaces."""
@@ -117,7 +119,6 @@ class AjaxGroup:
     name: str
     space_id: str
     state: GroupState = GroupState.NONE
-    night_mode_enabled: bool = False
     bulk_arm_involved: bool = False
     bulk_disarm_involved: bool = False
     image_id: str | None = None
@@ -161,9 +162,6 @@ class AjaxDevice:
     # Device specific attributes
     states: list[str] = field(default_factory=list)
     attributes: dict[str, Any] = field(default_factory=dict)
-
-    # Real-time events from notifications
-    last_trigger_time: datetime | None = None
 
     # Photo data for camera devices (MotionCam, etc.)
     last_photo_url: str | None = None
@@ -215,7 +213,7 @@ class AjaxDevice:
     @property
     def is_low_battery(self) -> bool:
         """Check if device has low battery."""
-        return self.battery_level is not None and self.battery_level < 20
+        return self.battery_level is not None and self.battery_level < BATTERY_LOW_THRESHOLD
 
 
 class VideoEdgeType(Enum):
@@ -387,12 +385,9 @@ class AjaxSpace:
 
     # Security
     security_state: SecurityState = SecurityState.NONE
-    can_arm: bool = True
-    can_disarm: bool = True
 
     # Group mode (if system uses groups instead of simple armed/disarmed)
     group_mode_enabled: bool = False
-    night_mode_enabled: bool = False
 
     # Notifications
     unread_notifications: int = 0
@@ -404,10 +399,6 @@ class AjaxSpace:
     video_edges: dict[str, AjaxVideoEdge] = field(default_factory=dict)
     smart_locks: dict[str, AjaxSmartLock] = field(default_factory=dict)
     notifications: list[AjaxNotification] = field(default_factory=list)
-
-    # Metadata
-    address: str | None = None
-    timezone: str | None = None
 
     # Raw hub details from API (all available hub information)
     hub_details: dict[str, Any] = field(default_factory=dict)

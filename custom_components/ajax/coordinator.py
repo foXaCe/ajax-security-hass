@@ -156,6 +156,7 @@ class AjaxDataCoordinator(
         self._aws_secret_access_key = aws_secret_access_key
         self._queue_name = queue_name
         self._sqs_initialized = False
+        self._sqs_init_in_progress = False
 
         # SSE real-time events (optional, for proxy mode)
         self.sse_manager: SSEManager | None = None
@@ -378,7 +379,7 @@ class AjaxDataCoordinator(
                     if not self._sse_initialized and self._sse_url:
                         # Proxy mode: use SSE for real-time events
                         entry.async_create_background_task(self.hass, self._async_init_sse(), "ajax_init_sse")
-                    elif not self._sqs_initialized and self._aws_access_key_id:
+                    elif not self._sqs_initialized and not self._sqs_init_in_progress and self._aws_access_key_id:
                         # Direct mode: use SQS for real-time events
                         entry.async_create_background_task(self.hass, self._async_init_sqs(), "ajax_init_sqs")
 
@@ -387,6 +388,18 @@ class AjaxDataCoordinator(
                         entry.async_create_background_task(self.hass, self._async_init_onvif(), "ajax_init_onvif")
             else:
                 # Periodic update - optimized polling
+                # Retry real-time SQS if it never came up in direct mode — e.g.
+                # aiobotocore was still being installed during initial load. This
+                # self-heals without a manual restart once the dependency lands.
+                if (
+                    self.config_entry is not None
+                    and self._aws_access_key_id
+                    and not self._sse_url
+                    and not self._sqs_initialized
+                    and not self._sqs_init_in_progress
+                ):
+                    self.config_entry.async_create_background_task(self.hass, self._async_init_sqs(), "ajax_retry_sqs")
+
                 # Check if we need full metadata refresh (hourly or forced)
                 need_metadata_refresh = self._force_metadata_refresh or self._should_refresh_metadata()
                 if need_metadata_refresh:

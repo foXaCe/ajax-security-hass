@@ -469,7 +469,9 @@ async def test_update_notifications_no_account_and_unknown_space() -> None:
 
 
 def _bootstrap() -> AjaxBootstrapMixin:
-    return object.__new__(AjaxBootstrapMixin)
+    mixin = object.__new__(AjaxBootstrapMixin)
+    mixin._sqs_init_in_progress = False
+    return mixin
 
 
 @pytest.mark.asyncio
@@ -767,7 +769,23 @@ async def test_init_sqs_aiobotocore_never_installs_creates_issue() -> None:
     ir_mod.async_create_issue.assert_called_once()
     # Surfaced with the dependency-missing reason.
     assert ir_mod.async_create_issue.call_args.kwargs["translation_placeholders"]["error"] == "aiobotocore required"
-    assert mixin._sqs_initialized is True
+    # Left False on the transient aiobotocore race so a later poll retries — SQS
+    # self-heals once pip finishes installing the dependency (no manual restart).
+    assert mixin._sqs_initialized is False
+    assert mixin._sqs_init_in_progress is False  # guard released by the finally
+
+
+@pytest.mark.asyncio
+async def test_init_sqs_skips_when_already_in_progress() -> None:
+    """A concurrent poll must not start a second SQS init while one is running."""
+    mixin = _bootstrap()
+    mixin._sqs_init_in_progress = True
+    mixin._sqs_initialized = False
+    mixin._aws_access_key_id = "AKIA"
+    with patch.object(init_mod, "_AjaxSQSClient") as client_factory:
+        await mixin._async_init_sqs()
+    client_factory.assert_not_called()  # guarded out before building anything
+    assert mixin._sqs_initialized is False  # untouched — a later poll retries
 
 
 # ---------------------------------------------------------------------------

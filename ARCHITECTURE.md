@@ -28,25 +28,26 @@ Ajax cloud ──REST──▶ api.AjaxRestApi ──▶ coordinator.AjaxDataCoo
 | `_coordinator_init.py` | Coordinator init, stores. |
 | `_coordinator_devices.py` | Device reconciliation pipeline, stale-device cleanup. Inherits `_device_normalize`. |
 | `_device_normalize.py` | `AjaxDeviceNormalizeMixin` — stateless attribute normalisation (raw Ajax field names → handler shapes) + motion-impulse expiry. |
-| `_coordinator_door_poll.py` | `AjaxDoorPollingMixin` — fast 5 s door/transmitter/wire-input polling while disarmed / night mode. |
+| `_coordinator_door_poll.py` | `AjaxDoorPollingMixin` — fast 5 s door/transmitter/wire-input polling while disarmed / night mode; also applies bridged smart-lock `lockStatus`/`doorStatus` from the same payload (#88). |
 | `_coordinator_state.py` | Payload parsers (security state, device type), video-edge / smart-lock pollers. |
+| `_device_type_map.py` | Pure-data device-type alias table (raw Ajax type strings → `DeviceType`), consumed by `_coordinator_state._parse_device_type`. |
 | `_coordinator_spaces.py` | Space / hub / users / groups parsing, night mode. |
 | `_coordinator_arm.py` | Arm / disarm / night / panic / group services + per-space locks + HA-action tracking. |
 | `_coordinator_events.py` | SSE/SQS event-filter options, persistent-notification dispatch. |
-| `_coordinator_onvif.py` | ONVIF orchestration across spaces, partial-cameras repair issue. |
+| `_coordinator_onvif.py` | ONVIF orchestration across spaces, partial-cameras repair issue, periodic reconcile (`_async_reconcile_onvif`) so cameras added/removed after startup are picked up (throttled bootstrap self-heal). |
 | `api/` | `AjaxRestApi` REST client, split by domain into a package (see [API client](#api-client-api-package)). `_base.py` holds `AjaxRestClientBase` (auth login/2FA/refresh/recover, transport `_request`/`_request_no_response` with retry/backoff/401-reauth, rate-limit, session, in-memory caches, typed exceptions); domain mixins `_hubs.py` / `_devices.py` / `_cameras.py` / `_video.py` / `_arm.py` carry the endpoint wrappers. |
 | `models.py` | Dataclasses: `AjaxAccount`, `AjaxSpace`, `AjaxDevice`, `AjaxVideoEdge`, `AjaxSmartLock`, enums; optimistic-update helpers (`mark_optimistic` / `is_optimistic`). |
 | `sse_client.py` / `sse_manager.py` | SSE transport + event handlers (proxy mode). |
 | `sqs_client.py` / `sqs_manager.py` | AWS SQS transport (daemon thread) + event handlers (direct mode). |
 | `event_maps.py` | **Single source of truth** for the event-tag / event-code lookup tables shared by both managers (no HA/transport imports). |
-| `_event_helpers.py` | `EventHandlerMixin` shared by both managers (video-edge lookup, detection state, doorbell/video reset, discovery throttle). |
+| `_event_helpers.py` | `EventHandlerMixin` shared by both managers (video-edge lookup, detection state, doorbell/video reset, discovery throttle, **transition-aware tamper + device-status mutation** — single source of truth for SSE *and* SQS). |
 | `_discovery.py` | `connect_new_entity_signal` — dynamic-entity discovery; dedupes on **`entity.unique_id`**. |
-| `_ids.py` | **Single source of truth** for config-entry-scoped registry ids (`device_identifier`, `entity_unique_id`). |
+| `_ids.py` | **Single source of truth** for the config-entry-scoped device-registry identifier (`device_identifier`); entities build their `unique_id` inline as `f"{entry_id}_{...}"`. |
 | `event_codes.py` | Vendored Ajax event-code table (excluded from coverage). |
 | `config_flow.py` / `config_flow_options.py` | `ConfigFlow` (user/direct/proxy/2FA/select_spaces/dhcp/reauth/reconfigure); `OptionsFlow` lives in `config_flow_options.py`. |
 | `diagnostics.py` | Redacted config-entry / device diagnostics. |
 | `devices/` | One handler per Ajax device type (`base.py` + 18 handlers); `DEVICE_HANDLERS` map + `get_device_handler` / `is_dimmer_device`. |
-| Platforms | `sensor.py`, `binary_sensor.py`, `switch.py` (+ `_switch_entity.py` / `_switch_dimmer.py`), `number.py`, `select.py`, `light.py`, `valve.py`, `lock.py`, `camera.py`, `event.py`, `alarm_control_panel.py`, `device_tracker.py`, `update.py`, `button.py`. |
+| Platforms | `sensor.py` (thin: setup + re-exports; entities in `_sensor_space.py` / `_sensor_device.py` / `_sensor_hub.py` / `_sensor_smart_lock.py`), `binary_sensor.py`, `switch.py` (+ `_switch_entity.py` / `_switch_dimmer.py`), `number.py`, `select.py`, `light.py`, `valve.py`, `lock.py`, `camera.py`, `event.py`, `alarm_control_panel.py`, `device_tracker.py`, `update.py`, `button.py`. Every platform (not just alarm) listens to `SIGNAL_NEW_SPACE` for hubs added after startup. |
 
 ## Identifier namespacing (schema v1.3)
 

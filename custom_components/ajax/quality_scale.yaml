@@ -32,8 +32,8 @@ rules:
     comment: |
       `tests/test_config_flow.py` covers the entry-point form schema, the
       auth-mode routing (direct vs proxy), and the cross-step persistence
-      of `_auth_mode`. Deeper coverage (2FA branch, reauth, reconfigure)
-      is planned for the next round.
+      of `_auth_mode`. `tests/test_config_flow_coverage.py` covers the
+      2FA branch, reauth, reconfigure and the full Options Flow.
   dependency-transparency:
     status: done
     comment: |
@@ -141,11 +141,11 @@ rules:
   test-coverage:
     status: done
     comment: |
-      `tests/` covers the optimistic-update guard (`models.py` 79 %), the
-      SSE/SQS event mixin (`_event_helpers.py` 100 %), the dynamic-entity
-      discovery helper (`_discovery.py` 100 %), the device descriptor
-      helpers (`devices/base.py` 88 %) and the translation schema. 49
-      tests at the time of this commit.
+      Exhaustive suite (~1900 tests, ≥ 99 % line coverage across the
+      integration): coordinator mixins, API client (auth/transport/retry),
+      SSE/SQS managers and dispatch, every entity platform, config flow
+      (user/direct/proxy/2FA/dhcp/reauth/reconfigure) + Options Flow,
+      diagnostics, migrations and the translation schema.
 
   # ------------------------------------------------------------------
   # Gold

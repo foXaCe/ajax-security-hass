@@ -4,6 +4,23 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+- **Bridged smart locks (Yale Doorman / LockBridge) now update within ~5 s while disarmed (#88).** Their `lockStatus`/`doorStatus` already rode the fast door-sensor poll payload but was thrown away; it is now applied at the same 5 s cadence instead of lagging on the 30–60 s main poll.
+- **SQS real-time could stay dead for the whole session after a pip race at boot ("aiobotocore required" loop).** When the integration's import raced Home Assistant's background install/upgrade of `aiobotocore`, half-initialised modules stayed cached in `sys.modules` and poisoned every retry until a manual restart. The failure path now purges both module families so the retry self-heals, logs the real import error, and the periodic retry is a single quiet attempt instead of re-warning every few minutes.
+- **Tamper state stuck on "detected" in direct/SQS mode.** Ajax reuses the `tamperopened` event for the lid opening *and* closing (the `transition` field disambiguates); the SQS path ignored it. Tamper and device-status handling is now a single transition-aware implementation shared by SSE and SQS.
+- **A hub added to the Ajax account while Home Assistant runs now gets all its entities.** Only the alarm panel was created dynamically; hub sensors, tamper/power binary sensors, the panic button, the GPS tracker and the firmware entity silently waited for a reload.
+- **Cameras added or removed after startup are now picked up by the local-AI (ONVIF) path.** New cameras get their ONVIF connection on the next video refresh (with a self-healing bootstrap retry), and removed cameras no longer leak an orphan polling client.
+- **Entities no longer show stale values as "available" when the cloud API is unreachable.** 15 entity classes (selects, numbers, valve, camera, lock, hub/video-edge/smart-lock sensors) ignored the coordinator failure flag while switches/lights on the same device went unavailable.
+- **Post-arm/disarm freshness is preserved across network retries.** The proxy no-cache flag was silently dropped when a request had to retry on a 5xx/timeout, serving stale group states exactly when freshness mattered.
+- **An optimistic switch toggle can no longer be bounced back by a legacy payload.** The nested `attributes.switchState` merge bypassed the per-key optimistic guard during the 15 s window.
+- **One failing space no longer leaves the other spaces' initial load running orphaned.**
+- **Panic button failures now raise a translated Home Assistant error** instead of a raw API exception, in all 7 languages.
+- **The two Options Flow errors ("no space selected", "invalid proxy URL") are now actually translated** — they displayed as raw keys in every language. The initial proxy setup also validates the URL scheme up front instead of failing later with a generic "cannot connect".
+- **`force_arm` targeting a group panel no longer mis-parses the group id as a space id** — group panels are skipped with a clear log (Ajax has no per-group force-arm API).
+
+### Changed
+- Internal: `sensor.py` split into focused modules (space/device/hub/smart-lock), device-type alias table extracted to `_device_type_map.py`, dimmer/lightswitch predicates and DoorProtect-Plus lists unified to single sources, bus event names centralised in `const.py`, dead code removed (write-only model fields, unused helpers/properties), inert `__slots__` dropped from entity classes.
+
 ## [0.34.2] - 2026-07-01
 
 ### Fixed

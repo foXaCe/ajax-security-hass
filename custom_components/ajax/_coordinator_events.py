@@ -27,11 +27,16 @@ from homeassistant.components.persistent_notification import async_create
 from .const import (
     CONF_NOTIFICATION_FILTER,
     CONF_PERSISTENT_NOTIFICATION,
+    EVENT_AJAX_ARMED,
+    EVENT_AJAX_ARMED_HOME,
+    EVENT_AJAX_ARMED_NIGHT,
+    EVENT_AJAX_DISARMED,
+    EVENT_AJAX_SECURITY_STATE_CHANGED,
     NOTIFICATION_FILTER_ALARMS_ONLY,
     NOTIFICATION_FILTER_ALL,
     NOTIFICATION_FILTER_NONE,
 )
-from .event_codes import get_event_message
+from .event_codes import get_event_message, resolve_event_language
 from .models import GroupState, SecurityState
 
 if TYPE_CHECKING:
@@ -76,15 +81,15 @@ class AjaxEventDispatchMixin:
                 ``APP`` / ``HA`` (Ajax `sourceObjectType`).
         """
         if new_state == SecurityState.ARMED:
-            event_name = "ajax_armed"
+            event_name = EVENT_AJAX_ARMED
         elif new_state == SecurityState.DISARMED:
-            event_name = "ajax_disarmed"
+            event_name = EVENT_AJAX_DISARMED
         elif new_state == SecurityState.NIGHT_MODE:
-            event_name = "ajax_armed_night"
+            event_name = EVENT_AJAX_ARMED_NIGHT
         elif new_state == SecurityState.PARTIALLY_ARMED:
-            event_name = "ajax_armed_home"
+            event_name = EVENT_AJAX_ARMED_HOME
         else:
-            event_name = "ajax_security_state_changed"
+            event_name = EVENT_AJAX_SECURITY_STATE_CHANGED
 
         event_data: dict[str, Any] = {
             "space_id": space.id,
@@ -132,9 +137,7 @@ class AjaxEventDispatchMixin:
         }
         action = action_map.get(new_state, new_state.value.lower())
 
-        ha_language = self.hass.config.language or "en"
-        lang_map = {"fr": "fr", "es": "es", "en": "en"}
-        language = lang_map.get(ha_language[:2], "en")
+        language = resolve_event_language(self.hass.config.language)
         message = get_event_message(action, language)
 
         # Note: source_name/user_name not included because REST doesn't
@@ -185,9 +188,7 @@ class AjaxEventDispatchMixin:
             return
         # NOTIFICATION_FILTER_SECURITY_EVENTS and NOTIFICATION_FILTER_ALL show everything.
 
-        ha_language = self.hass.config.language or "en"
-        lang_map = {"fr": "fr", "es": "es", "en": "en"}
-        language = lang_map.get(ha_language[:2], "en")
+        language = resolve_event_language(self.hass.config.language)
 
         # Map SecurityState values to action keys in event_codes.
         action_to_key = {

@@ -15,12 +15,13 @@ from __future__ import annotations
 
 import contextlib
 import logging
+import time
 from typing import TYPE_CHECKING, Any
 
 from homeassistant.helpers import issue_registry as ir
 
 from ._event_helpers import resolve_camera_entity_id
-from .const import CONF_RTSP_PASSWORD, CONF_RTSP_USERNAME, DOMAIN
+from .const import CONF_RTSP_PASSWORD, CONF_RTSP_USERNAME, DOMAIN, EVENT_AJAX_CAMERA_DETECTION, EVENT_AJAX_DOORBELL_RING
 from .models import VideoEdgeType
 
 if TYPE_CHECKING:
@@ -43,6 +44,12 @@ except ImportError:
     pass
 
 _LOGGER = logging.getLogger(__name__)
+
+
+# Minimum delay between two ONVIF bootstrap retries from the reconcile
+# path — keeps a persistently failing setup from re-attempting (and
+# re-logging) on every poll cycle.
+ONVIF_BOOTSTRAP_RETRY_SECONDS = 300.0
 
 
 # Ajax camera types observed in NVR `sourceAliases.sources` payloads.
@@ -76,6 +83,8 @@ class AjaxOnvifMixin:
         config_entry: ConfigEntry | None
         onvif_manager: AjaxOnvifManager | None
         _onvif_initialized: bool
+        _onvif_reconcile_in_progress: bool
+        _onvif_last_bootstrap_attempt: float
         _event_entities: dict[str, Any]
         stats: dict[str, int]
 
@@ -219,6 +228,48 @@ class AjaxOnvifMixin:
         finally:
             self._onvif_initialized = True
 
+    async def _async_reconcile_onvif(self) -> None:
+        """Keep ONVIF clients in sync with the current video-edge inventory.
+
+        Cameras can be added to (or removed from) the Ajax account while
+        Home Assistant is running, but ``_async_init_onvif`` only runs once
+        at startup. Called on the periodic video-edge refresh so a new
+        camera gets its local-AI connection — and a removed one has its
+        client shut down instead of leaking its poll task — without a
+        reload.
+
+        When the bootstrap never produced a manager (no camera had an IP
+        yet, or the init failed), the bootstrap is re-run instead —
+        mirroring the SQS self-heal pattern. Its early-return guards
+        (ONVIF wheel missing, no credentials, no cameras) keep the retry
+        free when ONVIF simply is not in use.
+        """
+        if self._onvif_reconcile_in_progress:
+            return
+        self._onvif_reconcile_in_progress = True
+        try:
+            if self.onvif_manager is None:
+                # Throttle bootstrap retries: a persistently failing ONVIF
+                # setup must not re-attempt (and re-log) on every poll cycle.
+                now = time.monotonic()
+                if now - self._onvif_last_bootstrap_attempt < ONVIF_BOOTSTRAP_RETRY_SECONDS:
+                    return
+                self._onvif_last_bootstrap_attempt = now
+                self._onvif_initialized = False
+                await self._async_init_onvif()
+                return
+            if self.account is None:
+                return
+            video_edges = [
+                video_edge
+                for space in self.account.spaces.values()
+                for video_edge in space.video_edges.values()
+                if video_edge.ip_address
+            ]
+            await self.onvif_manager.async_update_video_edges(video_edges)
+        finally:
+            self._onvif_reconcile_in_progress = False
+
     # ------------------------------------------------------------------
     # Event handling
     # ------------------------------------------------------------------
@@ -291,7 +342,7 @@ class AjaxOnvifMixin:
                     if camera_entity_id:
                         doorbell_data["camera_entity_id"] = camera_entity_id
                         doorbell_data["snapshot_url"] = f"/api/camera_proxy/{camera_entity_id}"
-                    self.hass.bus.async_fire("ajax_doorbell_ring", doorbell_data)
+                    self.hass.bus.async_fire(EVENT_AJAX_DOORBELL_RING, doorbell_data)
 
                 event_type = _ONVIF_DETECTION_EVENT_TYPES.get(detection_key)
                 if event_type:
@@ -313,7 +364,7 @@ class AjaxOnvifMixin:
                     if camera_entity_id:
                         bus_data["camera_entity_id"] = camera_entity_id
                         bus_data["snapshot_url"] = f"/api/camera_proxy/{camera_entity_id}"
-                    self.hass.bus.async_fire("ajax_camera_detection", bus_data)
+                    self.hass.bus.async_fire(EVENT_AJAX_CAMERA_DETECTION, bus_data)
 
             # Refresh entities so the detection_key change is reflected.
             self.async_set_updated_data(self.account)

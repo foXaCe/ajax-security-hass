@@ -25,7 +25,7 @@ if TYPE_CHECKING:
 
     from .api import AjaxRestApi
     from .const import AjaxConfigEntry
-    from .models import AjaxAccount
+    from .models import AjaxAccount, AjaxSpace
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -56,6 +56,9 @@ class AjaxDoorPollingMixin:
         def _normalize_device_attributes(
             self, api_attributes: dict[str, Any], device_type: DeviceType
         ) -> dict[str, Any]: ...
+        def _apply_smart_lock_rest_state(
+            self, space: AjaxSpace, device_id: str, device_data: dict[str, Any]
+        ) -> None: ...
 
     @staticmethod
     def _parse_door_state_from_wiring(external_state: str | None, wiring_details: dict[str, Any] | None) -> bool:
@@ -171,7 +174,11 @@ class AjaxDoorPollingMixin:
                         # Skip for other armed states
                         continue
 
-                    if not contact_sensors:
+                    # Smart locks ride the same enriched payload: a bridged lock
+                    # (e.g. Yale Doorman behind LockBridge) emits no realtime
+                    # events, so this fast poll is its only sub-minute state
+                    # source (#88). Poll the space if it has either kind.
+                    if not contact_sensors and not space.smart_locks:
                         continue
 
                     if not space.hub_id:
@@ -184,7 +191,26 @@ class AjaxDoorPollingMixin:
 
                         for device_summary in devices_data:
                             device_id = device_summary.get("id")
-                            if device_id and device_id in space.devices:
+                            if not device_id:
+                                continue
+
+                            if device_id in space.smart_locks:
+                                # A bridged smart lock's lockStatus/doorStatus is in
+                                # this same payload — apply it at the 5 s cadence so
+                                # its lock/door state does not lag on the 30-60 s
+                                # main poll (#88). A recent realtime event still wins
+                                # inside _apply_smart_lock_rest_state.
+                                lock = space.smart_locks[device_id]
+                                lock_data = dict(device_summary)
+                                if isinstance(device_summary.get("model"), dict):
+                                    lock_data.update(device_summary["model"])
+                                previous_lock_state = (lock.is_locked, lock.is_door_open)
+                                self._apply_smart_lock_rest_state(space, device_id, lock_data)
+                                if (lock.is_locked, lock.is_door_open) != previous_lock_state:
+                                    updated = True
+                                continue
+
+                            if device_id in space.devices:
                                 device = space.devices[device_id]
 
                                 # With enrich=True, detailed data is in "model" sub-object

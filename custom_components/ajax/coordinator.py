@@ -166,6 +166,8 @@ class AjaxDataCoordinator(
         # ONVIF local AI detections (optional, for video edge cameras)
         self.onvif_manager: AjaxOnvifManager | None = None
         self._onvif_initialized = False
+        self._onvif_reconcile_in_progress = False
+        self._onvif_last_bootstrap_attempt: float = 0.0
 
         # Device details refresh optimization
         # Battery/signal don't change often, so refresh every 5 minutes instead of every poll
@@ -351,7 +353,14 @@ class AjaxDataCoordinator(
                         tasks.append(self._async_update_video_edges(space_id))
                         tasks.append(self._async_update_smart_locks(space_id))
                         tasks.append(self._async_update_notifications(space_id, limit=20))
-                    await asyncio.gather(*tasks)
+                    # return_exceptions so one failing space cannot leave the
+                    # sibling coroutines running orphaned ("exception never
+                    # retrieved"); the first failure is re-raised afterwards so
+                    # the error handling below stays unchanged.
+                    results = await asyncio.gather(*tasks, return_exceptions=True)
+                    for result in results:
+                        if isinstance(result, BaseException):
+                            raise result
 
                 # Restore SSE/SQS-discovered smart locks from storage
                 await self._async_restore_smart_locks()
@@ -398,7 +407,9 @@ class AjaxDataCoordinator(
                     and not self._sqs_initialized
                     and not self._sqs_init_in_progress
                 ):
-                    self.config_entry.async_create_background_task(self.hass, self._async_init_sqs(), "ajax_retry_sqs")
+                    self.config_entry.async_create_background_task(
+                        self.hass, self._async_init_sqs(wait_for_dependency=False), "ajax_retry_sqs"
+                    )
 
                 # Check if we need full metadata refresh (hourly or forced)
                 need_metadata_refresh = self._force_metadata_refresh or self._should_refresh_metadata()
@@ -438,6 +449,15 @@ class AjaxDataCoordinator(
                             # Refresh smart locks (API data is minimal, state is event-driven)
                             if space_obj.smart_locks:
                                 await self._async_update_smart_locks(space_id)
+
+                # Reconcile ONVIF clients with the refreshed camera inventory
+                # (cameras added/removed since startup). Runs in the background:
+                # a camera that fails to connect must not stall the poll loop
+                # with its connection timeouts.
+                if refresh_video_smart and self._onvif_initialized and self.config_entry is not None:
+                    self.config_entry.async_create_background_task(
+                        self.hass, self._async_reconcile_onvif(), "ajax_onvif_reconcile"
+                    )
 
             # Reset auth error counter on success
             self._consecutive_auth_errors = 0

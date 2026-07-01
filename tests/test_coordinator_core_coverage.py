@@ -82,6 +82,9 @@ def _coordinator() -> AjaxDataCoordinator:
     coord._sqs_initialized = False
     coord._sqs_init_in_progress = False
     coord._aws_access_key_id = None
+    coord._onvif_initialized = False
+    coord._onvif_reconcile_in_progress = False
+    coord._onvif_last_bootstrap_attempt = 0.0
 
     # Auth resilience.
     coord._consecutive_auth_errors = 0
@@ -963,3 +966,85 @@ async def test_async_shutdown_no_managers() -> None:
     await coord.async_shutdown()
 
     coord.api.close.assert_awaited_once()
+
+
+async def test_update_data_initial_load_gather_isolates_failures() -> None:
+    """One failing space must not leave sibling loads orphaned.
+
+    ``gather(return_exceptions=True)`` lets every per-space coroutine finish,
+    then the first failure is re-raised so error handling stays unchanged.
+    """
+    coord = _coordinator()
+    coord._initial_load_done = False
+
+    async def _init_account() -> None:
+        account = _account_with_space(SecurityState.ARMED)
+        # Second space so the gather schedules two device loads.
+        second = AjaxSpace(id="s2", name="Garage", hub_id="hub2")
+        account.spaces["s2"] = second
+        coord.account = account
+
+    coord._async_init_account = AsyncMock(side_effect=_init_account)
+    coord._async_update_spaces_from_hubs = AsyncMock()
+    boom = AjaxRestApiError("space s1 exploded")
+
+    async def _update_devices(space_id: str) -> None:
+        if space_id != "s2":
+            raise boom
+
+    coord._async_update_devices = AsyncMock(side_effect=_update_devices)
+    coord._async_update_video_edges = AsyncMock()
+    coord._async_update_smart_locks = AsyncMock()
+    coord._async_update_notifications = AsyncMock()
+    coord._async_restore_smart_locks = AsyncMock()
+    coord._async_cleanup_stale_devices = MagicMock()
+    coord._manage_door_sensor_polling = MagicMock()
+    coord._sse_url = None
+    coord._aws_access_key_id = None
+    coord._sse_initialized = True
+    coord._sqs_initialized = True
+    coord._onvif_initialized = True
+    coord.config_entry = None
+    coord.api.is_proxy_mode = False
+
+    with pytest.raises(UpdateFailed):
+        await coord._async_update_data()
+
+    # BOTH spaces were attempted — the failure did not cancel the sibling.
+    called_spaces = {c.args[0] for c in coord._async_update_devices.await_args_list}
+    assert called_spaces == {"s1", "s2"}
+
+
+async def test_door_poll_loop_refreshes_smart_lock_state() -> None:
+    """A bridged smart lock (no realtime events) must follow the 5 s fast
+    poll instead of lagging on the 30-60 s main poll (#88)."""
+    from custom_components.ajax.models import AjaxSmartLock
+
+    coord = _coordinator()
+    space = AjaxSpace(id="s1", name="Home", hub_id="hub1", security_state=SecurityState.DISARMED)
+    lock = AjaxSmartLock(id="sl1", name="Doorman", space_id="s1")
+    lock.is_locked = True
+    lock.is_door_open = False
+    space.smart_locks["sl1"] = lock
+    coord.account = AjaxAccount(user_id="u1", name="u", email="u@e.com")
+    coord.account.spaces["s1"] = space
+
+    coord.api.async_get_devices = AsyncMock(
+        return_value=[{"id": "sl1", "model": {"lockStatus": "UNLOCKED", "doorStatus": "OPEN"}}]
+    )
+    coord.async_set_updated_data = MagicMock()
+
+    import asyncio as _a
+
+    with pytest.raises(_a.CancelledError):  # noqa: SIM117
+        import unittest.mock as _m
+
+        with _m.patch(
+            "custom_components.ajax.coordinator.asyncio.sleep",
+            new=_sleep_then_cancel(),
+        ):
+            await coord._async_poll_door_sensors_loop()
+
+    assert lock.is_locked is False
+    assert lock.is_door_open is True
+    coord.async_set_updated_data.assert_called_once_with(coord.account)

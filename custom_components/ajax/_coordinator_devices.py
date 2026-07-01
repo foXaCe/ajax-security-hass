@@ -257,36 +257,35 @@ class AjaxDevicesMixin(AjaxDeviceNormalizeMixin):
 
             # Battery and signal are present in the enriched response — always
             # update so the UI reflects battery swaps / radio quality changes.
-            if True:
-                # Battery level: try multiple field names
+            # Battery level: try multiple field names
+            # Round to int to avoid jitter on last decimal
+            battery = device_data.get("batteryChargeLevelPercentage")
+            if battery is None:
+                battery = device_data.get("batteryPercents")
+            if battery is None:
+                battery = device_data.get("battery_level")
+            if battery is not None:
+                battery = round(battery)
+            device.battery_level = battery
+            device.battery_state = device_data.get("batteryState", device_data.get("battery_state"))
+            # Convert signal level string to percentage
+            signal_level = device_data.get("signalLevel", device_data.get("signal_strength"))
+            if isinstance(signal_level, str):
+                signal_map = {
+                    "EXCELLENT": 100,
+                    "STRONG": 85,
+                    "GOOD": 70,
+                    "NORMAL": 60,
+                    "MEDIUM": 50,
+                    "WEAK": 30,
+                    "POOR": 15,
+                }
+                device.signal_strength = signal_map.get(signal_level.upper())
+            elif signal_level is not None:
                 # Round to int to avoid jitter on last decimal
-                battery = device_data.get("batteryChargeLevelPercentage")
-                if battery is None:
-                    battery = device_data.get("batteryPercents")
-                if battery is None:
-                    battery = device_data.get("battery_level")
-                if battery is not None:
-                    battery = round(battery)
-                device.battery_level = battery
-                device.battery_state = device_data.get("batteryState", device_data.get("battery_state"))
-                # Convert signal level string to percentage
-                signal_level = device_data.get("signalLevel", device_data.get("signal_strength"))
-                if isinstance(signal_level, str):
-                    signal_map = {
-                        "EXCELLENT": 100,
-                        "STRONG": 85,
-                        "GOOD": 70,
-                        "NORMAL": 60,
-                        "MEDIUM": 50,
-                        "WEAK": 30,
-                        "POOR": 15,
-                    }
-                    device.signal_strength = signal_map.get(signal_level.upper())
-                elif signal_level is not None:
-                    # Round to int to avoid jitter on last decimal
-                    device.signal_strength = round(signal_level)
-                else:
-                    device.signal_strength = signal_level
+                device.signal_strength = round(signal_level)
+            else:
+                device.signal_strength = signal_level
 
             device.firmware_version = device_data.get("firmwareVersion", device_data.get("firmware_version"))
             device.hardware_version = device_data.get("hardwareVersion", device_data.get("hardware_version"))
@@ -701,9 +700,14 @@ class AjaxDevicesMixin(AjaxDeviceNormalizeMixin):
 
             # Update device attributes dict
             if "attributes" in device_data:
-                # Normalize API attributes to internal format
+                # Normalize API attributes to internal format. Skip any key with
+                # an optimistic update in flight (e.g. ``is_on`` recomputed from a
+                # nested ``switchState``), otherwise this late merge would undo
+                # the per-key guards applied to the root-level fields above.
                 normalized_attrs = self._normalize_device_attributes(device_data["attributes"], device.type)
-                device.attributes.update(normalized_attrs)
+                device.attributes.update(
+                    {key: value for key, value in normalized_attrs.items() if not device.is_optimistic(key)}
+                )
             # Update room association
             if device.room_id and device.room_id in space.rooms:
                 room = space.rooms[device.room_id]

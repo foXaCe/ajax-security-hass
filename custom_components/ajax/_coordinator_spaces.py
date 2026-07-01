@@ -25,6 +25,8 @@ if TYPE_CHECKING:
 
     from .api import AjaxRestApi
     from .models import AjaxAccount
+    from .sqs_manager import SQSManager
+    from .sse_manager import SSEManager
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -38,8 +40,8 @@ class AjaxSpacesMixin:
         api: AjaxRestApi
         hass: HomeAssistant
         all_discovered_spaces: dict[str, str]
-        sqs_manager: Any | None
-        sse_manager: Any | None
+        sqs_manager: SQSManager | None
+        sse_manager: SSEManager | None
         _enabled_spaces: list[str] | None
         _space_binding_cache: dict[str, dict[str, Any]]
         _skipped_state_change_hubs: set[str]

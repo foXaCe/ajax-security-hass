@@ -1311,3 +1311,31 @@ def test_apply_smart_lock_rest_state_applies_after_stale_event() -> None:
     space.smart_locks["lock1"] = lock
     mixin._apply_smart_lock_rest_state(space, "lock1", {"lockStatus": "LOCKED"})
     assert lock.is_locked is True  # stale event → poll updates
+
+
+async def test_update_devices_nested_attributes_respect_optimistic_guard() -> None:
+    """The late ``attributes`` merge must honour per-key optimistic guards.
+
+    A nested ``attributes.switchState`` is re-normalised to ``is_on`` by
+    ``_normalize_device_attributes``; without the guard the merge undid the
+    root-level ``is_on`` protection during the 15 s optimistic window.
+    """
+    space = _make_space()
+    dev = _device(DeviceType.RELAY, id="d1", name="Relais")
+    dev.mark_optimistic("is_on")
+    dev.attributes["is_on"] = True
+    space.devices["d1"] = dev
+    account = _account_with_space(space)
+    payload = [
+        {
+            "id": "d1",
+            "deviceName": "Relais",
+            "deviceType": "Relay",
+            "attributes": {"switchState": ["SWITCHED_OFF"], "signalLevel": "GOOD"},
+        }
+    ]
+    mixin = _make_mixin(account=account, devices_list=payload)
+    await mixin._async_update_devices("s1")
+    # is_on stays optimistic-True; the non-guarded key still merges normally.
+    assert dev.attributes["is_on"] is True
+    assert dev.attributes.get("signal_level") == "GOOD" or "signalLevel" in dev.attributes

@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.34.3] - 2026-07-02
+
 ### Fixed
 - **Bridged smart locks (Yale Doorman / LockBridge) now update within ~5 s while disarmed (#88).** Their `lockStatus`/`doorStatus` already rode the fast door-sensor poll payload but was thrown away; it is now applied at the same 5 s cadence instead of lagging on the 30–60 s main poll.
 - **SQS real-time could stay dead for the whole session after a pip race at boot ("aiobotocore required" loop).** When the integration's import raced Home Assistant's background install/upgrade of `aiobotocore`, half-initialised modules stayed cached in `sys.modules` and poisoned every retry until a manual restart. The failure path now purges both module families so the retry self-heals, logs the real import error, and the periodic retry is a single quiet attempt instead of re-warning every few minutes.

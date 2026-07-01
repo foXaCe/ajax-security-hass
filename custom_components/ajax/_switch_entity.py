@@ -28,8 +28,6 @@ _LOGGER = logging.getLogger(__name__)
 class AjaxSwitch(CoordinatorEntity[AjaxDataCoordinator], SwitchEntity):
     """Representation of an Ajax switch."""
 
-    __slots__ = ("_space_id", "_device_id", "_switch_key", "_switch_desc")
-
     _attr_has_entity_name = True
 
     def __init__(

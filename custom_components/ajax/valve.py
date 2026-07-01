@@ -114,8 +114,6 @@ async def async_setup_entry(
 class AjaxValve(CoordinatorEntity[AjaxDataCoordinator], ValveEntity):
     """Representation of an Ajax valve (WaterStop)."""
 
-    __slots__ = ("_space_id", "_device_id", "_valve_key", "_valve_desc")
-
     _attr_has_entity_name = True
     _attr_supported_features = ValveEntityFeature.OPEN | ValveEntityFeature.CLOSE
     _attr_reports_position = False
@@ -176,6 +174,8 @@ class AjaxValve(CoordinatorEntity[AjaxDataCoordinator], ValveEntity):
     @property
     def available(self) -> bool:
         """Return if entity is available."""
+        if not self.coordinator.last_update_success:
+            return False
         device = self._get_device()
         if not device:
             return False

@@ -1016,3 +1016,39 @@ async def test_update_options_no_change_is_noop() -> None:
     await _async_update_options(MagicMock(), entry)
 
     coord._manage_door_sensor_polling.assert_not_called()
+
+
+async def test_force_arm_skips_group_panels(tmp_path: Any) -> None:
+    """A group panel must never be parsed as a space target.
+
+    Its unique_id (``{entry}_group_alarm_{group_id}``) also contains the
+    ``_alarm_`` marker — before the guard, a group_id that collided with a
+    space_id would have been force-armed. Adversarial setup: the space id
+    EQUALS the group id.
+    """
+    _, handlers = await _handlers(tmp_path)
+    coord = _coord_with_spaces(["g42"])
+    call = _call(_entry(coord))
+    selected = SimpleNamespace(
+        referenced={"alarm_control_panel.perimeter_group"},
+        indirectly_referenced=set(),
+    )
+    registry = MagicMock()
+    registry.async_get.return_value = SimpleNamespace(
+        domain="alarm_control_panel",
+        unique_id="e1_group_alarm_g42",
+    )
+    with (
+        patch(
+            "custom_components.ajax._services.async_extract_config_entry_ids",
+            AsyncMock(return_value=set()),
+        ),
+        patch(
+            "custom_components.ajax._services.async_extract_referenced_entity_ids",
+            return_value=selected,
+        ),
+        patch("custom_components.ajax._services.er.async_get", return_value=registry),
+        pytest.raises(ServiceValidationError),
+    ):
+        await handlers[SERVICE_FORCE_ARM](call)
+    coord.async_arm_space.assert_not_awaited()

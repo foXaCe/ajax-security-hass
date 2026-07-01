@@ -237,7 +237,7 @@ def test_init_translation_key_falls_back_to_event_key() -> None:
 @pytest.mark.asyncio
 async def test_event_setup_entry_no_account_returns_early() -> None:
     coordinator = SimpleNamespace(account=None)
-    entry = SimpleNamespace(runtime_data=coordinator)
+    entry = SimpleNamespace(runtime_data=coordinator, async_on_unload=lambda _f: None)
     add = MagicMock()
     await event_async_setup_entry(MagicMock(), entry, add)
     # No account → the platform returns early without registering any entity.
@@ -254,7 +254,7 @@ async def test_event_setup_entry_creates_all_event_types() -> None:
     }
     smart_locks = {"lock1": _smart_lock("lock1")}
     coordinator = _event_coordinator(_account(devices=devices, video_edges=video_edges, smart_locks=smart_locks))
-    entry = SimpleNamespace(runtime_data=coordinator)
+    entry = SimpleNamespace(runtime_data=coordinator, async_on_unload=lambda _f: None)
     add = MagicMock()
     with patch("custom_components.ajax.event.connect_new_entity_signal"):
         await event_async_setup_entry(MagicMock(), entry, add)
@@ -291,7 +291,7 @@ async def test_event_setup_entry_dedupes_duplicate_unique_ids() -> None:
         get_space=lambda sid: account.spaces.get(sid),
         _event_entities={},
     )
-    entry = SimpleNamespace(runtime_data=coordinator)
+    entry = SimpleNamespace(runtime_data=coordinator, async_on_unload=lambda _f: None)
     add = MagicMock()
     with patch("custom_components.ajax.event.connect_new_entity_signal"):
         await event_async_setup_entry(MagicMock(), entry, add)
@@ -307,7 +307,7 @@ async def test_event_setup_entry_dedupes_duplicate_unique_ids() -> None:
 
 async def _capture_event_builders(coordinator):
     """Run event async_setup_entry and capture every builder by signal."""
-    entry = SimpleNamespace(runtime_data=coordinator)
+    entry = SimpleNamespace(runtime_data=coordinator, async_on_unload=lambda _f: None)
     captured: dict = {}
 
     def _fake_connect(hass, entry_, signal, domain, add, builder, label):
@@ -439,7 +439,7 @@ async def test_panic_cooldown_uses_module_constant() -> None:
 @pytest.mark.asyncio
 async def test_button_setup_entry_no_account_skips() -> None:
     coordinator = SimpleNamespace(account=None)
-    entry = SimpleNamespace(runtime_data=coordinator)
+    entry = SimpleNamespace(runtime_data=coordinator, async_on_unload=lambda _f: None)
     add = MagicMock()
     await button_async_setup_entry(MagicMock(), entry, add)
     add.assert_not_called()
@@ -448,7 +448,7 @@ async def test_button_setup_entry_no_account_skips() -> None:
 @pytest.mark.asyncio
 async def test_button_setup_entry_empty_account_skips() -> None:
     coordinator = SimpleNamespace(account=_account())  # space exists but loop adds one button
-    entry = SimpleNamespace(entry_id="entry1", runtime_data=coordinator)
+    entry = SimpleNamespace(entry_id="entry1", runtime_data=coordinator, async_on_unload=lambda _f: None)
     add = MagicMock()
     await button_async_setup_entry(MagicMock(), entry, add)
     # One space -> one panic button created.
@@ -462,7 +462,7 @@ async def test_button_setup_entry_empty_account_skips() -> None:
 async def test_button_setup_entry_no_spaces_skips_add() -> None:
     account = AjaxAccount(user_id="u1", name="U", email="u@e.com")  # zero spaces
     coordinator = SimpleNamespace(account=account)
-    entry = SimpleNamespace(runtime_data=coordinator)
+    entry = SimpleNamespace(runtime_data=coordinator, async_on_unload=lambda _f: None)
     add = MagicMock()
     await button_async_setup_entry(MagicMock(), entry, add)
     add.assert_not_called()
@@ -474,7 +474,7 @@ async def test_button_setup_entry_one_per_space() -> None:
     account.spaces["s1"] = AjaxSpace(id="s1", name="Home", hub_id="hub1")
     account.spaces["s2"] = AjaxSpace(id="s2", name="Garage", hub_id="hub2")
     coordinator = SimpleNamespace(account=account)
-    entry = SimpleNamespace(entry_id="entry1", runtime_data=coordinator)
+    entry = SimpleNamespace(entry_id="entry1", runtime_data=coordinator, async_on_unload=lambda _f: None)
     add = MagicMock()
     await button_async_setup_entry(MagicMock(), entry, add)
     created = add.call_args[0][0]

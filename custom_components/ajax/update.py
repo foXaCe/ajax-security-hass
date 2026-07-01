@@ -24,7 +24,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from . import AjaxConfigEntry
 from ._discovery import connect_new_entity_signal
 from ._ids import device_identifier
-from .const import MANUFACTURER, SIGNAL_NEW_VIDEO_EDGE
+from .const import MANUFACTURER, SIGNAL_NEW_SPACE, SIGNAL_NEW_VIDEO_EDGE
 from .coordinator import AjaxDataCoordinator
 from .models import VIDEO_EDGE_MODEL_NAMES, AjaxSpace, AjaxVideoEdge
 
@@ -80,6 +80,28 @@ async def async_setup_entry(
         _LOGGER.debug("Adding %d update entities", len(entities))
         async_add_entities(entities)
 
+    def _build_space(space_id: str, _obj_id: str) -> list[tuple[str, UpdateEntity]]:
+        """Build the hub firmware entity for a hub added after startup (#multi-hub)."""
+        space = coordinator.get_space(space_id)
+        if space is None or not (space.hub_details and space.hub_details.get("firmware")):
+            return []
+        return [
+            (
+                f"{space_id}_hub_firmware",
+                AjaxHubFirmwareUpdate(coordinator=coordinator, space=space),
+            )
+        ]
+
+    connect_new_entity_signal(
+        hass,
+        entry,
+        SIGNAL_NEW_SPACE,
+        UPDATE_DOMAIN,
+        async_add_entities,
+        _build_space,
+        label="hub firmware update(s)",
+    )
+
     def _build_update(space_id: str, video_edge_id: str) -> list[tuple[str, UpdateEntity]]:
         """Build the firmware update entity for a newly-discovered Video Edge."""
         space = coordinator.get_space(space_id)
@@ -106,8 +128,6 @@ async def async_setup_entry(
 
 class AjaxVideoEdgeFirmwareUpdate(CoordinatorEntity[AjaxDataCoordinator], UpdateEntity):
     """Firmware update entity for Ajax Video Edge devices."""
-
-    __slots__ = ("_video_edge_id", "_space_id")
 
     _attr_has_entity_name = True
     _attr_translation_key = "video_edge_firmware"
@@ -235,8 +255,6 @@ class AjaxVideoEdgeFirmwareUpdate(CoordinatorEntity[AjaxDataCoordinator], Update
 
 class AjaxHubFirmwareUpdate(CoordinatorEntity[AjaxDataCoordinator], UpdateEntity):
     """Firmware update entity for Ajax Hub."""
-
-    __slots__ = ("_space_id",)
 
     _attr_has_entity_name = True
     _attr_translation_key = "hub_firmware"

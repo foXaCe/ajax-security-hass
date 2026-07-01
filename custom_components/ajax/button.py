@@ -14,8 +14,9 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import AjaxConfigEntry
+from ._discovery import connect_new_entity_signal
 from ._ids import device_identifier
-from .const import DOMAIN, MANUFACTURER
+from .const import DOMAIN, MANUFACTURER, SIGNAL_NEW_SPACE
 from .coordinator import AjaxDataCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -48,6 +49,22 @@ async def async_setup_entry(
     else:
         _LOGGER.info("No Ajax spaces found, no buttons created (yet)")
 
+    def _build_space(space_id: str, _obj_id: str) -> list[tuple[str, ButtonEntity]]:
+        """Build the panic button for a hub added after startup (#multi-hub)."""
+        if coordinator.get_space(space_id) is None:
+            return []
+        return [(f"panic_{space_id}", AjaxPanicButton(coordinator, entry, space_id))]
+
+    connect_new_entity_signal(
+        hass,
+        entry,
+        SIGNAL_NEW_SPACE,
+        "button",
+        async_add_entities,
+        _build_space,
+        label="panic button(s)",
+    )
+
 
 class AjaxPanicButton(CoordinatorEntity[AjaxDataCoordinator], ButtonEntity):
     """Representation of an Ajax panic button.
@@ -55,8 +72,6 @@ class AjaxPanicButton(CoordinatorEntity[AjaxDataCoordinator], ButtonEntity):
     Disabled by default to avoid accidental taps that would trigger a
     real alarm. Users must explicitly enable the entity.
     """
-
-    __slots__ = ("_entry", "_space_id", "_last_press_ts")
 
     # No device_class: IDENTIFY is semantically "flash the device to find it",
     # which does not match the destructive nature of a panic trigger.
@@ -96,7 +111,11 @@ class AjaxPanicButton(CoordinatorEntity[AjaxDataCoordinator], ButtonEntity):
             # retry immediately after a transient API failure during an emergency.
             self._last_press_ts = previous_ts
             _LOGGER.error("Failed to trigger panic: %s", err)
-            raise
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="panic_failed",
+                translation_placeholders={"error": str(err)},
+            ) from err
 
     @property
     def device_info(self) -> DeviceInfo | None:

@@ -280,8 +280,6 @@ async def async_setup_entry(
 class AjaxEventEntity(CoordinatorEntity[AjaxDataCoordinator], EventEntity):
     """Event entity for Ajax button/doorbell devices."""
 
-    __slots__ = ("_space_id", "_device_id", "_event_key", "_event_desc")
-
     _attr_has_entity_name = True
 
     def __init__(

@@ -761,7 +761,7 @@ def test_valve_get_device_none_when_space_missing() -> None:
     valve._space_id = "s1"
     valve._device_id = "d1"
     valve._valve_desc = {"key": "valve"}
-    valve.coordinator = SimpleNamespace(get_space=lambda sid: None)
+    valve.coordinator = SimpleNamespace(last_update_success=True, get_space=lambda sid: None)
     assert valve._get_device() is None
 
 
@@ -774,7 +774,7 @@ def _event_entity(*, account_spaces: dict | None) -> AjaxEventEntity:
     ent = object.__new__(AjaxEventEntity)
     ent._device_id = "x1"
     account = SimpleNamespace(spaces=account_spaces) if account_spaces is not None else None
-    ent.coordinator = SimpleNamespace(account=account, entry_id="entry_test")
+    ent.coordinator = SimpleNamespace(last_update_success=True, account=account, entry_id="entry_test")
     return ent
 
 
@@ -855,7 +855,7 @@ def _lock(smart_lock: AjaxSmartLock | None) -> AjaxLock:
     lock._space_id = "s1"
     lock._smart_lock_id = "sl1"
     space = SimpleNamespace(smart_locks={"sl1": smart_lock} if smart_lock else {})
-    lock.coordinator = SimpleNamespace(get_space=lambda sid: space, entry_id="entry_test")
+    lock.coordinator = SimpleNamespace(last_update_success=True, get_space=lambda sid: space, entry_id="entry_test")
     return lock
 
 
@@ -895,7 +895,7 @@ def test_lock_get_smart_lock_none_when_space_missing() -> None:
     lock = object.__new__(AjaxLock)
     lock._space_id = "s1"
     lock._smart_lock_id = "sl1"
-    lock.coordinator = SimpleNamespace(get_space=lambda sid: None)
+    lock.coordinator = SimpleNamespace(last_update_success=True, get_space=lambda sid: None)
     assert lock._get_smart_lock() is None
     assert lock.is_locked is None
     assert lock.available is False
@@ -909,7 +909,7 @@ def test_lock_get_smart_lock_none_when_space_missing() -> None:
 def _tracker(space: SimpleNamespace | None) -> AjaxHubTracker:
     tracker = object.__new__(AjaxHubTracker)
     tracker._space_id = "s1"
-    tracker.coordinator = SimpleNamespace(get_space=lambda sid: space, entry_id="entry_test")
+    tracker.coordinator = SimpleNamespace(last_update_success=True, get_space=lambda sid: space, entry_id="entry_test")
     return tracker
 
 
@@ -933,7 +933,7 @@ def _geofence_tracker(geofence: dict) -> AjaxHubTracker:
     space = SimpleNamespace(hub_details={"geoFence": geofence}, hub_id="hub1", name="Maison")
     tracker = object.__new__(AjaxHubTracker)
     tracker._space_id = "s1"
-    tracker.coordinator = SimpleNamespace(get_space=lambda sid: space, entry_id="entry_test")
+    tracker.coordinator = SimpleNamespace(last_update_success=True, get_space=lambda sid: space, entry_id="entry_test")
     return tracker
 
 

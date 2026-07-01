@@ -97,8 +97,6 @@ async def async_setup_entry(
 class AjaxDimmerLight(CoordinatorEntity[AjaxDataCoordinator], LightEntity):
     """Representation of an Ajax dimmable light switch."""
 
-    __slots__ = ("_space_id", "_device_id")
-
     _attr_has_entity_name = True
     _attr_translation_key = "dimmer_light"
     _attr_color_mode = ColorMode.BRIGHTNESS

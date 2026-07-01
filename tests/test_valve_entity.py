@@ -33,7 +33,7 @@ def _make_valve(valve_desc: dict, *, device: AjaxDevice | None = None) -> AjaxVa
     valve._valve_key = valve_desc["key"]
     valve._valve_desc = valve_desc
     space = SimpleNamespace(devices={"d1": device} if device else {})
-    valve.coordinator = SimpleNamespace(get_space=lambda sid: space)
+    valve.coordinator = SimpleNamespace(last_update_success=True, get_space=lambda sid: space)
     return valve
 
 

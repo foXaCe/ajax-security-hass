@@ -84,6 +84,16 @@ async def _async_setup_services(hass: HomeAssistant) -> None:
             if entry is None or entry.domain != "alarm_control_panel":
                 continue
             uid = entry.unique_id or ""
+            # Group panels (f"{entry_id}_group_alarm_{group_id}") are NOT valid
+            # force-arm targets — Ajax has no per-group force-arm API. Their
+            # unique_id also contains "_alarm_", so skip them explicitly before
+            # the marker parse or a group_id would be misread as a space_id.
+            if "_group_alarm_" in uid:
+                _LOGGER.warning(
+                    "force_arm targets the group panel %s — group panels are not supported, target the space panel",
+                    entity_id,
+                )
+                continue
             # Main space panel unique_id: f"{entry_id}_alarm_{space_id}"
             marker = "_alarm_"
             if marker in uid:

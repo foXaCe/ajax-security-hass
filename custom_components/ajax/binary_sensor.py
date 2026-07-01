@@ -24,7 +24,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from . import AjaxConfigEntry
 from ._discovery import connect_new_entity_signal
 from ._ids import device_identifier
-from .const import MANUFACTURER, SIGNAL_NEW_DEVICE, SIGNAL_NEW_SMART_LOCK, SIGNAL_NEW_VIDEO_EDGE
+from .const import MANUFACTURER, SIGNAL_NEW_DEVICE, SIGNAL_NEW_SMART_LOCK, SIGNAL_NEW_SPACE, SIGNAL_NEW_VIDEO_EDGE
 from .coordinator import AjaxDataCoordinator
 from .devices import VideoEdgeHandler, get_device_handler
 from .devices.base import resolve_entity_category
@@ -235,6 +235,29 @@ async def async_setup_entry(
             )
         ]
 
+    def _build_space(space_id: str, _obj_id: str) -> list[tuple[str, BinarySensorEntity]]:
+        """Build hub binary sensors for a hub added after startup (#multi-hub)."""
+        space = coordinator.get_space(space_id)
+        if space is None or not space.hub_details:
+            return []
+        hub_id = space.hub_id
+        return [
+            (
+                f"{hub_id}_{sensor_key}",
+                AjaxHubBinarySensor(coordinator=coordinator, space_id=space_id, sensor_key=sensor_key),
+            )
+            for sensor_key in AjaxHubBinarySensor.HUB_BINARY_SENSORS
+        ]
+
+    connect_new_entity_signal(
+        hass,
+        entry,
+        SIGNAL_NEW_SPACE,
+        BINARY_SENSOR_DOMAIN,
+        async_add_entities,
+        _build_space,
+        label="hub binary sensor(s)",
+    )
     connect_new_entity_signal(
         hass,
         entry,
@@ -266,8 +289,6 @@ async def async_setup_entry(
 
 class AjaxBinarySensor(CoordinatorEntity[AjaxDataCoordinator], BinarySensorEntity):
     """Representation of an Ajax binary sensor."""
-
-    __slots__ = ("_space_id", "_device_id", "_sensor_key", "_sensor_desc")
 
     _attr_has_entity_name = True
 
@@ -420,8 +441,6 @@ class AjaxBinarySensor(CoordinatorEntity[AjaxDataCoordinator], BinarySensorEntit
 class AjaxVideoEdgeBinarySensor(CoordinatorEntity[AjaxDataCoordinator], BinarySensorEntity):
     """Representation of an Ajax Video Edge binary sensor."""
 
-    __slots__ = ("_space_id", "_video_edge_id", "_sensor_key", "_sensor_desc")
-
     _attr_has_entity_name = True
 
     def __init__(
@@ -476,6 +495,8 @@ class AjaxVideoEdgeBinarySensor(CoordinatorEntity[AjaxDataCoordinator], BinarySe
     @property
     def available(self) -> bool:
         """Return True if entity is available."""
+        if not self.coordinator.last_update_success:
+            return False
         video_edge = self._get_video_edge()
         if video_edge is None:
             return False
@@ -537,8 +558,6 @@ class AjaxHubBinarySensor(CoordinatorEntity[AjaxDataCoordinator], BinarySensorEn
     This is for hub-level sensors that come from space.hub_details,
     not from a device in space.devices.
     """
-
-    __slots__ = ("_space_id", "_sensor_key", "_sensor_config")
 
     _attr_has_entity_name = True
 
@@ -605,6 +624,8 @@ class AjaxHubBinarySensor(CoordinatorEntity[AjaxDataCoordinator], BinarySensorEn
     @property
     def available(self) -> bool:
         """Return True if entity is available."""
+        if not self.coordinator.last_update_success:
+            return False
         space = self.coordinator.get_space(self._space_id)
         return space is not None and space.hub_details is not None
 
@@ -651,6 +672,8 @@ class AjaxSmartLockBinarySensor(CoordinatorEntity[AjaxDataCoordinator], BinarySe
     @property
     def available(self) -> bool:
         """Return True if entity is available."""
+        if not self.coordinator.last_update_success:
+            return False
         return self._get_smart_lock() is not None
 
     @property

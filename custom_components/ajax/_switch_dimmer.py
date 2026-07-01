@@ -51,8 +51,6 @@ DIMMER_SETTINGS_SWITCHES = [
 class AjaxDimmerSettingsSwitch(CoordinatorEntity[AjaxDataCoordinator], SwitchEntity):
     """Switch entity for LightSwitchDimmer settings (settingsSwitch list)."""
 
-    __slots__ = ("_space_id", "_device_id", "_switch_def")
-
     _attr_has_entity_name = True
     _attr_entity_category = EntityCategory.CONFIG
 
@@ -156,8 +154,6 @@ class AjaxDimmerSettingsSwitch(CoordinatorEntity[AjaxDataCoordinator], SwitchEnt
 class AjaxDimmerBoolSwitch(CoordinatorEntity[AjaxDataCoordinator], SwitchEntity):
     """Switch entity for LightSwitchDimmer boolean attributes."""
 
-    __slots__ = ("_space_id", "_device_id", "_attr_key", "_api_key")
-
     _attr_has_entity_name = True
     _attr_entity_category = EntityCategory.CONFIG
 
@@ -253,8 +249,6 @@ class AjaxDimmerBoolSwitch(CoordinatorEntity[AjaxDataCoordinator], SwitchEntity)
 
 class AjaxDimmerCalibrationSwitch(CoordinatorEntity[AjaxDataCoordinator], SwitchEntity):
     """Switch entity for LightSwitchDimmer calibration (nested in dimmerSettings)."""
-
-    __slots__ = ("_space_id", "_device_id")
 
     _attr_has_entity_name = True
     _attr_entity_category = EntityCategory.CONFIG

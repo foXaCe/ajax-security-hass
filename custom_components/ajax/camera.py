@@ -154,19 +154,6 @@ async def async_setup_entry(
 class AjaxVideoEdgeCamera(CoordinatorEntity[AjaxDataCoordinator], Camera):
     """Camera entity for Ajax Video Edge devices."""
 
-    __slots__ = (
-        "_entry",
-        "_video_edge_id",
-        "_space_id",
-        "_stream_type",
-        "_channel_index",
-        "_channel_id",
-        "_model_name",
-        "_color",
-        "_snapshot_cache",
-        "_snapshot_cache_time",
-    )
-
     _attr_has_entity_name = True
     _attr_supported_features = CameraEntityFeature.STREAM
     _attr_use_stream_for_stills = False  # Use async_camera_image() (1 FFmpeg frame) instead of full stream pipeline
@@ -251,6 +238,8 @@ class AjaxVideoEdgeCamera(CoordinatorEntity[AjaxDataCoordinator], Camera):
     @property
     def available(self) -> bool:
         """Return True if entity is available."""
+        if not self.coordinator.last_update_success:
+            return False
         video_edge = self._video_edge
         if not video_edge:
             return False

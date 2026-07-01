@@ -51,7 +51,7 @@ async def test_panic_button_propagates_coordinator_failure() -> None:
     """If the coordinator's panic call fails, surface the error to the user."""
     button = _make_panic()
     button.coordinator.async_press_panic_button = AsyncMock(side_effect=RuntimeError("api down"))
-    with pytest.raises(RuntimeError):
+    with pytest.raises(HomeAssistantError):
         await button.async_press()
 
 
@@ -62,7 +62,7 @@ async def test_panic_button_failed_press_does_not_consume_cooldown() -> None:
     """
     button = _make_panic()
     button.coordinator.async_press_panic_button = AsyncMock(side_effect=RuntimeError("api down"))
-    with pytest.raises(RuntimeError):
+    with pytest.raises(HomeAssistantError):
         await button.async_press()  # first press fails
 
     # The cooldown timestamp was restored, so a retry reaches the coordinator

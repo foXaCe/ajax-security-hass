@@ -16,8 +16,9 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import AjaxConfigEntry
+from ._discovery import connect_new_entity_signal
 from ._ids import device_identifier
-from .const import MANUFACTURER
+from .const import MANUFACTURER, SIGNAL_NEW_SPACE
 from .coordinator import AjaxDataCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -54,11 +55,29 @@ async def async_setup_entry(
         async_add_entities(entities)
         _LOGGER.info("Added %d Ajax device tracker(s)", len(entities))
 
+    def _build_space(space_id: str, _obj_id: str) -> list[tuple[str, AjaxHubTracker]]:
+        """Build the hub tracker for a hub added after startup (#multi-hub)."""
+        space = coordinator.get_space(space_id)
+        if space is None or not space.hub_details:
+            return []
+        geofence = space.hub_details.get("geoFence") or {}
+        if not (geofence.get("latitude") and geofence.get("longitude")):
+            return []
+        return [(f"{space_id}_location", AjaxHubTracker(coordinator, space_id))]
+
+    connect_new_entity_signal(
+        hass,
+        entry,
+        SIGNAL_NEW_SPACE,
+        "device_tracker",
+        async_add_entities,
+        _build_space,
+        label="hub tracker(s)",
+    )
+
 
 class AjaxHubTracker(CoordinatorEntity[AjaxDataCoordinator], TrackerEntity):
     """Device tracker for Ajax Hub location."""
-
-    __slots__ = ("_space_id",)
 
     _attr_has_entity_name = True
 

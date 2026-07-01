@@ -25,17 +25,15 @@ from ._discovery import connect_new_entity_signal
 from ._ids import device_identifier
 from .const import DOMAIN, SIGNAL_NEW_DEVICE
 from .coordinator import AjaxDataCoordinator
+from .devices import is_dimmer_device, is_lightswitch_device
+from .devices.door_contact import DOOR_PLUS_DEVICE_TYPES
 from .models import AjaxDevice, DeviceType, SecurityState
 
 _LOGGER = logging.getLogger(__name__)
 PARALLEL_UPDATES = 1
 
 # Device types that support DoorProtect Plus number settings
-DEVICES_WITH_DOOR_PLUS_NUMBERS = [
-    "DoorProtectPlus",
-    "DoorProtectPlusFibra",
-    "DoorProtectSPlus",
-]
+DEVICES_WITH_DOOR_PLUS_NUMBERS = DOOR_PLUS_DEVICE_TYPES
 
 # Device types that support current threshold
 DEVICES_WITH_CURRENT_THRESHOLD = [
@@ -109,18 +107,6 @@ DIMMER_NUMBER_DEFINITIONS = [
         "entity_category": "config",
     },
 ]
-
-
-def is_dimmer_device(device: AjaxDevice) -> bool:
-    """Check if device is a LightSwitchDimmer."""
-    raw_type = (device.raw_type or "").lower().replace("_", "").replace(" ", "")
-    return "lightswitchdimmer" in raw_type or raw_type == "dimmer"
-
-
-def is_lightswitch_device(device: AjaxDevice) -> bool:
-    """Check if device is a LightSwitch (non-dimmer)."""
-    raw_type = (device.raw_type or "").lower().replace("_", "").replace(" ", "")
-    return "lightswitch" in raw_type and "dimmer" not in raw_type
 
 
 async def async_setup_entry(
@@ -289,8 +275,6 @@ async def async_setup_entry(
 class AjaxDoorPlusBaseNumber(CoordinatorEntity[AjaxDataCoordinator], NumberEntity):
     """Base class for DoorProtect Plus number entities."""
 
-    __slots__ = ("_space_id", "_device_id")
-
     _attr_has_entity_name = True
     _attr_mode = NumberMode.SLIDER
 
@@ -305,6 +289,8 @@ class AjaxDoorPlusBaseNumber(CoordinatorEntity[AjaxDataCoordinator], NumberEntit
 
     @property
     def available(self) -> bool:
+        if not self.coordinator.last_update_success:
+            return False
         device = self._get_device()
         return device.online if device else False
 
@@ -380,8 +366,6 @@ class AjaxTiltDegreesNumber(AjaxDoorPlusBaseNumber):
 class AjaxCurrentThresholdNumber(CoordinatorEntity[AjaxDataCoordinator], NumberEntity):
     """Number entity for socket current threshold (protection limit)."""
 
-    __slots__ = ("_space_id", "_device_id")
-
     _attr_has_entity_name = True
     _attr_mode = NumberMode.SLIDER
     _attr_native_min_value = 1
@@ -403,6 +387,8 @@ class AjaxCurrentThresholdNumber(CoordinatorEntity[AjaxDataCoordinator], NumberE
 
     @property
     def available(self) -> bool:
+        if not self.coordinator.last_update_success:
+            return False
         device = self._get_device()
         return device.online if device else False
 
@@ -457,8 +443,6 @@ class AjaxCurrentThresholdNumber(CoordinatorEntity[AjaxDataCoordinator], NumberE
 class AjaxLedBrightnessV2Number(CoordinatorEntity[AjaxDataCoordinator], NumberEntity):
     """Number entity for SocketOutlet LED brightness (1-8 scale)."""
 
-    __slots__ = ("_space_id", "_device_id")
-
     _attr_has_entity_name = True
     _attr_mode = NumberMode.SLIDER
     _attr_native_min_value = 1
@@ -479,6 +463,8 @@ class AjaxLedBrightnessV2Number(CoordinatorEntity[AjaxDataCoordinator], NumberEn
 
     @property
     def available(self) -> bool:
+        if not self.coordinator.last_update_success:
+            return False
         device = self._get_device()
         if not device or not device.online:
             return False
@@ -535,8 +521,6 @@ class AjaxLedBrightnessV2Number(CoordinatorEntity[AjaxDataCoordinator], NumberEn
 
 class AjaxDimmerNumber(CoordinatorEntity[AjaxDataCoordinator], NumberEntity):
     """Number entity for LightSwitchDimmer settings."""
-
-    __slots__ = ("_space_id", "_device_id", "_number_def")
 
     _attr_has_entity_name = True
     _attr_mode = NumberMode.SLIDER

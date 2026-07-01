@@ -25,17 +25,10 @@ from ._switch_dimmer import (
 )
 from ._switch_entity import AjaxSwitch
 from .const import SIGNAL_NEW_DEVICE
-from .devices import LightSwitchHandler, get_device_handler, is_dimmer_device
-from .models import AjaxDevice
+from .devices import LightSwitchHandler, get_device_handler, is_dimmer_device, is_lightswitch_device
 
 _LOGGER = logging.getLogger(__name__)
 PARALLEL_UPDATES = 1
-
-
-def is_lightswitch_device(device: AjaxDevice) -> bool:
-    """Check if device is a LightSwitch (non-dimmer)."""
-    raw_type = (device.raw_type or "").lower().replace("_", "").replace(" ", "")
-    return "lightswitch" in raw_type and "dimmer" not in raw_type
 
 
 async def async_setup_entry(

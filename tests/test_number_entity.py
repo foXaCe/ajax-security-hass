@@ -50,7 +50,7 @@ def _make_number(
     entity = object.__new__(AjaxTiltDegreesNumber)
     entity._space_id = "s1"
     entity._device_id = "d1"
-    entity.coordinator = SimpleNamespace(get_space=lambda sid: space)
+    entity.coordinator = SimpleNamespace(last_update_success=True, get_space=lambda sid: space)
     return entity
 
 

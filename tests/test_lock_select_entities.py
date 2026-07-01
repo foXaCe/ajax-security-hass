@@ -36,6 +36,7 @@ def _make_lock(smart_lock: AjaxSmartLock | None, *, hub_id: str | None = "hub1")
     lock._smart_lock_id = "sl1"
     space = SimpleNamespace(smart_locks={"sl1": smart_lock} if smart_lock else {}, hub_id=hub_id)
     lock.coordinator = SimpleNamespace(
+        last_update_success=True,
         get_space=lambda sid: space,
         api=SimpleNamespace(async_send_device_command=AsyncMock()),
         async_request_refresh=AsyncMock(),
@@ -131,7 +132,7 @@ def _make_select(
     select = object.__new__(AjaxShockSensitivitySelect)
     select._space_id = "s1"
     select._device_id = "d1"
-    select.coordinator = SimpleNamespace(get_space=lambda sid: space)
+    select.coordinator = SimpleNamespace(last_update_success=True, get_space=lambda sid: space)
     return select
 
 

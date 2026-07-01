@@ -87,8 +87,6 @@ async def async_setup_entry(
 class AjaxLock(CoordinatorEntity[AjaxDataCoordinator], LockEntity):
     """Representation of an Ajax smart lock (read-only)."""
 
-    __slots__ = ("_space_id", "_smart_lock_id")
-
     _attr_has_entity_name = True
 
     def __init__(
@@ -119,6 +117,8 @@ class AjaxLock(CoordinatorEntity[AjaxDataCoordinator], LockEntity):
     @property
     def available(self) -> bool:
         """Return if entity is available."""
+        if not self.coordinator.last_update_success:
+            return False
         return self._get_smart_lock() is not None
 
     async def async_lock(self, **kwargs: Any) -> None:

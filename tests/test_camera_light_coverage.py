@@ -126,6 +126,7 @@ def _camera(
     if in_space:
         space.video_edges[video_edge.id] = video_edge
     cam.coordinator = SimpleNamespace(
+        last_update_success=True,
         entry_id="entry_test",
         data=SimpleNamespace(spaces={"s1": space}),
         get_space=lambda sid: space if sid == "s1" else None,
@@ -146,7 +147,7 @@ def test_video_edge_property_returns_device() -> None:
 
 def test_video_edge_property_none_when_space_missing() -> None:
     cam = _camera()
-    cam.coordinator = SimpleNamespace(data=SimpleNamespace(spaces={}))
+    cam.coordinator = SimpleNamespace(last_update_success=True, data=SimpleNamespace(spaces={}))
     assert cam._video_edge is None
 
 
@@ -209,13 +210,13 @@ def test_device_info_links_to_recording_nvr() -> None:
 
 def test_get_recording_nvr_id_none_when_data_none() -> None:
     cam = _camera()
-    cam.coordinator = SimpleNamespace(data=None)
+    cam.coordinator = SimpleNamespace(last_update_success=True, data=None)
     assert cam._get_recording_nvr_id() is None
 
 
 def test_get_recording_nvr_id_none_when_space_missing() -> None:
     cam = _camera()
-    cam.coordinator = SimpleNamespace(data=SimpleNamespace(spaces={}))
+    cam.coordinator = SimpleNamespace(last_update_success=True, data=SimpleNamespace(spaces={}))
     assert cam._get_recording_nvr_id() is None
 
 
@@ -510,7 +511,7 @@ def _light(
 
 def test_light_get_device_none_when_space_missing() -> None:
     light = _light(_device())
-    light.coordinator = SimpleNamespace(get_space=lambda sid: None)
+    light.coordinator = SimpleNamespace(last_update_success=True, get_space=lambda sid: None)
     assert light._get_device() is None
 
 

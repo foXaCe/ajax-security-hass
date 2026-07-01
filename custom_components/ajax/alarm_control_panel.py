@@ -97,8 +97,6 @@ class AjaxAlarmControlPanel(CoordinatorEntity[AjaxDataCoordinator], AlarmControl
     from "unavailable" back to its normal state.
     """
 
-    __slots__ = ("_entry", "_space_id", "_device_info_updated")
-
     _attr_has_entity_name = True
     _attr_name = None  # Use device name as entity name (main entity)
     # Ajax exposes partial arming only at group level (see AjaxGroupAlarmControlPanel),
@@ -371,8 +369,6 @@ class AjaxGroupAlarmControlPanel(CoordinatorEntity[AjaxDataCoordinator], AlarmCo
     Each group in the Ajax system gets its own alarm control panel entity,
     allowing users to arm/disarm individual groups independently.
     """
-
-    __slots__ = ("_entry", "_space_id", "_group_id")
 
     _attr_has_entity_name = True
     _attr_supported_features = AlarmControlPanelEntityFeature.ARM_AWAY

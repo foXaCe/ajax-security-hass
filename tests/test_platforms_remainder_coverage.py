@@ -81,7 +81,7 @@ def _waterstop_space() -> AjaxSpace:
 
 @pytest.mark.asyncio
 async def test_valve_setup_entry_no_account_returns_early() -> None:
-    entry = SimpleNamespace(runtime_data=SimpleNamespace(account=None))
+    entry = SimpleNamespace(runtime_data=SimpleNamespace(account=None), async_on_unload=lambda _f: None)
     add = MagicMock()
     await valve_mod.async_setup_entry(MagicMock(), entry, add)
     add.assert_not_called()
@@ -91,7 +91,7 @@ async def test_valve_setup_entry_no_account_returns_early() -> None:
 async def test_valve_setup_entry_creates_valve() -> None:
     space = _waterstop_space()
     coordinator = SimpleNamespace(account=_account(space), get_space=lambda sid: None, entry_id="entry_test")
-    entry = SimpleNamespace(runtime_data=coordinator)
+    entry = SimpleNamespace(runtime_data=coordinator, async_on_unload=lambda _f: None)
     add = MagicMock()
     with patch("custom_components.ajax.valve.connect_new_entity_signal"):
         await valve_mod.async_setup_entry(MagicMock(), entry, add)
@@ -106,7 +106,7 @@ async def test_valve_setup_entry_no_handler_skips_add() -> None:
     space = AjaxSpace(id="s1", name="Home", hub_id="hub1")
     space.devices[device.id] = device
     coordinator = SimpleNamespace(account=_account(space), get_space=lambda sid: None)
-    entry = SimpleNamespace(runtime_data=coordinator)
+    entry = SimpleNamespace(runtime_data=coordinator, async_on_unload=lambda _f: None)
     add = MagicMock()
     with patch("custom_components.ajax.valve.connect_new_entity_signal"):
         await valve_mod.async_setup_entry(MagicMock(), entry, add)
@@ -119,7 +119,7 @@ async def _capture_valve_builder(space: AjaxSpace):
         get_space=lambda sid: space if sid == space.id else None,
         entry_id="entry_test",
     )
-    entry = SimpleNamespace(runtime_data=coordinator)
+    entry = SimpleNamespace(runtime_data=coordinator, async_on_unload=lambda _f: None)
     captured: dict = {}
 
     def _fake_connect(hass, entry_, signal, domain, add, builder, label):
@@ -264,7 +264,7 @@ def _lock_space() -> AjaxSpace:
 
 @pytest.mark.asyncio
 async def test_lock_setup_entry_no_account_returns_early() -> None:
-    entry = SimpleNamespace(runtime_data=SimpleNamespace(account=None))
+    entry = SimpleNamespace(runtime_data=SimpleNamespace(account=None), async_on_unload=lambda _f: None)
     add = MagicMock()
     await lock_mod.async_setup_entry(MagicMock(), entry, add)
     add.assert_not_called()
@@ -273,7 +273,7 @@ async def test_lock_setup_entry_no_account_returns_early() -> None:
 @pytest.mark.asyncio
 async def test_lock_setup_entry_creates_lock() -> None:
     coordinator = SimpleNamespace(account=_account(_lock_space()), entry_id="entry_test")
-    entry = SimpleNamespace(runtime_data=coordinator)
+    entry = SimpleNamespace(runtime_data=coordinator, async_on_unload=lambda _f: None)
     add = MagicMock()
     with patch("custom_components.ajax.lock.connect_new_entity_signal"):
         await lock_mod.async_setup_entry(MagicMock(), entry, add)
@@ -285,7 +285,7 @@ async def test_lock_setup_entry_creates_lock() -> None:
 @pytest.mark.asyncio
 async def test_lock_setup_entry_no_locks_skips_add() -> None:
     coordinator = SimpleNamespace(account=_account(AjaxSpace(id="s1", name="Home", hub_id="hub1")))
-    entry = SimpleNamespace(runtime_data=coordinator)
+    entry = SimpleNamespace(runtime_data=coordinator, async_on_unload=lambda _f: None)
     add = MagicMock()
     with patch("custom_components.ajax.lock.connect_new_entity_signal"):
         await lock_mod.async_setup_entry(MagicMock(), entry, add)
@@ -295,7 +295,7 @@ async def test_lock_setup_entry_no_locks_skips_add() -> None:
 @pytest.mark.asyncio
 async def test_lock_build_lock_pairs() -> None:
     coordinator = SimpleNamespace(account=_account(_lock_space()), entry_id="entry_test")
-    entry = SimpleNamespace(runtime_data=coordinator)
+    entry = SimpleNamespace(runtime_data=coordinator, async_on_unload=lambda _f: None)
     captured: dict = {}
 
     def _fake_connect(hass, entry_, signal, domain, add, builder, label):
@@ -350,7 +350,7 @@ def _hub_space(*, geofence: dict | None) -> AjaxSpace:
 
 @pytest.mark.asyncio
 async def test_tracker_setup_entry_no_account_returns_early() -> None:
-    entry = SimpleNamespace(runtime_data=SimpleNamespace(account=None))
+    entry = SimpleNamespace(runtime_data=SimpleNamespace(account=None), async_on_unload=lambda _f: None)
     add = MagicMock()
     await dt_mod.async_setup_entry(MagicMock(), entry, add)
     add.assert_not_called()
@@ -360,7 +360,7 @@ async def test_tracker_setup_entry_no_account_returns_early() -> None:
 async def test_tracker_setup_entry_creates_tracker_with_geofence() -> None:
     space = _hub_space(geofence={"latitude": 48.85, "longitude": 2.35})
     coordinator = SimpleNamespace(account=_account(space), entry_id="entry_test")
-    entry = SimpleNamespace(runtime_data=coordinator)
+    entry = SimpleNamespace(runtime_data=coordinator, async_on_unload=lambda _f: None)
     add = MagicMock()
     await dt_mod.async_setup_entry(MagicMock(), entry, add)
     add.assert_called_once()
@@ -374,7 +374,7 @@ async def test_tracker_setup_entry_skips_space_without_coordinates() -> None:
     # hub_details present but geoFence has no lat/lon -> no tracker.
     space = _hub_space(geofence={"radiusMeters": 100})
     coordinator = SimpleNamespace(account=_account(space))
-    entry = SimpleNamespace(runtime_data=coordinator)
+    entry = SimpleNamespace(runtime_data=coordinator, async_on_unload=lambda _f: None)
     add = MagicMock()
     await dt_mod.async_setup_entry(MagicMock(), entry, add)
     add.assert_not_called()
@@ -384,7 +384,7 @@ async def test_tracker_setup_entry_skips_space_without_coordinates() -> None:
 async def test_tracker_setup_entry_skips_space_without_hub_details() -> None:
     space = _hub_space(geofence=None)
     coordinator = SimpleNamespace(account=_account(space))
-    entry = SimpleNamespace(runtime_data=coordinator)
+    entry = SimpleNamespace(runtime_data=coordinator, async_on_unload=lambda _f: None)
     add = MagicMock()
     await dt_mod.async_setup_entry(MagicMock(), entry, add)
     add.assert_not_called()
@@ -398,7 +398,7 @@ async def test_tracker_setup_entry_skips_space_without_hub_details() -> None:
 @pytest.mark.asyncio
 async def test_acp_setup_entry_no_account_logs_and_skips() -> None:
     coordinator = SimpleNamespace(account=None)
-    entry = SimpleNamespace(runtime_data=coordinator, entry_id="e1")
+    entry = SimpleNamespace(runtime_data=coordinator, entry_id="e1", async_on_unload=lambda _f: None)
     add = MagicMock()
     with patch("custom_components.ajax.alarm_control_panel.connect_new_entity_signal"):
         await acp_mod.async_setup_entry(MagicMock(), entry, add)
@@ -409,7 +409,7 @@ async def test_acp_setup_entry_no_account_logs_and_skips() -> None:
 async def test_acp_setup_entry_creates_space_panel_only() -> None:
     space = AjaxSpace(id="s1", name="Home", hub_id="hub1")
     coordinator = SimpleNamespace(account=_account(space))
-    entry = SimpleNamespace(runtime_data=coordinator, entry_id="e1")
+    entry = SimpleNamespace(runtime_data=coordinator, entry_id="e1", async_on_unload=lambda _f: None)
     add = MagicMock()
     with patch("custom_components.ajax.alarm_control_panel.connect_new_entity_signal"):
         await acp_mod.async_setup_entry(MagicMock(), entry, add)
@@ -428,7 +428,7 @@ async def test_acp_setup_entry_creates_group_panels() -> None:
         account=_account(space),
         get_group=lambda sid, gid: space.groups.get(gid),
     )
-    entry = SimpleNamespace(runtime_data=coordinator, entry_id="e1")
+    entry = SimpleNamespace(runtime_data=coordinator, entry_id="e1", async_on_unload=lambda _f: None)
     add = MagicMock()
     with patch("custom_components.ajax.alarm_control_panel.connect_new_entity_signal"):
         await acp_mod.async_setup_entry(MagicMock(), entry, add)
@@ -491,7 +491,7 @@ async def test_update_setup_entry_creates_hub_and_video_edge() -> None:
         id="ve1", name="Cam", space_id="s1", video_edge_type=VideoEdgeType.TURRET, firmware_version="2.0"
     )
     coordinator = _coordinator_with_spaces(space)
-    entry = SimpleNamespace(runtime_data=coordinator)
+    entry = SimpleNamespace(runtime_data=coordinator, async_on_unload=lambda _f: None)
     add = MagicMock()
     with patch("custom_components.ajax.update.connect_new_entity_signal"):
         await update_mod.async_setup_entry(MagicMock(), entry, add)
@@ -505,7 +505,7 @@ async def test_update_setup_entry_creates_hub_and_video_edge() -> None:
 async def test_update_setup_entry_no_firmware_no_hub_entity() -> None:
     space = AjaxSpace(id="s1", name="Home", hub_id="hub1")  # hub_details empty -> no hub entity
     coordinator = _coordinator_with_spaces(space)
-    entry = SimpleNamespace(runtime_data=coordinator)
+    entry = SimpleNamespace(runtime_data=coordinator, async_on_unload=lambda _f: None)
     add = MagicMock()
     with patch("custom_components.ajax.update.connect_new_entity_signal"):
         await update_mod.async_setup_entry(MagicMock(), entry, add)
@@ -519,7 +519,7 @@ async def test_update_build_update_pairs() -> None:
         id="ve1", name="Cam", space_id="s1", video_edge_type=VideoEdgeType.BULLET, firmware_version="2.0"
     )
     coordinator = _coordinator_with_spaces(space)
-    entry = SimpleNamespace(runtime_data=coordinator)
+    entry = SimpleNamespace(runtime_data=coordinator, async_on_unload=lambda _f: None)
     captured: dict = {}
 
     def _fake_connect(hass, entry_, signal, domain, add, builder, label):

@@ -34,28 +34,26 @@ def test_no_f_string_logging() -> None:
     assert not offenders, "f-string logging found (use lazy %s):\n" + "\n".join(offenders)
 
 
-def test_entity_classes_declare_slots() -> None:
-    """All Coordinator-backed entity classes must declare __slots__.
+def test_entity_classes_do_not_declare_slots() -> None:
+    """HA entity subclasses must NOT declare __slots__.
 
-    Each entity carries instance state via _attr_X fields; without
-    __slots__ Python allocates a per-instance __dict__ that pays for
-    nothing (we never set arbitrary attributes). On a 200-entity install
-    that's ~22 kB of overhead for zero benefit.
+    Home Assistant's ``Entity`` base class has no ``__slots__``, so every
+    subclass instance keeps a ``__dict__`` anyway — a subclass
+    ``__slots__`` saves zero memory and silently stops guarding attribute
+    creation. Worse, several classes assigned attributes missing from
+    their (inert) slot tuples; if HA ever slotted ``Entity`` they would
+    crash at instantiation. Keep entity classes slot-free.
     """
-    entity_class_pattern = re.compile(r"^class\s+(Ajax\w+)\((CoordinatorEntity[^)]*|.*Entity[^)]*)\):", re.MULTILINE)
     slots_pattern = re.compile(r"__slots__\s*=")
     offenders: list[str] = []
-    for path in INTEGRATION_DIR.rglob("*.py"):
+    for path in INTEGRATION_DIR.glob("*.py"):
         text = path.read_text()
-        classes = entity_class_pattern.findall(text)
-        if not classes:
+        if "Entity" not in text:
             continue
-        # Heuristic: every class found above its first __slots__ counts;
-        # this catches the file-level coverage rather than per-class line lookup.
-        if classes and not slots_pattern.search(text):
-            for cls_name, _ in classes:
-                offenders.append(f"{path.name}: {cls_name} (no __slots__ in file)")
-    assert not offenders, "Entity classes without __slots__:\n" + "\n".join(offenders)
+        for line_no, line in enumerate(text.splitlines(), start=1):
+            if slots_pattern.search(line):
+                offenders.append(f"{path.name}:{line_no}: {line.strip()[:100]}")
+    assert not offenders, "Inert __slots__ on entity classes (see docstring):\n" + "\n".join(offenders)
 
 
 def test_main_polling_interval_at_least_30s() -> None:

@@ -24,6 +24,8 @@ from ._discovery import connect_new_entity_signal
 from ._ids import device_identifier
 from .const import DOMAIN, SIGNAL_NEW_DEVICE
 from .coordinator import AjaxDataCoordinator
+from .devices import is_dimmer_device, is_lightswitch_device
+from .devices.door_contact import DOOR_PLUS_DEVICE_TYPES
 from .devices.siren import SirenHandler
 from .models import AjaxDevice, DeviceType, SecurityState
 
@@ -36,11 +38,7 @@ SELECT_DEVICE_HANDLERS = {
 }
 
 # Device types that support DoorProtect Plus select settings
-DEVICES_WITH_DOOR_PLUS_SELECTS = [
-    "DoorProtectPlus",
-    "DoorProtectPlusFibra",
-    "DoorProtectSPlus",
-]
+DEVICES_WITH_DOOR_PLUS_SELECTS = DOOR_PLUS_DEVICE_TYPES
 
 # Shock sensitivity options mapping (value -> translation key)
 SHOCK_SENSITIVITY_OPTIONS = {
@@ -105,18 +103,6 @@ DIMMER_SELECT_DEFINITIONS: list[dict[str, Any]] = [
         },
     },
 ]
-
-
-def is_dimmer_device(device: AjaxDevice) -> bool:
-    """Check if device is a LightSwitchDimmer."""
-    raw_type = (device.raw_type or "").lower().replace("_", "").replace(" ", "")
-    return "lightswitchdimmer" in raw_type or raw_type == "dimmer"
-
-
-def is_lightswitch_device(device: AjaxDevice) -> bool:
-    """Check if device is a LightSwitch (non-dimmer)."""
-    raw_type = (device.raw_type or "").lower().replace("_", "").replace(" ", "")
-    return "lightswitch" in raw_type and "dimmer" not in raw_type
 
 
 # LightSwitch touch mode select definition
@@ -294,8 +280,6 @@ async def async_setup_entry(
 class AjaxDoorPlusBaseSelect(CoordinatorEntity[AjaxDataCoordinator], SelectEntity):
     """Base class for DoorProtect Plus select entities."""
 
-    __slots__ = ("_space_id", "_device_id")
-
     _attr_has_entity_name = True
 
     def __init__(self, coordinator: AjaxDataCoordinator, space_id: str, device_id: str) -> None:
@@ -309,6 +293,8 @@ class AjaxDoorPlusBaseSelect(CoordinatorEntity[AjaxDataCoordinator], SelectEntit
 
     @property
     def available(self) -> bool:
+        if not self.coordinator.last_update_success:
+            return False
         device = self._get_device()
         return device.online if device else False
 
@@ -323,8 +309,6 @@ class AjaxDoorPlusBaseSelect(CoordinatorEntity[AjaxDataCoordinator], SelectEntit
 
 class AjaxShockSensitivitySelect(AjaxDoorPlusBaseSelect):
     """Select entity for shock sensor sensitivity."""
-
-    __slots__ = ()
 
     _attr_entity_category = EntityCategory.CONFIG
     _attr_options = list(SHOCK_SENSITIVITY_OPTIONS.values())
@@ -386,8 +370,6 @@ class AjaxShockSensitivitySelect(AjaxDoorPlusBaseSelect):
 class AjaxLedBrightnessSelect(CoordinatorEntity[AjaxDataCoordinator], SelectEntity):
     """Select entity for Socket LED brightness."""
 
-    __slots__ = ("_space_id", "_device_id")
-
     _attr_has_entity_name = True
     _attr_entity_category = EntityCategory.CONFIG
     _attr_options = LED_BRIGHTNESS_OPTIONS
@@ -405,6 +387,8 @@ class AjaxLedBrightnessSelect(CoordinatorEntity[AjaxDataCoordinator], SelectEnti
 
     @property
     def available(self) -> bool:
+        if not self.coordinator.last_update_success:
+            return False
         device = self._get_device()
         if not device or not device.online:
             return False
@@ -467,8 +451,6 @@ class AjaxLedBrightnessSelect(CoordinatorEntity[AjaxDataCoordinator], SelectEnti
 class AjaxIndicationModeSelect(CoordinatorEntity[AjaxDataCoordinator], SelectEntity):
     """Select entity for SocketOutlet indication mode (LED backlight mode)."""
 
-    __slots__ = ("_space_id", "_device_id")
-
     _attr_has_entity_name = True
     _attr_entity_category = EntityCategory.CONFIG
     _attr_options = list(INDICATION_MODE_OPTIONS.values())
@@ -486,6 +468,8 @@ class AjaxIndicationModeSelect(CoordinatorEntity[AjaxDataCoordinator], SelectEnt
 
     @property
     def available(self) -> bool:
+        if not self.coordinator.last_update_success:
+            return False
         device = self._get_device()
         return device.online if device else False
 
@@ -537,8 +521,6 @@ class AjaxIndicationModeSelect(CoordinatorEntity[AjaxDataCoordinator], SelectEnt
 
 class AjaxDimmerSelect(CoordinatorEntity[AjaxDataCoordinator], SelectEntity):
     """Select entity for LightSwitchDimmer settings."""
-
-    __slots__ = ("_space_id", "_device_id", "_select_def")
 
     _attr_has_entity_name = True
     _attr_entity_category = EntityCategory.CONFIG
@@ -639,8 +621,6 @@ class AjaxDimmerSelect(CoordinatorEntity[AjaxDataCoordinator], SelectEntity):
 class AjaxHandlerSelect(CoordinatorEntity[AjaxDataCoordinator], SelectEntity):
     """Generic select entity created from device handler definitions (for sirens, etc.)."""
 
-    __slots__ = ("_space_id", "_device_id", "_select_desc")
-
     _attr_has_entity_name = True
     _attr_entity_category = EntityCategory.CONFIG
 
@@ -666,6 +646,8 @@ class AjaxHandlerSelect(CoordinatorEntity[AjaxDataCoordinator], SelectEntity):
 
     @property
     def available(self) -> bool:
+        if not self.coordinator.last_update_success:
+            return False
         device = self._get_device()
         return device.online if device else False
 

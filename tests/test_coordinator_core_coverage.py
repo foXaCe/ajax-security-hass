@@ -79,6 +79,9 @@ def _coordinator() -> AjaxDataCoordinator:
     coord._door_sensor_poll_security_state = SecurityState.DISARMED
     coord._door_sensor_fast_poll_enabled = False
     coord._sse_url = None
+    coord._sqs_initialized = False
+    coord._sqs_init_in_progress = False
+    coord._aws_access_key_id = None
 
     # Auth resilience.
     coord._consecutive_auth_errors = 0

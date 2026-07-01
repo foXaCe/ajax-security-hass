@@ -89,6 +89,7 @@ class AjaxBootstrapMixin:
         _aws_secret_access_key: str | None
         _queue_name: str | None
         _sqs_initialized: bool
+        _sqs_init_in_progress: bool
         _sse_url: str | None
         _sse_initialized: bool
         _smart_lock_store: Store[Any]
@@ -206,6 +207,9 @@ class AjaxBootstrapMixin:
         Requires ``aiobotocore`` + AWS credentials. On failure the
         integration falls back to REST-only mode without raising.
         """
+        if self._sqs_init_in_progress:
+            return  # a startup/retry attempt is already running — don't overlap
+
         if not SQS_AVAILABLE:
             _LOGGER.info("AWS SQS not available (aiobotocore not installed). Using REST API polling only.")
             self._sqs_initialized = True  # Mark as "initialized" to prevent retries.
@@ -219,6 +223,7 @@ class AjaxBootstrapMixin:
         entry_id = self.config_entry.entry_id if self.config_entry else "unknown"
         sqs_issue = f"sqs_init_failed_{entry_id}"
 
+        self._sqs_init_in_progress = True
         try:
             _LOGGER.info("Initializing AWS SQS for real-time events...")
 
@@ -252,7 +257,8 @@ class AjaxBootstrapMixin:
 
             if sqs_client is None:
                 _LOGGER.warning(
-                    "aiobotocore unavailable after ~%d s — real-time SQS disabled, using REST API polling only",
+                    "aiobotocore unavailable after ~%d s — real-time SQS deferred, using REST API "
+                    "polling meanwhile; will retry automatically once the dependency is installed",
                     SQS_AIOBOTOCORE_WAIT_ATTEMPTS * SQS_AIOBOTOCORE_WAIT_INTERVAL,
                 )
                 ir.async_create_issue(
@@ -264,6 +270,9 @@ class AjaxBootstrapMixin:
                     translation_key="sqs_init_failed",
                     translation_placeholders={"error": "aiobotocore required"},
                 )
+                # Leave _sqs_initialized False (transient): a later poll retries
+                # via the periodic-update branch, so SQS self-heals without a
+                # manual restart once pip finishes installing aiobotocore.
                 return
 
             self.sqs_manager = _SQSManager(
@@ -280,10 +289,12 @@ class AjaxBootstrapMixin:
 
             if success:
                 _LOGGER.info("✓ AWS SQS initialized successfully - Real-time events enabled!")
+                self._sqs_initialized = True
                 ir.async_delete_issue(self.hass, DOMAIN, sqs_issue)
             else:
                 _LOGGER.warning("Failed to start SQS - Falling back to REST API polling only")
                 self.sqs_manager = None
+                self._sqs_initialized = True  # config/network failure — not the aiobotocore race
                 ir.async_create_issue(
                     self.hass,
                     DOMAIN,
@@ -300,6 +311,7 @@ class AjaxBootstrapMixin:
                 err,
             )
             self.sqs_manager = None
+            self._sqs_initialized = True  # unexpected error — don't retry in a loop
             ir.async_create_issue(
                 self.hass,
                 DOMAIN,
@@ -310,7 +322,7 @@ class AjaxBootstrapMixin:
                 translation_placeholders={"error": str(err)},
             )
         finally:
-            self._sqs_initialized = True
+            self._sqs_init_in_progress = False
 
     # ------------------------------------------------------------------
     # SSE (proxy mode)

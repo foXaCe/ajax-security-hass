@@ -1350,9 +1350,6 @@
           "group_name": {
             "name": "Groepsnaam"
           },
-          "night_mode_enabled": {
-            "name": "Nachtmodus ingeschakeld"
-          },
           "space_id": {
             "name": "Ruimte-ID"
           },
@@ -1550,6 +1547,9 @@
     "panic_cooldown": {
       "message": "Paniekknop geweigerd: wacht {seconds} seconden tussen drukken om dubbele alarmen te voorkomen."
     },
+    "panic_failed": {
+      "message": "Activeren van het paniekalarm mislukt: {error}"
+    },
     "space_not_found": {
       "message": "Ruimte niet gevonden."
     },
@@ -1584,6 +1584,10 @@
     }
   },
   "options": {
+    "error": {
+      "invalid_proxy_url": "Ongeldige proxy-URL. URL moet beginnen met http:// of https://",
+      "no_spaces_selected": "Selecteer ten minste één ruimte om in te schakelen."
+    },
     "step": {
       "aws_credentials": {
         "data": {
@@ -1668,6 +1672,11 @@
       "options": {
         "direct": "Direct (alleen enterprise API-sleutel)",
         "proxy_secure": "Ajax-proxy"
+      }
+    },
+    "dhcp_action": {
+      "options": {
+        "new": "Nieuwe configuratie aanmaken"
       }
     },
     "notification_filter": {

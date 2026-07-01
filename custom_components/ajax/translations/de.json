@@ -1350,9 +1350,6 @@
           "group_name": {
             "name": "Gruppenname"
           },
-          "night_mode_enabled": {
-            "name": "Nachtmodus aktiviert"
-          },
           "space_id": {
             "name": "Bereichs-ID"
           },
@@ -1550,6 +1547,9 @@
     "panic_cooldown": {
       "message": "Paniktaste abgelehnt: bitte {seconds} Sekunden zwischen den Drücken warten, um doppelte Alarme zu vermeiden."
     },
+    "panic_failed": {
+      "message": "Auslösen des Panikalarms fehlgeschlagen: {error}"
+    },
     "space_not_found": {
       "message": "Bereich nicht gefunden."
     },
@@ -1584,6 +1584,10 @@
     }
   },
   "options": {
+    "error": {
+      "invalid_proxy_url": "Ungültige Proxy-URL. URL muss mit http:// oder https:// beginnen",
+      "no_spaces_selected": "Bitte wählen Sie mindestens einen Bereich aus."
+    },
     "step": {
       "aws_credentials": {
         "data": {
@@ -1668,6 +1672,11 @@
       "options": {
         "direct": "Direkt (nur Enterprise-API-Schlüssel)",
         "proxy_secure": "Ajax-Proxy"
+      }
+    },
+    "dhcp_action": {
+      "options": {
+        "new": "Neue Konfiguration erstellen"
       }
     },
     "notification_filter": {

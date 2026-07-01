@@ -1339,9 +1339,6 @@
           "group_name": {
             "name": "Group name"
           },
-          "night_mode_enabled": {
-            "name": "Night mode enabled"
-          },
           "space_id": {
             "name": "Space ID"
           },
@@ -1550,6 +1547,9 @@
     "panic_cooldown": {
       "message": "Panic button rejected: please wait {seconds} seconds between presses to avoid duplicate alarms."
     },
+    "panic_failed": {
+      "message": "Failed to trigger the panic alarm: {error}"
+    },
     "space_not_found": {
       "message": "Space not found."
     },
@@ -1584,6 +1584,10 @@
     }
   },
   "options": {
+    "error": {
+      "invalid_proxy_url": "Invalid proxy URL. URL must start with http:// or https://",
+      "no_spaces_selected": "Please select at least one space to enable."
+    },
     "step": {
       "aws_credentials": {
         "data": {
@@ -1668,6 +1672,11 @@
       "options": {
         "direct": "Direct (Enterprise API key only)",
         "proxy_secure": "Ajax Proxy"
+      }
+    },
+    "dhcp_action": {
+      "options": {
+        "new": "Create a new configuration"
       }
     },
     "notification_filter": {

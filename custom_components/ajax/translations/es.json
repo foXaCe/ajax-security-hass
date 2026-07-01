@@ -1350,9 +1350,6 @@
           "group_name": {
             "name": "Nombre del grupo"
           },
-          "night_mode_enabled": {
-            "name": "Modo nocturno activado"
-          },
           "space_id": {
             "name": "ID del espacio"
           },
@@ -1550,6 +1547,9 @@
     "panic_cooldown": {
       "message": "Botón de pánico rechazado: espera {seconds} segundos entre pulsaciones para evitar alarmas duplicadas."
     },
+    "panic_failed": {
+      "message": "Error al activar la alarma de pánico: {error}"
+    },
     "space_not_found": {
       "message": "Espacio no encontrado."
     },
@@ -1584,6 +1584,10 @@
     }
   },
   "options": {
+    "error": {
+      "invalid_proxy_url": "URL del proxy inválida. La URL debe comenzar con http:// o https://",
+      "no_spaces_selected": "Por favor, seleccione al menos un espacio para activar."
+    },
     "step": {
       "aws_credentials": {
         "data": {
@@ -1668,6 +1672,11 @@
       "options": {
         "direct": "Directo (Solo clave API empresarial)",
         "proxy_secure": "Proxy Ajax"
+      }
+    },
+    "dhcp_action": {
+      "options": {
+        "new": "Crear una nueva configuración"
       }
     },
     "notification_filter": {

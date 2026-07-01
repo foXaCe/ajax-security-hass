@@ -48,6 +48,14 @@ from .const import (
 
 _LOGGER = logging.getLogger(__name__)
 
+# AjaxRestAuthError.error_type -> config-flow error translation key.
+_AUTH_ERROR_MAP = {
+    "invalid_api_key": "invalid_api_key",
+    "invalid_password": "invalid_password",
+    "invalid_account_type": "invalid_account_type",
+    "generic": "invalid_auth",
+}
+
 
 class AjaxConfigFlow(ConfigFlow, domain=DOMAIN):
     """Handle a config flow for Ajax Security Systems."""
@@ -79,6 +87,28 @@ class AjaxConfigFlow(ConfigFlow, domain=DOMAIN):
             existing_macs = self._entry_data.get(CONF_DISCOVERED_MACS, [])
             if discovered_mac not in existing_macs:
                 self._entry_data[CONF_DISCOVERED_MACS] = existing_macs + [discovered_mac]
+
+    async def _async_discover_spaces(self, hubs: list[dict[str, Any]]) -> list[dict[str, str]]:
+        """Resolve the {id, name} space list from the hubs payload.
+
+        The proper space name comes from the space-binding endpoint; on
+        failure the hub name (or a short id) is used instead.
+        """
+        assert self._api is not None
+        spaces: list[dict[str, str]] = []
+        for hub in hubs:
+            hub_id = hub.get("hubId")
+            if not hub_id:
+                continue
+            hub_name = hub.get("hubName", f"Hub {hub_id[:6]}")
+            try:
+                space_binding = await self._api.async_get_space_by_hub(hub_id)
+                if space_binding and space_binding.get("name"):
+                    hub_name = space_binding.get("name")
+            except AjaxRestApiError as err:
+                _LOGGER.debug("Could not resolve space name for %s: %s", hub_id, err)
+            spaces.append({"id": hub_id, "name": hub_name})
+        return spaces
 
     async def async_step_user(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         """Handle the initial step - choose authentication mode."""
@@ -138,19 +168,7 @@ class AjaxConfigFlow(ConfigFlow, domain=DOMAIN):
                 hubs = await self._api.async_get_hubs()
 
                 # Build list of spaces from hubs
-                self._spaces = []
-                for hub in hubs:
-                    hub_id = hub.get("hubId")
-                    if hub_id:
-                        # Get proper space name via space binding API
-                        hub_name = hub.get("hubName", f"Hub {hub_id[:6]}")
-                        try:
-                            space_binding = await self._api.async_get_space_by_hub(hub_id)
-                            if space_binding and space_binding.get("name"):
-                                hub_name = space_binding.get("name")
-                        except AjaxRestApiError as err:
-                            _LOGGER.debug("Could not resolve space name for %s: %s", hub_id, err)
-                        self._spaces.append({"id": hub_id, "name": hub_name})
+                self._spaces = await self._async_discover_spaces(hubs)
 
                 await self._api.close()
 
@@ -203,13 +221,7 @@ class AjaxConfigFlow(ConfigFlow, domain=DOMAIN):
                 if self._api:
                     await self._api.close()
                 # Map error type to translation key
-                error_map = {
-                    "invalid_api_key": "invalid_api_key",
-                    "invalid_password": "invalid_password",
-                    "invalid_account_type": "invalid_account_type",
-                    "generic": "invalid_auth",
-                }
-                errors["base"] = error_map.get(err.error_type, "invalid_auth")
+                errors["base"] = _AUTH_ERROR_MAP.get(err.error_type, "invalid_auth")
             except AjaxRestApiError as err:
                 _LOGGER.error("Cannot connect to Ajax API: %s", err)
                 if self._api:
@@ -250,106 +262,94 @@ class AjaxConfigFlow(ConfigFlow, domain=DOMAIN):
             self._user_input[CONF_AUTH_MODE] = self._auth_mode
 
             proxy_url = user_input[CONF_PROXY_URL].rstrip("/")
-            verify_ssl = user_input.get(CONF_VERIFY_SSL, True)
-            self._user_input[CONF_PROXY_URL] = proxy_url
-            self._user_input[CONF_VERIFY_SSL] = verify_ssl
+            if not proxy_url.startswith(("http://", "https://")):
+                # Immediate feedback on a malformed URL — otherwise it only
+                # surfaces later as a generic cannot_connect (mirrors the
+                # options-flow proxy_settings validation).
+                errors["base"] = "invalid_proxy_url"
+            else:
+                verify_ssl = user_input.get(CONF_VERIFY_SSL, True)
+                self._user_input[CONF_PROXY_URL] = proxy_url
+                self._user_input[CONF_VERIFY_SSL] = verify_ssl
 
-            await self.async_set_unique_id(user_input[CONF_EMAIL].lower())
-            self._abort_if_unique_id_configured()
-            try:
-                # For proxy mode, we authenticate via the proxy
-                # The proxy will provide API key (hybrid) or handle all requests (secure)
-                self._api = AjaxRestApi(
-                    api_key="",  # Will be provided by proxy
-                    email=user_input[CONF_EMAIL],
-                    password=user_input[CONF_PASSWORD],
-                    proxy_url=proxy_url,
-                    proxy_mode=self._auth_mode,
-                    verify_ssl=verify_ssl,
-                )
-
-                # Test connection by logging in via proxy
-                await self._api.async_login()
-
-                # Get hubs to discover spaces
+                await self.async_set_unique_id(user_input[CONF_EMAIL].lower())
+                self._abort_if_unique_id_configured()
                 try:
-                    hubs = await self._api.async_get_hubs()
-                    self._spaces = []
-                    for hub in hubs:
-                        hub_id = hub.get("hubId")
-                        if hub_id:
-                            # Get proper space name via space binding API
-                            hub_name = hub.get("hubName", f"Hub {hub_id[:6]}")
-                            try:
-                                space_binding = await self._api.async_get_space_by_hub(hub_id)
-                                if space_binding and space_binding.get("name"):
-                                    hub_name = space_binding.get("name")
-                            except AjaxRestApiError as err:
-                                _LOGGER.debug("Could not resolve space name for %s: %s", hub_id, err)
-                            self._spaces.append({"id": hub_id, "name": hub_name})
+                    # For proxy mode, we authenticate via the proxy
+                    # The proxy will provide API key (hybrid) or handle all requests (secure)
+                    self._api = AjaxRestApi(
+                        api_key="",  # Will be provided by proxy
+                        email=user_input[CONF_EMAIL],
+                        password=user_input[CONF_PASSWORD],
+                        proxy_url=proxy_url,
+                        proxy_mode=self._auth_mode,
+                        verify_ssl=verify_ssl,
+                    )
+
+                    # Test connection by logging in via proxy
+                    await self._api.async_login()
+
+                    # Get hubs to discover spaces
+                    try:
+                        hubs = await self._api.async_get_hubs()
+                        self._spaces = await self._async_discover_spaces(hubs)
+                    except AjaxRestApiError as err:
+                        # Proxy may not have all endpoints - continue without space selection
+                        _LOGGER.debug("Proxy hubs discovery failed: %s", err)
+                        self._spaces = []
+
+                    await self._api.close()
+
+                    # Hash password for secure storage
+                    password_hash = hashlib.sha256(user_input[CONF_PASSWORD].encode()).hexdigest()
+
+                    # Prepare entry data
+                    self._entry_data = {
+                        CONF_AUTH_MODE: self._auth_mode,
+                        CONF_PROXY_URL: proxy_url,
+                        CONF_EMAIL: user_input[CONF_EMAIL],
+                        CONF_PASSWORD: password_hash,
+                        CONF_VERIFY_SSL: user_input.get(CONF_VERIFY_SSL, True),
+                    }
+
+                    # If multiple spaces, let user select which to enable
+                    if len(self._spaces) > 1:
+                        return await self.async_step_select_spaces()
+
+                    # Single space or no spaces - enable all by default
+                    if self._spaces:
+                        self._entry_data[CONF_ENABLED_SPACES] = [s["id"] for s in self._spaces]
+
+                    # Add discovered MAC if from DHCP discovery
+                    self._add_discovered_mac_to_entry_data()
+
+                    # Create entry
+                    return self.async_create_entry(
+                        title=f"Ajax - {user_input[CONF_EMAIL]}",
+                        data=self._entry_data,
+                    )
+
+                except AjaxRest2FARequiredError as err:
+                    _LOGGER.info("2FA required for proxy login")
+                    self._request_id = err.request_id
+                    return await self.async_step_2fa()
+
+                except AjaxRestAuthError as err:
+                    _LOGGER.error("Authentication failed: %s (type: %s)", err, err.error_type)
+                    if self._api:
+                        await self._api.close()
+                    # Map error type to translation key
+                    errors["base"] = _AUTH_ERROR_MAP.get(err.error_type, "invalid_auth")
                 except AjaxRestApiError as err:
-                    # Proxy may not have all endpoints - continue without space selection
-                    _LOGGER.debug("Proxy hubs discovery failed: %s", err)
-                    self._spaces = []
-
-                await self._api.close()
-
-                # Hash password for secure storage
-                password_hash = hashlib.sha256(user_input[CONF_PASSWORD].encode()).hexdigest()
-
-                # Prepare entry data
-                self._entry_data = {
-                    CONF_AUTH_MODE: self._auth_mode,
-                    CONF_PROXY_URL: proxy_url,
-                    CONF_EMAIL: user_input[CONF_EMAIL],
-                    CONF_PASSWORD: password_hash,
-                    CONF_VERIFY_SSL: user_input.get(CONF_VERIFY_SSL, True),
-                }
-
-                # If multiple spaces, let user select which to enable
-                if len(self._spaces) > 1:
-                    return await self.async_step_select_spaces()
-
-                # Single space or no spaces - enable all by default
-                if self._spaces:
-                    self._entry_data[CONF_ENABLED_SPACES] = [s["id"] for s in self._spaces]
-
-                # Add discovered MAC if from DHCP discovery
-                self._add_discovered_mac_to_entry_data()
-
-                # Create entry
-                return self.async_create_entry(
-                    title=f"Ajax - {user_input[CONF_EMAIL]}",
-                    data=self._entry_data,
-                )
-
-            except AjaxRest2FARequiredError as err:
-                _LOGGER.info("2FA required for proxy login")
-                self._request_id = err.request_id
-                return await self.async_step_2fa()
-
-            except AjaxRestAuthError as err:
-                _LOGGER.error("Authentication failed: %s (type: %s)", err, err.error_type)
-                if self._api:
-                    await self._api.close()
-                # Map error type to translation key
-                error_map = {
-                    "invalid_api_key": "invalid_api_key",
-                    "invalid_password": "invalid_password",
-                    "invalid_account_type": "invalid_account_type",
-                    "generic": "invalid_auth",
-                }
-                errors["base"] = error_map.get(err.error_type, "invalid_auth")
-            except AjaxRestApiError as err:
-                _LOGGER.error("Cannot connect to proxy: %s", err)
-                if self._api:
-                    await self._api.close()
-                errors["base"] = "cannot_connect"
-            except Exception as err:
-                _LOGGER.exception("Unexpected exception: %s", err)
-                if self._api:
-                    await self._api.close()
-                errors["base"] = "unknown"
+                    _LOGGER.error("Cannot connect to proxy: %s", err)
+                    if self._api:
+                        await self._api.close()
+                    errors["base"] = "cannot_connect"
+                except Exception as err:
+                    _LOGGER.exception("Unexpected exception: %s", err)
+                    if self._api:
+                        await self._api.close()
+                    errors["base"] = "unknown"
 
         # Show configuration form for proxy mode
         data_schema = vol.Schema(
@@ -393,19 +393,7 @@ class AjaxConfigFlow(ConfigFlow, domain=DOMAIN):
                     # Proxy may not expose all discovery endpoints.
                     _LOGGER.debug("Proxy hubs discovery failed after 2FA: %s", err)
                     hubs = []
-                self._spaces = []
-                for hub in hubs:
-                    hub_id = hub.get("hubId")
-                    if hub_id:
-                        # Get proper space name via space binding API
-                        hub_name = hub.get("hubName", f"Hub {hub_id[:6]}")
-                        try:
-                            space_binding = await self._api.async_get_space_by_hub(hub_id)
-                            if space_binding and space_binding.get("name"):
-                                hub_name = space_binding.get("name")
-                        except AjaxRestApiError as err:
-                            _LOGGER.debug("Could not resolve space name for %s: %s", hub_id, err)
-                        self._spaces.append({"id": hub_id, "name": hub_name})
+                self._spaces = await self._async_discover_spaces(hubs)
 
                 await self._api.close()
 
@@ -510,7 +498,7 @@ class AjaxConfigFlow(ConfigFlow, domain=DOMAIN):
                 self._add_discovered_mac_to_entry_data()
 
                 return self.async_create_entry(
-                    title=f"Ajax - {self._entry_data.get(CONF_EMAIL, 'Unknown')}",
+                    title=f"Ajax - {email}" if (email := self._entry_data.get(CONF_EMAIL)) else "Ajax",
                     data=self._entry_data,
                 )
 
@@ -599,7 +587,9 @@ class AjaxConfigFlow(ConfigFlow, domain=DOMAIN):
         data_schema = vol.Schema(
             {
                 vol.Required("action"): SelectSelector(
-                    SelectSelectorConfig(options=options, mode=SelectSelectorMode.LIST)
+                    # translation_key so the static "new" option is localised;
+                    # email options have no translation and fall back to their label.
+                    SelectSelectorConfig(options=options, mode=SelectSelectorMode.LIST, translation_key="dhcp_action")
                 ),
             }
         )
@@ -677,13 +667,7 @@ class AjaxConfigFlow(ConfigFlow, domain=DOMAIN):
                 _LOGGER.error("Reauth failed: %s (type: %s)", err, err.error_type)
                 if self._api:
                     await self._api.close()
-                error_map = {
-                    "invalid_api_key": "invalid_api_key",
-                    "invalid_password": "invalid_password",
-                    "invalid_account_type": "invalid_account_type",
-                    "generic": "invalid_auth",
-                }
-                errors["base"] = error_map.get(err.error_type, "invalid_auth")
+                errors["base"] = _AUTH_ERROR_MAP.get(err.error_type, "invalid_auth")
             except AjaxRestApiError as err:
                 _LOGGER.error("Reauth failed: %s", err)
                 if self._api:

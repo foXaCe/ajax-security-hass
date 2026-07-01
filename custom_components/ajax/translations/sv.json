@@ -1350,9 +1350,6 @@
           "group_name": {
             "name": "Gruppnamn"
           },
-          "night_mode_enabled": {
-            "name": "Nattläge aktiverat"
-          },
           "space_id": {
             "name": "Space-ID"
           },
@@ -1550,6 +1547,9 @@
     "panic_cooldown": {
       "message": "Panikknappen avvisad: vänta {seconds} sekunder mellan tryck för att undvika dubbla larm."
     },
+    "panic_failed": {
+      "message": "Det gick inte att utlösa paniklarmet: {error}"
+    },
     "space_not_found": {
       "message": "Space kan ej hittas."
     },
@@ -1584,6 +1584,10 @@
     }
   },
   "options": {
+    "error": {
+      "invalid_proxy_url": "Ogiltig proxy URL. URL måste börja med http:// eller https://",
+      "no_spaces_selected": "Välj minst ett space för aktivering."
+    },
     "step": {
       "aws_credentials": {
         "data": {
@@ -1668,6 +1672,11 @@
       "options": {
         "direct": "Direkt (Enbart Enterprise API-nyckel)",
         "proxy_secure": "Ajax-proxy"
+      }
+    },
+    "dhcp_action": {
+      "options": {
+        "new": "Skapa en ny konfiguration"
       }
     },
     "notification_filter": {

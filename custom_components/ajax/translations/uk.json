@@ -1350,9 +1350,6 @@
           "group_name": {
             "name": "Назва групи"
           },
-          "night_mode_enabled": {
-            "name": "Нічний режим увімкнено"
-          },
           "space_id": {
             "name": "ID простору"
           },
@@ -1550,6 +1547,9 @@
     "panic_cooldown": {
       "message": "Кнопку паніки відхилено: зачекайте {seconds} секунд між натисканнями, щоб уникнути повторних тривог."
     },
+    "panic_failed": {
+      "message": "Не вдалося активувати тривожну кнопку: {error}"
+    },
     "space_not_found": {
       "message": "Простір не знайдено."
     },
@@ -1584,6 +1584,10 @@
     }
   },
   "options": {
+    "error": {
+      "invalid_proxy_url": "Невірна URL-адреса проксі. URL має починатися з http:// або https://",
+      "no_spaces_selected": "Будь ласка, виберіть принаймні один простір для активації."
+    },
     "step": {
       "aws_credentials": {
         "data": {
@@ -1668,6 +1672,11 @@
       "options": {
         "direct": "Пряме (тільки корпоративний API-ключ)",
         "proxy_secure": "Проксі Ajax"
+      }
+    },
+    "dhcp_action": {
+      "options": {
+        "new": "Створити нову конфігурацію"
       }
     },
     "notification_filter": {

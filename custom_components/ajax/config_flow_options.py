@@ -52,7 +52,7 @@ class AjaxOptionsFlow(OptionsFlow):
     def _mask_credential(self, value: str | None) -> str:
         """Mask a credential for display (show first 4 and last 4 chars)."""
         if not value or len(value) < 10:
-            return "Not configured"
+            return "—"
         return f"{value[:4]}****{value[-4:]}"
 
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
@@ -353,7 +353,7 @@ class AjaxOptionsFlow(OptionsFlow):
             description_placeholders={
                 "current_access_key": self._mask_credential(current_access_key),
                 "current_secret_key": self._mask_credential(current_secret_key),
-                "current_queue": current_queue or "Not configured",
+                "current_queue": current_queue or "—",
             },
         )
 
@@ -390,7 +390,7 @@ class AjaxOptionsFlow(OptionsFlow):
             step_id="rtsp_credentials",
             data_schema=data_schema,
             description_placeholders={
-                "current_username": current_username or "Not configured",
-                "current_password": self._mask_credential(current_password) if current_password else "Not configured",
+                "current_username": current_username or "—",
+                "current_password": self._mask_credential(current_password) if current_password else "—",
             },
         )

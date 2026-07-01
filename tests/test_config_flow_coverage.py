@@ -1060,8 +1060,8 @@ def _coordinator_with_spaces() -> MagicMock:
 
 def test_mask_credential() -> None:
     flow = _make_options_flow()
-    assert flow._mask_credential(None) == "Not configured"
-    assert flow._mask_credential("short") == "Not configured"
+    assert flow._mask_credential(None) == "—"
+    assert flow._mask_credential("short") == "—"
     assert flow._mask_credential("ABCDEFGHIJKL") == "ABCD****IJKL"
 
 
@@ -1240,8 +1240,8 @@ async def test_options_rtsp_credentials_form() -> None:
 async def test_options_rtsp_credentials_form_empty() -> None:
     flow = _make_options_flow(options={})
     result = await flow.async_step_rtsp_credentials()
-    assert result["description_placeholders"]["current_username"] == "Not configured"
-    assert result["description_placeholders"]["current_password"] == "Not configured"
+    assert result["description_placeholders"]["current_username"] == "—"
+    assert result["description_placeholders"]["current_password"] == "—"
 
 
 async def test_options_rtsp_credentials_saves() -> None:

@@ -10,7 +10,9 @@ Covered:
   UpdateFailed.
 - ``get_space`` / ``get_device`` / ``get_room`` / ``get_group`` helpers.
 - ``_update_polling_interval`` adaptive interval + door-poll management.
-- realtime_skip_factor throttle of video/smart-lock refresh.
+- realtime_skip_factor throttle of video/smart-lock refresh, armed-aware
+  (manager presence alone is not enough — SSE/SQS deliver nothing while
+  every space is disarmed, so that state forces a refresh every cycle).
 - ``async_shutdown`` (stop SQS / SSE / ONVIF / door poll + close api).
 """
 
@@ -263,14 +265,20 @@ async def test_periodic_update_no_realtime_always_refreshes_video_smart() -> Non
 
 
 async def test_periodic_update_realtime_throttles_video_smart() -> None:
-    """With realtime active and cycle not on the Nth tick, video/smart skip."""
+    """Manager present + an armed space + cycle not on the Nth tick → skip.
+
+    Realtime freshness (SSE/SQS) is only trustworthy while the alarm is
+    armed, so this test uses an ARMED space — a disarmed one would force
+    the refresh regardless of the cycle counter (see the dedicated
+    all-disarmed test below).
+    """
     coord = _coordinator()
     coord._initial_load_done = True
     coord.sse_manager = MagicMock()  # realtime active
     coord._realtime_skip_factor = 3
     coord._cycle_counter = 0  # becomes 1 after increment → 1 % 3 != 0 → skip
     coord._last_metadata_refresh = 1e18
-    coord.account = _account_with_space()
+    coord.account = _account_with_space(SecurityState.ARMED)
     coord.account.spaces["s1"].video_edges["ve1"] = MagicMock()
     coord.account.spaces["s1"].smart_locks["sl1"] = MagicMock()
 
@@ -288,14 +296,43 @@ async def test_periodic_update_realtime_throttles_video_smart() -> None:
 
 
 async def test_periodic_update_realtime_refreshes_on_nth_cycle() -> None:
-    """With realtime active, the Nth cycle still does the full REST sync."""
+    """Manager present + an armed space: the Nth cycle still does the full sync."""
     coord = _coordinator()
     coord._initial_load_done = True
     coord.sqs_manager = MagicMock()  # realtime active
     coord._realtime_skip_factor = 3
     coord._cycle_counter = 2  # becomes 3 after increment → 3 % 3 == 0 → refresh
     coord._last_metadata_refresh = 1e18
-    coord.account = _account_with_space()
+    coord.account = _account_with_space(SecurityState.ARMED)
+    coord.account.spaces["s1"].video_edges["ve1"] = MagicMock()
+    coord.account.spaces["s1"].smart_locks["sl1"] = MagicMock()
+
+    coord._async_update_spaces_from_hubs = AsyncMock()
+    coord._async_update_devices = AsyncMock()
+    coord._async_update_video_edges = AsyncMock()
+    coord._async_update_smart_locks = AsyncMock()
+    coord._reset_expired_motion_detections = MagicMock()
+
+    await coord._async_update_data()
+
+    coord._async_update_video_edges.assert_awaited_once_with("s1")
+    coord._async_update_smart_locks.assert_awaited_once_with("s1")
+
+
+async def test_periodic_update_realtime_manager_but_all_disarmed_always_refreshes() -> None:
+    """Manager present but every space disarmed → SSE/SQS deliver nothing.
+
+    Ajax never pushes real-time events while disarmed, so a manager being
+    instantiated is not enough on its own: the throttle must fall back to
+    polling every cycle, same as the no-manager case, even off the Nth tick.
+    """
+    coord = _coordinator()
+    coord._initial_load_done = True
+    coord.sse_manager = MagicMock()  # manager present...
+    coord._realtime_skip_factor = 3
+    coord._cycle_counter = 0  # becomes 1 after increment → 1 % 3 != 0
+    coord._last_metadata_refresh = 1e18
+    coord.account = _account_with_space(SecurityState.DISARMED)  # ...but disarmed
     coord.account.spaces["s1"].video_edges["ve1"] = MagicMock()
     coord.account.spaces["s1"].smart_locks["sl1"] = MagicMock()
 

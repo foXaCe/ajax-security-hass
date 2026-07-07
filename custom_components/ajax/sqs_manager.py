@@ -13,7 +13,7 @@ Supported event types:
 
 Event codes:
 - Events contain both eventTag (e.g., "DoorOpened") and eventCode (e.g., "M_01_20")
-- The event_codes module provides multilingual translations (fr, en, es)
+- The event_codes module provides multilingual translations (en, fr, es, de, nl, sv, uk)
 """
 
 from __future__ import annotations
@@ -37,6 +37,7 @@ from .const import (
 )
 from .event_codes import (
     DEFAULT_LANGUAGE,
+    SUPPORTED_LANGUAGES,
     get_event_message,
     get_event_type_description,
     parse_event_code,
@@ -48,7 +49,9 @@ from .event_maps import (
     DOORBELL_EVENTS,
     EVENT_TAG_TO_STATE,
     FLOOD_EVENTS,
+    FULL_ARM_EVENT_TAGS,
     GLASS_EVENTS,
+    GROUP_ARM_EVENT_TAGS,
     HUB_EVENTS,
     LOCK_DOOR_EVENT_CODE_STATES,
     LOCK_DOOR_EVENTS,
@@ -108,7 +111,7 @@ class SQSManager(EventHandlerMixin):
 
     def set_language(self, language: str) -> None:
         """Set the language for event messages."""
-        self._language = language if language in ("fr", "en", "es") else DEFAULT_LANGUAGE
+        self._language = language if language in SUPPORTED_LANGUAGES else DEFAULT_LANGUAGE
         _LOGGER.debug("SQS Manager language set to: %s", self._language)
 
     async def start(self) -> bool:
@@ -442,10 +445,10 @@ class SQSManager(EventHandlerMixin):
 
         # Group arm/disarm events need a FULL refresh to update group states
         # because the final state depends on how many groups are armed
-        is_group_event = event_tag in ("grouparm", "groupdisarm")
+        is_group_event = event_tag in GROUP_ARM_EVENT_TAGS
 
         # Full arm/disarm also affects all groups - need refresh to update them
-        is_full_arm_disarm = event_tag in ("arm", "disarm")
+        is_full_arm_disarm = event_tag in FULL_ARM_EVENT_TAGS
 
         if is_group_event or is_full_arm_disarm:
             _LOGGER.info(

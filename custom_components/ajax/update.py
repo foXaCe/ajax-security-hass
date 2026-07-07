@@ -54,32 +54,6 @@ async def async_setup_entry(
     """Set up Ajax update entities from a config entry."""
     coordinator = entry.runtime_data
 
-    entities: list[UpdateEntity] = []
-
-    for space in coordinator.data.spaces.values():
-        # Create update entity for Hub
-        if space.hub_details and space.hub_details.get("firmware"):
-            entities.append(
-                AjaxHubFirmwareUpdate(
-                    coordinator=coordinator,
-                    space=space,
-                )
-            )
-
-        # Create update entities for video edges
-        for video_edge in space.video_edges.values():
-            entities.append(
-                AjaxVideoEdgeFirmwareUpdate(
-                    coordinator=coordinator,
-                    video_edge=video_edge,
-                    space_id=space.id,
-                )
-            )
-
-    if entities:
-        _LOGGER.debug("Adding %d update entities", len(entities))
-        async_add_entities(entities)
-
     def _build_space(space_id: str, _obj_id: str) -> list[tuple[str, UpdateEntity]]:
         """Build the hub firmware entity for a hub added after startup (#multi-hub)."""
         space = coordinator.get_space(space_id)
@@ -114,6 +88,17 @@ async def async_setup_entry(
                 AjaxVideoEdgeFirmwareUpdate(coordinator=coordinator, video_edge=video_edge, space_id=space_id),
             )
         ]
+
+    # Static setup: reuse the discovery builders.
+    entities: list[UpdateEntity] = []
+    for space in coordinator.data.spaces.values():
+        entities.extend(entity for _uid, entity in _build_space(space.id, space.id))
+        for video_edge_id in space.video_edges:
+            entities.extend(entity for _uid, entity in _build_update(space.id, video_edge_id))
+
+    if entities:
+        _LOGGER.debug("Adding %d update entities", len(entities))
+        async_add_entities(entities)
 
     connect_new_entity_signal(
         hass,

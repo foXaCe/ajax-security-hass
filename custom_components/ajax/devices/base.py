@@ -150,16 +150,6 @@ class AjaxDeviceHandler(ABC):
         """
         return []
 
-    def get_alarm_control_panels(self) -> list[dict[str, Any]]:
-        """Return alarm control panel descriptions for this device.
-
-        Usually only the Hub device creates an alarm control panel.
-
-        Returns:
-            List of dicts with alarm panel configuration
-        """
-        return []
-
     # ---------------------------------------------------------------------
     # Helpers: common entity descriptors shared by most handlers.
     # Returning a dict (not appending) lets each handler control ordering

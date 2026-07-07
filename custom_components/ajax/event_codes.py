@@ -10,7 +10,7 @@ Placeholders in messages:
 - %2$s = room name
 - %3$s = hub name
 
-Supported languages: fr, en, es
+Supported languages: en, fr, es, de, nl, sv, uk
 """
 
 from __future__ import annotations
@@ -1681,8 +1681,10 @@ ACTION_CATEGORIES = {
 # Default language fallback order
 DEFAULT_LANGUAGE = "en"
 
-# Languages the EVENT_MESSAGES tables actually carry.
-SUPPORTED_LANGUAGES = frozenset({"en", "fr", "es"})
+# Languages the EVENT_MESSAGES tables actually carry. Matches the
+# integration's translations/ directory; ``get_event_message`` falls back
+# to English for the few entries missing a language.
+SUPPORTED_LANGUAGES = frozenset({"en", "fr", "es", "de", "nl", "sv", "uk"})
 
 
 def resolve_event_language(ha_language: str | None) -> str:
@@ -1696,7 +1698,7 @@ def get_event_message(action_key: str, language: str = DEFAULT_LANGUAGE) -> str:
 
     Args:
         action_key: Action key like "door_opened", "motion_detected"
-        language: Language code (fr, en, es)
+        language: Language code (see ``SUPPORTED_LANGUAGES``)
 
     Returns:
         Translated message or the action_key if not found
@@ -1721,7 +1723,7 @@ def get_event_type_description(event_type: str, language: str = DEFAULT_LANGUAGE
 
     Args:
         event_type: Event type like "ALARM", "SECURITY", "MALFUNCTION"
-        language: Language code (fr, en, es)
+        language: Language code (see ``SUPPORTED_LANGUAGES``)
 
     Returns:
         Translated description or the event_type if not found
@@ -1744,7 +1746,7 @@ def parse_event_code(event_code: str, language: str = DEFAULT_LANGUAGE) -> dict[
 
     Args:
         event_code: Event code like "M_01_20"
-        language: Language code for message translation (fr, en, es)
+        language: Language code for message translation (see ``SUPPORTED_LANGUAGES``)
 
     Returns:
         Dict with action, message, category, is_alarm, device_type, transition or None if not found
@@ -1851,7 +1853,7 @@ def format_event_message(
         device_name: Name of the device
         room_name: Name of the room
         hub_name: Name of the hub
-        language: Language code (fr, en, es)
+        language: Language code (see ``SUPPORTED_LANGUAGES``)
 
     Returns:
         Formatted message string

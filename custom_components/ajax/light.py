@@ -48,28 +48,6 @@ async def async_setup_entry(
     if coordinator.account is None:
         return
 
-    entities: list[LightEntity] = []
-
-    for space_id, space in coordinator.account.spaces.items():
-        for device_id, device in space.devices.items():
-            # Only create light entities for dimmer devices
-            if device.type in DIMMABLE_DEVICE_TYPES and is_dimmer_device(device):
-                entities.append(
-                    AjaxDimmerLight(
-                        coordinator=coordinator,
-                        space_id=space_id,
-                        device_id=device_id,
-                    )
-                )
-                _LOGGER.debug(
-                    "Created light entity for dimmer device: %s",
-                    device.name,
-                )
-
-    if entities:
-        async_add_entities(entities)
-        _LOGGER.info("Added %d Ajax light entit(ies)", len(entities))
-
     def _build_light(space_id: str, device_id: str) -> list[tuple[str, LightEntity]]:
         """Build the light entity for a newly-discovered dimmer device."""
         space = coordinator.get_space(space_id)
@@ -82,6 +60,18 @@ async def async_setup_entry(
                 AjaxDimmerLight(coordinator=coordinator, space_id=space_id, device_id=device_id),
             )
         ]
+
+    # Static setup: reuse the discovery builder.
+    entities: list[LightEntity] = [
+        entity
+        for space_id, space in coordinator.account.spaces.items()
+        for device_id in space.devices
+        for _uid, entity in _build_light(space_id, device_id)
+    ]
+
+    if entities:
+        async_add_entities(entities)
+        _LOGGER.info("Added %d Ajax light entit(ies)", len(entities))
 
     connect_new_entity_signal(
         hass,

@@ -42,102 +42,6 @@ async def async_setup_entry(
     if coordinator.account is None:
         return
 
-    entities: list[SwitchEntity] = []
-
-    # Create switches for each device
-    for space_id, space in coordinator.account.spaces.items():
-        for device_id, device in space.devices.items():
-            # Handle LightSwitchDimmer separately with static definitions
-            if is_dimmer_device(device):
-                # Settings-based switches (settingsSwitch list)
-                if "settingsSwitch" in device.attributes:
-                    for switch_def in DIMMER_SETTINGS_SWITCHES:
-                        entities.append(
-                            AjaxDimmerSettingsSwitch(
-                                coordinator=coordinator,
-                                space_id=space_id,
-                                device_id=device_id,
-                                switch_def=switch_def,
-                            )
-                        )
-                        _LOGGER.debug(
-                            "Created dimmer switch '%s' for device: %s",
-                            switch_def["key"],
-                            device.name,
-                        )
-
-                # Night mode switch (boolean attribute)
-                if "nightModeArm" in device.attributes:
-                    entities.append(
-                        AjaxDimmerBoolSwitch(
-                            coordinator=coordinator,
-                            space_id=space_id,
-                            device_id=device_id,
-                            switch_key="night_mode",
-                            attr_key="nightModeArm",
-                            api_key="nightModeArm",
-                        )
-                    )
-
-                # Dimmer calibration switch (nested in dimmerSettings)
-                dimmer_settings = device.attributes.get("dimmerSettings", {})
-                if dimmer_settings and "calibration" in dimmer_settings:
-                    entities.append(
-                        AjaxDimmerCalibrationSwitch(
-                            coordinator=coordinator,
-                            space_id=space_id,
-                            device_id=device_id,
-                        )
-                    )
-                continue
-
-            # Standard handler-based switches for other devices
-            handler_class = get_device_handler(device)
-            if handler_class:
-                handler = handler_class(device)
-                switches = handler.get_switches()
-
-                for switch_desc in switches:
-                    entities.append(
-                        AjaxSwitch(
-                            coordinator=coordinator,
-                            space_id=space_id,
-                            device_id=device_id,
-                            switch_key=switch_desc["key"],
-                            switch_desc=switch_desc,
-                        )
-                    )
-                    _LOGGER.debug(
-                        "Created switch '%s' for device: %s (type: %s)",
-                        switch_desc["key"],
-                        device.name,
-                        device.type.value if device.type else "unknown",
-                    )
-
-            # Add LightSwitch settings switches (non-dimmer) - LED, child lock, etc.
-            if is_lightswitch_device(device):
-                lightswitch_handler = LightSwitchHandler(device)
-                settings_switches = lightswitch_handler.get_switches()
-                for switch_desc in settings_switches:
-                    entities.append(
-                        AjaxSwitch(
-                            coordinator=coordinator,
-                            space_id=space_id,
-                            device_id=device_id,
-                            switch_key=switch_desc["key"],
-                            switch_desc=switch_desc,
-                        )
-                    )
-                    _LOGGER.debug(
-                        "Created LightSwitch settings switch '%s' for device: %s",
-                        switch_desc["key"],
-                        device.name,
-                    )
-
-    if entities:
-        async_add_entities(entities)
-        _LOGGER.info("Added %d Ajax switch(es)", len(entities))
-
     def _build_device(space_id: str, device_id: str) -> list[tuple[str, SwitchEntity]]:
         """Build switch entities for a newly-discovered device.
 
@@ -205,6 +109,19 @@ async def async_setup_entry(
                     )
 
         return pairs
+
+    # Static setup: reuse the discovery builder (dimmer / handler / lightswitch
+    # branching lives in exactly one place).
+    entities: list[SwitchEntity] = [
+        entity
+        for space_id, space in coordinator.account.spaces.items()
+        for device_id in space.devices
+        for _uid, entity in _build_device(space_id, device_id)
+    ]
+
+    if entities:
+        async_add_entities(entities)
+        _LOGGER.info("Added %d Ajax switch(es)", len(entities))
 
     connect_new_entity_signal(
         hass,

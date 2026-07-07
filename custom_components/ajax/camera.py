@@ -43,72 +43,6 @@ async def async_setup_entry(
     """Set up Ajax camera entities from a config entry."""
     coordinator = entry.runtime_data
 
-    entities: list[Camera] = []
-
-    # Create camera entities for video edges
-    for space in coordinator.data.spaces.values():
-        for video_edge in space.video_edges.values():
-            # Only create camera if we have an IP address
-            if video_edge.ip_address:
-                # NVR: create cameras for each channel
-                if video_edge.video_edge_type == VideoEdgeType.NVR and video_edge.channels:
-                    for i, channel in enumerate(video_edge.channels):
-                        channel_name = channel.get("name") if isinstance(channel, dict) else None
-                        channel_id = channel.get("id") if isinstance(channel, dict) else None
-                        # Main stream for this channel
-                        entities.append(
-                            AjaxVideoEdgeCamera(
-                                coordinator=coordinator,
-                                entry=entry,
-                                video_edge=video_edge,
-                                space_id=space.id,
-                                stream_type="main",
-                                channel_index=i,
-                                channel_name=channel_name,
-                                channel_id=channel_id,
-                            )
-                        )
-                        # Sub stream for this channel (disabled by default)
-                        entities.append(
-                            AjaxVideoEdgeCamera(
-                                coordinator=coordinator,
-                                entry=entry,
-                                video_edge=video_edge,
-                                space_id=space.id,
-                                stream_type="sub",
-                                channel_index=i,
-                                channel_name=channel_name,
-                                channel_id=channel_id,
-                            )
-                        )
-                else:
-                    # Single camera (TurretCam, BulletCam, MiniDome, etc.)
-                    # Create main stream camera (high quality, enabled by default)
-                    entities.append(
-                        AjaxVideoEdgeCamera(
-                            coordinator=coordinator,
-                            entry=entry,
-                            video_edge=video_edge,
-                            space_id=space.id,
-                            stream_type="main",
-                        )
-                    )
-                    # Create sub stream camera (low quality, disabled by default)
-                    # Useful for 3G/4G connections with limited bandwidth
-                    entities.append(
-                        AjaxVideoEdgeCamera(
-                            coordinator=coordinator,
-                            entry=entry,
-                            video_edge=video_edge,
-                            space_id=space.id,
-                            stream_type="sub",
-                        )
-                    )
-
-    if entities:
-        _LOGGER.debug("Adding %d camera entities", len(entities))
-        async_add_entities(entities)
-
     def _build_cameras(space_id: str, video_edge_id: str) -> list[tuple[str, Camera]]:
         """Build camera entities for a newly-discovered Video Edge device."""
         space = coordinator.get_space(space_id)
@@ -139,6 +73,19 @@ async def async_setup_entry(
             cameras.append(AjaxVideoEdgeCamera(coordinator, entry, video_edge, space_id, stream_type="sub"))
 
         return [(camera.unique_id, camera) for camera in cameras if camera.unique_id]
+
+    # Static setup: reuse the discovery builder (NVR-channel vs single-camera
+    # logic lives in exactly one place).
+    entities: list[Camera] = [
+        camera
+        for space in coordinator.data.spaces.values()
+        for video_edge_id in space.video_edges
+        for _uid, camera in _build_cameras(space.id, video_edge_id)
+    ]
+
+    if entities:
+        _LOGGER.debug("Adding %d camera entities", len(entities))
+        async_add_entities(entities)
 
     connect_new_entity_signal(
         hass,

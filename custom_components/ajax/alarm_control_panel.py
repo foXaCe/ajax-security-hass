@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Awaitable, Callable
 from typing import Any
 
 from homeassistant.components.alarm_control_panel import (
@@ -26,6 +27,43 @@ from .models import GroupState, SecurityState
 
 _LOGGER = logging.getLogger(__name__)
 PARALLEL_UPDATES = 1
+
+
+async def _async_optimistic_transition(
+    entity: CoordinatorEntity[AjaxDataCoordinator],
+    target: Any,
+    state_attr: str,
+    optimistic_state: Any,
+    action: Callable[[], Awaitable[Any]],
+    failure_log: str,
+) -> None:
+    """Apply an optimistic arm/disarm state, run ``action``, roll back on failure.
+
+    Shared by the space and group panels: shows ``optimistic_state`` on
+    ``target.<state_attr>`` immediately, then restores the pre-action state
+    synchronously if the API call fails (so the panel does not keep showing
+    the wrong state during the debounced bypass refresh) and raises a
+    translated ``HomeAssistantError``.
+    """
+    previous_state: Any = None
+    if target is not None:
+        previous_state = getattr(target, state_attr)
+        setattr(target, state_attr, optimistic_state)
+        entity.async_write_ha_state()
+
+    try:
+        await action()
+    except Exception as err:
+        _LOGGER.error("%s: %s", failure_log, err)
+        if target is not None and previous_state is not None:
+            setattr(target, state_attr, previous_state)
+            entity.async_write_ha_state()
+        await entity.coordinator.async_request_refresh_bypass_cache()
+        raise HomeAssistantError(
+            translation_domain=DOMAIN,
+            translation_key="arm_disarm_failed",
+            translation_placeholders={"error": str(err)},
+        ) from err
 
 
 async def async_setup_entry(
@@ -189,89 +227,38 @@ class AjaxAlarmControlPanel(CoordinatorEntity[AjaxDataCoordinator], AlarmControl
     async def async_alarm_disarm(self, code: str | None = None) -> None:
         """Send disarm command."""
         _LOGGER.info("Disarming Ajax alarm for space %s", self._space_id)
-
-        # Optimistic update - change state immediately
-        space = self.coordinator.get_space(self._space_id)
-        previous_state: SecurityState | None = None
-        if space:
-            previous_state = space.security_state
-            space.security_state = SecurityState.DISARMED
-            self.async_write_ha_state()
-
-        try:
-            await self.coordinator.async_disarm_space(self._space_id)
-        except Exception as err:
-            _LOGGER.error("Failed to disarm: %s", err)
-            # Restore the pre-action state synchronously so the panel does not
-            # keep showing the optimistic (wrong) state during the debounced
-            # bypass refresh, then trigger that refresh as a fallback.
-            if space and previous_state is not None:
-                space.security_state = previous_state
-                self.async_write_ha_state()
-            await self.coordinator.async_request_refresh_bypass_cache()
-            raise HomeAssistantError(
-                translation_domain=DOMAIN,
-                translation_key="arm_disarm_failed",
-                translation_placeholders={"error": str(err)},
-            ) from err
+        await _async_optimistic_transition(
+            self,
+            self.coordinator.get_space(self._space_id),
+            "security_state",
+            SecurityState.DISARMED,
+            lambda: self.coordinator.async_disarm_space(self._space_id),
+            "Failed to disarm",
+        )
 
     async def async_alarm_arm_away(self, code: str | None = None) -> None:
         """Send arm away command."""
         _LOGGER.info("Arming Ajax alarm (away) for space %s", self._space_id)
-
-        # Optimistic update - change state immediately
-        space = self.coordinator.get_space(self._space_id)
-        previous_state: SecurityState | None = None
-        if space:
-            previous_state = space.security_state
-            space.security_state = SecurityState.ARMED
-            self.async_write_ha_state()
-
-        try:
-            await self.coordinator.async_arm_space(self._space_id)
-        except Exception as err:
-            _LOGGER.error("Failed to arm: %s", err)
-            # Restore the pre-action state synchronously so the panel does not
-            # keep showing the optimistic (wrong) state during the debounced
-            # bypass refresh, then trigger that refresh as a fallback.
-            if space and previous_state is not None:
-                space.security_state = previous_state
-                self.async_write_ha_state()
-            await self.coordinator.async_request_refresh_bypass_cache()
-            raise HomeAssistantError(
-                translation_domain=DOMAIN,
-                translation_key="arm_disarm_failed",
-                translation_placeholders={"error": str(err)},
-            ) from err
+        await _async_optimistic_transition(
+            self,
+            self.coordinator.get_space(self._space_id),
+            "security_state",
+            SecurityState.ARMED,
+            lambda: self.coordinator.async_arm_space(self._space_id),
+            "Failed to arm",
+        )
 
     async def async_alarm_arm_night(self, code: str | None = None) -> None:
         """Send arm night command."""
         _LOGGER.info("Arming Ajax alarm (night) for space %s", self._space_id)
-
-        # Optimistic update - change state immediately
-        space = self.coordinator.get_space(self._space_id)
-        previous_state: SecurityState | None = None
-        if space:
-            previous_state = space.security_state
-            space.security_state = SecurityState.NIGHT_MODE
-            self.async_write_ha_state()
-
-        try:
-            await self.coordinator.async_arm_night_mode(self._space_id)
-        except Exception as err:
-            _LOGGER.error("Failed to arm night mode: %s", err)
-            # Restore the pre-action state synchronously so the panel does not
-            # keep showing the optimistic (wrong) state during the debounced
-            # bypass refresh, then trigger that refresh as a fallback.
-            if space and previous_state is not None:
-                space.security_state = previous_state
-                self.async_write_ha_state()
-            await self.coordinator.async_request_refresh_bypass_cache()
-            raise HomeAssistantError(
-                translation_domain=DOMAIN,
-                translation_key="arm_disarm_failed",
-                translation_placeholders={"error": str(err)},
-            ) from err
+        await _async_optimistic_transition(
+            self,
+            self.coordinator.get_space(self._space_id),
+            "security_state",
+            SecurityState.NIGHT_MODE,
+            lambda: self.coordinator.async_arm_night_mode(self._space_id),
+            "Failed to arm night mode",
+        )
 
     async def async_added_to_hass(self) -> None:
         """When entity is added to hass, update device info in registry."""
@@ -419,60 +406,26 @@ class AjaxGroupAlarmControlPanel(CoordinatorEntity[AjaxDataCoordinator], AlarmCo
     async def async_alarm_disarm(self, code: str | None = None) -> None:
         """Send disarm command for this group."""
         _LOGGER.info("Disarming Ajax group %s in space %s", self._group_id, self._space_id)
-
-        # Optimistic update
-        group = self.coordinator.get_group(self._space_id, self._group_id)
-        previous_state: GroupState | None = None
-        if group:
-            previous_state = group.state
-            group.state = GroupState.DISARMED
-            self.async_write_ha_state()
-
-        try:
-            await self.coordinator.async_disarm_group(self._space_id, self._group_id)
-        except Exception as err:
-            _LOGGER.error("Failed to disarm group: %s", err)
-            # Restore the pre-action state synchronously so the panel does not
-            # keep showing the optimistic (wrong) state during the debounced
-            # bypass refresh, then trigger that refresh as a fallback.
-            if group and previous_state is not None:
-                group.state = previous_state
-                self.async_write_ha_state()
-            await self.coordinator.async_request_refresh_bypass_cache()
-            raise HomeAssistantError(
-                translation_domain=DOMAIN,
-                translation_key="arm_disarm_failed",
-                translation_placeholders={"error": str(err)},
-            ) from err
+        await _async_optimistic_transition(
+            self,
+            self.coordinator.get_group(self._space_id, self._group_id),
+            "state",
+            GroupState.DISARMED,
+            lambda: self.coordinator.async_disarm_group(self._space_id, self._group_id),
+            "Failed to disarm group",
+        )
 
     async def async_alarm_arm_away(self, code: str | None = None) -> None:
         """Send arm command for this group."""
         _LOGGER.info("Arming Ajax group %s in space %s", self._group_id, self._space_id)
-
-        # Optimistic update
-        group = self.coordinator.get_group(self._space_id, self._group_id)
-        previous_state: GroupState | None = None
-        if group:
-            previous_state = group.state
-            group.state = GroupState.ARMED
-            self.async_write_ha_state()
-
-        try:
-            await self.coordinator.async_arm_group(self._space_id, self._group_id)
-        except Exception as err:
-            _LOGGER.error("Failed to arm group: %s", err)
-            # Restore the pre-action state synchronously so the panel does not
-            # keep showing the optimistic (wrong) state during the debounced
-            # bypass refresh, then trigger that refresh as a fallback.
-            if group and previous_state is not None:
-                group.state = previous_state
-                self.async_write_ha_state()
-            await self.coordinator.async_request_refresh_bypass_cache()
-            raise HomeAssistantError(
-                translation_domain=DOMAIN,
-                translation_key="arm_disarm_failed",
-                translation_placeholders={"error": str(err)},
-            ) from err
+        await _async_optimistic_transition(
+            self,
+            self.coordinator.get_group(self._space_id, self._group_id),
+            "state",
+            GroupState.ARMED,
+            lambda: self.coordinator.async_arm_group(self._space_id, self._group_id),
+            "Failed to arm group",
+        )
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:

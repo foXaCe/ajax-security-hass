@@ -222,7 +222,15 @@ class AjaxEventDispatchMixin:
         )
 
         if source_name:
-            by_word = {"fr": "par", "en": "by", "es": "por"}.get(language, "by")
+            by_word = {
+                "fr": "par",
+                "en": "by",
+                "es": "por",
+                "de": "von",
+                "nl": "door",
+                "sv": "av",
+                "uk": "від",
+            }.get(language, "by")
             # Persistent notifications render markdown — escape user-supplied
             # source_name (from Ajax API) to neutralise [text](javascript:...)
             # injection and stray markdown formatting.

@@ -300,6 +300,18 @@ class AjaxDataCoordinator(
         self._force_metadata_refresh = True  # Set flag to force refresh
         await self.async_refresh()
 
+    async def async_force_state_refresh(self) -> None:
+        """Immediate light refresh after a realtime security event.
+
+        Bypasses the DataUpdateCoordinator debouncer (async_refresh, same
+        rationale as async_force_metadata_refresh) WITHOUT forcing the
+        account-wide metadata pass: hub state and per-group states are
+        fetched on every tick anyway (#150), so an arm/disarm event only
+        needs immediacy - not rooms/users/video re-fetches across all hubs.
+        """
+        _LOGGER.info("Forcing light state refresh (immediate)")
+        await self.async_refresh()
+
     async def async_request_refresh_bypass_cache(self) -> None:
         """Request a refresh that bypasses the proxy cache.
 

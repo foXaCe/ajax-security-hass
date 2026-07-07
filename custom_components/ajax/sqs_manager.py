@@ -449,8 +449,8 @@ class SQSManager(EventHandlerMixin):
             ha_action_pending,
         )
 
-        # Group arm/disarm events need a FULL refresh to update group states
-        # because the final state depends on how many groups are armed
+        # Group arm/disarm events need an immediate refresh to update group
+        # states (group states are already fetched on every tick, #150)
         is_group_event = event_tag in GROUP_ARM_EVENT_TAGS
 
         # Full arm/disarm also affects all groups - need refresh to update them
@@ -474,10 +474,17 @@ class SQSManager(EventHandlerMixin):
                     # Wait for Ajax backend to process the change before refreshing
                     # Without this delay, the API may return stale state
                     await asyncio.sleep(1.0)
-                    await self.coordinator.async_force_metadata_refresh()
-                    _LOGGER.info("SQS: Metadata refresh completed after security event")
+                    # Bypass proxy cache to get fresh group states from Ajax API
+                    # (parity with the SSE path)
+                    self.coordinator._bypass_cache_next_refresh = True
+                    # Group states are already fetched on every tick (#150), so an
+                    # arm/disarm event only needs an immediate light refresh - not a
+                    # full account-wide metadata pass (rooms/users/video re-fetches
+                    # across all hubs).
+                    await self.coordinator.async_force_state_refresh()
+                    _LOGGER.info("SQS: State refresh completed after security event")
                 except Exception as err:
-                    _LOGGER.error("SQS: Metadata refresh failed after security event: %s", err)
+                    _LOGGER.error("SQS: State refresh failed after security event: %s", err)
                 finally:
                     # Always clear the per-hub skip flag
                     if space.hub_id:

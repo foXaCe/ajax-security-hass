@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from urllib.parse import urlsplit
 
 from homeassistant.const import Platform
@@ -42,6 +42,8 @@ from .const import (
     CONF_PASSWORD,
     CONF_PROXY_URL,
     CONF_QUEUE_NAME,
+    CONF_RTSP_PASSWORD,
+    CONF_RTSP_USERNAME,
     CONF_VERIFY_SSL,
     DOMAIN,
     INTEGRATION_VERSION,
@@ -221,15 +223,47 @@ async def async_setup_entry(hass: HomeAssistant, entry: AjaxConfigEntry) -> bool
         "ajax_setup_areas",
     )
 
-    # Listen for options updates (takes effect immediately without reboot)
+    # Snapshot of the connection-relevant configuration. The update listener
+    # is the single reload decision point (HA deprecates flow-side reload
+    # helpers on entries that have an update listener — error in 2026.12):
+    # when this snapshot no longer matches, the listener schedules a reload.
+    coordinator._reload_config_snapshot = _reload_relevant_config(entry)
+
+    # Listen for config/options updates: live-apply what can be, schedule a
+    # reload for connection-relevant changes (credentials, proxy, spaces…).
     entry.async_on_unload(entry.add_update_listener(_async_update_options))
 
     return True
 
 
+def _reload_relevant_config(entry: AjaxConfigEntry) -> tuple[dict[str, Any], str, str]:
+    """Return the part of the entry config that requires a reload to apply.
+
+    ``entry.data`` only holds connection/credential settings (auth mode,
+    email/password, API key, proxy, AWS SQS, enabled spaces, discovered
+    MACs). In ``entry.options`` only the RTSP/ONVIF credentials need a
+    reload — the ONVIF manager reads them at bootstrap only; everything
+    else is either applied live (fast poll) or read dynamically
+    (notification settings).
+    """
+    return (
+        dict(entry.data),
+        entry.options.get(CONF_RTSP_USERNAME, ""),
+        entry.options.get(CONF_RTSP_PASSWORD, ""),
+    )
+
+
 async def _async_update_options(hass: HomeAssistant, entry: AjaxConfigEntry) -> None:
-    """Handle options update."""
+    """Handle config entry updates: reload if needed, else live-apply."""
     coordinator = entry.runtime_data
+
+    # Connection-relevant change (credentials, proxy, spaces, RTSP…) →
+    # schedule a reload; the fresh setup re-reads everything and takes a
+    # new snapshot. Scheduling (vs awaiting) keeps this listener-safe.
+    if _reload_relevant_config(entry) != coordinator._reload_config_snapshot:
+        _LOGGER.info("Connection-relevant configuration changed, reloading the Ajax entry")
+        hass.config_entries.async_schedule_reload(entry.entry_id)
+        return
 
     # Update door sensor fast polling option
     door_sensor_fast_poll = entry.options.get(CONF_DOOR_SENSOR_FAST_POLL, False)

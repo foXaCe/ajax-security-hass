@@ -92,13 +92,12 @@ class AjaxOptionsFlow(OptionsFlow):
                 new_data = {**self.config_entry.data}
                 new_data[CONF_ENABLED_SPACES] = selected_spaces
 
+                # The update listener detects the data change and schedules
+                # the reload (single reload decision point).
                 self.hass.config_entries.async_update_entry(
                     self.config_entry,
                     data=new_data,
                 )
-
-                # Reload integration to apply changes
-                await self.hass.config_entries.async_reload(self.config_entry.entry_id)
 
                 return self.async_create_entry(title="", data=self.config_entry.options)
 
@@ -265,13 +264,12 @@ class AjaxOptionsFlow(OptionsFlow):
                     new_data[CONF_PROXY_URL] = new_proxy_url.rstrip("/")
                     new_data[CONF_VERIFY_SSL] = user_input.get(CONF_VERIFY_SSL, True)
 
+                    # The update listener detects the data change and
+                    # schedules the reload (applies proxy URL / TLS changes).
                     self.hass.config_entries.async_update_entry(
                         self.config_entry,
                         data=new_data,
                     )
-
-                    # Reload to apply SSL changes
-                    await self.hass.config_entries.async_reload(self.config_entry.entry_id)
 
                     return self.async_create_entry(title="", data=self.config_entry.options)
 
@@ -314,15 +312,14 @@ class AjaxOptionsFlow(OptionsFlow):
             if user_input.get(CONF_QUEUE_NAME):
                 new_data[CONF_QUEUE_NAME] = user_input[CONF_QUEUE_NAME]
 
-            # Update the config entry data and reload so the running
-            # SQSManager actually picks the new credentials up — without
-            # the reload it keeps polling with the old ones forever.
+            # The update listener detects the data change and schedules the
+            # reload so the running SQSManager picks the new credentials up —
+            # without it, it keeps polling with the old ones forever.
             if new_data != dict(self.config_entry.data):
                 self.hass.config_entries.async_update_entry(
                     self.config_entry,
                     data=new_data,
                 )
-                await self.hass.config_entries.async_reload(self.config_entry.entry_id)
 
             return self.async_create_entry(title="", data=self.config_entry.options)
 
@@ -372,16 +369,10 @@ class AjaxOptionsFlow(OptionsFlow):
             new_options[CONF_RTSP_PASSWORD] = user_input.get(CONF_RTSP_PASSWORD, "")
 
             # The ONVIF manager only reads these credentials at bootstrap
-            # (`_async_init_onvif`), so a reload is required for local AI
-            # detections to use them. The RTSP camera stream path reads the
-            # options on every request and would work either way.
-            if new_options != dict(self.config_entry.options):
-                self.hass.config_entries.async_update_entry(
-                    self.config_entry,
-                    options=new_options,
-                )
-                await self.hass.config_entries.async_reload(self.config_entry.entry_id)
-
+            # (`_async_init_onvif`) — the update listener detects the change
+            # and schedules the reload so local AI detections use them. The
+            # RTSP camera stream path reads the options on every request and
+            # would work either way.
             return self.async_create_entry(title="", data=new_options)
 
         # Get current credentials

@@ -590,9 +590,9 @@ async def test_step_2fa_reauth_success() -> None:
     result = await flow.async_step_2fa({"code": "123456"})
     assert result["type"] == "abort"
     assert result["reason"] == "reauth_successful"
-    # async_update_reload_and_abort → update + scheduled reload.
+    # async_update_and_abort → update only; the update listener owns the reload.
     flow.hass.config_entries.async_update_entry.assert_called_once()
-    flow.hass.config_entries.async_schedule_reload.assert_called_once_with("entry-1")
+    flow.hass.config_entries.async_schedule_reload.assert_not_called()
 
 
 async def test_step_2fa_invalid_code() -> None:
@@ -813,6 +813,36 @@ async def test_step_reauth_confirm_direct_success() -> None:
     flow.hass.config_entries.async_update_entry.assert_called_once()
 
 
+async def test_step_reauth_confirm_same_password_schedules_reload() -> None:
+    """Re-entering the SAME password (expired-token case) must retry the setup.
+
+    Unchanged data does not fire the update listener, so the flow schedules
+    the reload explicitly — otherwise the entry stays in its failed state.
+    """
+    import hashlib
+
+    same_hash = hashlib.sha256(b"samepass").hexdigest()
+    flow = _make_flow()
+    flow.context["entry_id"] = "e1"
+    entry = MagicMock()
+    entry.entry_id = "e1"
+    entry.data = {
+        CONF_EMAIL: "u@e.com",
+        CONF_AUTH_MODE: AUTH_MODE_DIRECT,
+        CONF_API_KEY: "key",
+        CONF_PASSWORD: same_hash,
+    }
+    flow.hass.config_entries.async_get_entry = MagicMock(return_value=entry)
+    flow.hass.config_entries.async_update_entry = MagicMock()
+    flow.hass.config_entries.async_schedule_reload = MagicMock()
+    api = _mock_api()
+    with patch(API_PATH, return_value=api):
+        result = await flow.async_step_reauth_confirm({CONF_PASSWORD: "samepass"})
+    assert result["type"] == "abort"
+    assert result["reason"] == "reauth_successful"
+    flow.hass.config_entries.async_schedule_reload.assert_called_once_with("e1")
+
+
 async def test_step_reauth_confirm_proxy_success() -> None:
     flow = _make_flow()
     flow.context["entry_id"] = "e1"
@@ -897,7 +927,7 @@ def _reconfigure_flow(entry_data: dict[str, Any]) -> AjaxConfigFlow:
     entry.entry_id = "e1"
     entry.data = entry_data
     flow._get_reconfigure_entry = MagicMock(return_value=entry)
-    flow.async_update_reload_and_abort = MagicMock(
+    flow.async_update_and_abort = MagicMock(
         side_effect=lambda *a, **kw: {
             "type": "abort",
             "reason": "reconfigure_successful",
@@ -1125,7 +1155,8 @@ async def test_options_enabled_spaces_saves() -> None:
     result = await flow.async_step_enabled_spaces({CONF_ENABLED_SPACES: ["H1"]})
     assert result["type"] == "create_entry"
     flow.hass.config_entries.async_update_entry.assert_called_once()
-    flow.hass.config_entries.async_reload.assert_awaited_once_with("e1")
+    # The update listener owns the reload — the step must not reload itself.
+    flow.hass.config_entries.async_reload.assert_not_awaited()
 
 
 async def test_options_notifications_form_with_spaces() -> None:
@@ -1229,8 +1260,9 @@ async def test_options_aws_credentials_saves() -> None:
     assert new_data[CONF_AWS_ACCESS_KEY_ID] == "AKIA"
     assert new_data[CONF_AWS_SECRET_ACCESS_KEY] == "SEC"
     assert new_data[CONF_QUEUE_NAME] == "queue"
-    # New credentials must restart the SQS manager → entry reload.
-    flow.hass.config_entries.async_reload.assert_awaited_once()
+    # New credentials must restart the SQS manager — via the update
+    # listener's scheduled reload, not a manual one in the step.
+    flow.hass.config_entries.async_reload.assert_not_awaited()
 
 
 async def test_options_aws_credentials_unchanged_no_reload() -> None:
@@ -1268,10 +1300,8 @@ async def test_options_rtsp_credentials_saves() -> None:
     assert result["data"][CONF_RTSP_USERNAME] == "admin"
     assert result["data"][CONF_RTSP_PASSWORD] == "pass"
     assert result["data"]["keep"] == "me"
-    # The ONVIF manager only reads credentials at bootstrap → reload required.
-    new_options = flow.hass.config_entries.async_update_entry.call_args.kwargs["options"]
-    assert new_options[CONF_RTSP_USERNAME] == "admin"
-    flow.hass.config_entries.async_reload.assert_awaited_once()
+    # The options change fires the update listener, which owns the reload.
+    flow.hass.config_entries.async_reload.assert_not_awaited()
 
 
 async def test_options_rtsp_credentials_unchanged_no_reload() -> None:

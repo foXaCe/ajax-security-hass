@@ -16,7 +16,7 @@ All notable changes to this project will be documented in this file.
 - Options flow: field descriptions for the notifications and enabled-spaces steps, in all 7 languages.
 
 ### Changed
-- Re-authentication (password and 2FA paths) uses the modern `async_update_reload_and_abort` helper — single reload, no manual update/reload/abort triplet.
+- **The update listener is now the single reload decision point** (HA deprecates flow-side reload helpers on entries with an update listener — error in HA 2026.12). Config flows and options steps only update the entry; the listener compares the connection-relevant config against a snapshot and schedules the reload when needed, while fast-poll and notification options keep applying live.
 - Read-only platforms (sensor, binary_sensor, device_tracker) now set the recommended `PARALLEL_UPDATES = 0`.
 - Internal: static entity setup reuses the dynamic-discovery builders across 10 platforms (event descriptors and NVR/dimmer branching now live in one place); the five copy-pasted optimistic-update blocks of the alarm panels folded into one helper; never-called `get_alarm_control_panels()` removed; arm/disarm event tags named in `event_maps`.
 - Internal: the 640-line device-reconciliation method was split — per-family attribute application now lives in `_device_apply.py` as pure functions; `binary_sensor.py`, `select.py` and `number.py` follow the house pattern (thin platform + `_*_entities.py` module); the config flow builds its REST client through a single `_build_api` helper instead of four duplicated constructions.

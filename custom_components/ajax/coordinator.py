@@ -181,6 +181,11 @@ class AjaxDataCoordinator(
         # Door sensor fast polling option (disabled by default to reduce API calls)
         self._door_sensor_fast_poll_enabled: bool = False
 
+        # Snapshot of the connection-relevant entry config, set at setup by
+        # ``__init__.async_setup_entry``. The update listener compares against
+        # it to decide whether a config change requires a reload.
+        self._reload_config_snapshot: tuple[dict[str, Any], str, str] | None = None
+
         # Event entity registry: device_id -> AjaxEventEntity
         self._event_entities: dict[str, Any] = {}
 

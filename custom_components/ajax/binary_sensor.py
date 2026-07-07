@@ -1,39 +1,41 @@
-"""Ajax binary sensor platform (refactored).
+"""Ajax binary sensor platform.
 
-This module creates binary sensors for Ajax devices using the device handler architecture.
-Each device type (MotionProtect, DoorProtect, etc.) has its own handler that defines
-which binary sensors to create.
+Thin platform module: ``async_setup_entry`` plus the discovery builders.
+The static setup reuses the builders so entity-construction logic exists
+in exactly one place. The entity classes live in
+``_binary_sensor_entities`` and are re-exported here for backwards
+compatibility (tests and older imports).
 """
 
 from __future__ import annotations
 
 import logging
-from typing import Any
 
 from homeassistant.components.binary_sensor import (
     DOMAIN as BINARY_SENSOR_DOMAIN,
-    BinarySensorDeviceClass,
     BinarySensorEntity,
 )
-from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers import device_registry as dr
-from homeassistant.helpers.device_registry import DeviceInfo
+from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import AjaxConfigEntry
-from ._discovery import connect_new_entity_signal
-from ._ids import device_identifier
-from .const import MANUFACTURER, SIGNAL_NEW_DEVICE, SIGNAL_NEW_SMART_LOCK, SIGNAL_NEW_SPACE, SIGNAL_NEW_VIDEO_EDGE
-from .coordinator import AjaxDataCoordinator
-from .devices import VideoEdgeHandler, get_device_handler
-from .devices.base import resolve_entity_category
-from .models import (
-    VIDEO_EDGE_MODEL_NAMES,
-    AjaxDevice,
-    AjaxSmartLock,
-    AjaxVideoEdge,
+from ._binary_sensor_entities import (
+    AjaxBinarySensor,
+    AjaxHubBinarySensor,
+    AjaxSmartLockBinarySensor,
+    AjaxVideoEdgeBinarySensor,
 )
+from ._discovery import connect_new_entity_signal
+from .const import SIGNAL_NEW_DEVICE, SIGNAL_NEW_SMART_LOCK, SIGNAL_NEW_SPACE, SIGNAL_NEW_VIDEO_EDGE
+from .devices import VideoEdgeHandler, get_device_handler
+
+__all__ = [
+    "AjaxBinarySensor",
+    "AjaxHubBinarySensor",
+    "AjaxSmartLockBinarySensor",
+    "AjaxVideoEdgeBinarySensor",
+    "async_setup_entry",
+]
 
 _LOGGER = logging.getLogger(__name__)
 # Read-only coordinator-driven platform: no per-entity I/O to throttle
@@ -51,132 +53,6 @@ async def async_setup_entry(
 
     if coordinator.account is None:
         return
-
-    entities: list[BinarySensorEntity] = []
-    seen_unique_ids: set[str] = set()
-
-    # Create binary sensors for all devices using handlers
-    for space_id, space in coordinator.account.spaces.items():
-        for device_id, device in space.devices.items():
-            handler_class = get_device_handler(device)
-            if handler_class:
-                handler = handler_class(device)
-                binary_sensors = handler.get_binary_sensors()
-
-                for sensor_desc in binary_sensors:
-                    unique_id = f"{device_id}_{sensor_desc['key']}"
-
-                    # Skip if we already created this entity in this setup
-                    if unique_id in seen_unique_ids:
-                        _LOGGER.debug(
-                            "Skipping duplicate unique_id %s for device %s",
-                            unique_id,
-                            device.name,
-                        )
-                        continue
-                    seen_unique_ids.add(unique_id)
-
-                    entities.append(
-                        AjaxBinarySensor(
-                            coordinator=coordinator,
-                            space_id=space_id,
-                            device_id=device_id,
-                            sensor_key=sensor_desc["key"],
-                            sensor_desc=sensor_desc,
-                        )
-                    )
-                    _LOGGER.debug(
-                        "Created binary sensor '%s' for device: %s (type: %s)",
-                        sensor_desc["key"],
-                        device.name,
-                        device.type.value,
-                    )
-
-        # Create binary sensors for video edges (surveillance cameras)
-        # Pass all video edges so we can find NVR links for each camera
-        all_video_edges = space.video_edges
-        for ve_id, video_edge in all_video_edges.items():
-            handler = VideoEdgeHandler(video_edge, all_video_edges)  # type: ignore[assignment]
-            binary_sensors = handler.get_binary_sensors()
-
-            for sensor_desc in binary_sensors:
-                # Use target_video_edge_id if present (for NVR channels linked to cameras)
-                # This attaches the entity to the camera device instead of NVR
-                target_ve_id = sensor_desc.get("target_video_edge_id") or ve_id
-                unique_id = f"{target_ve_id}_{sensor_desc['key']}"
-
-                if unique_id in seen_unique_ids:
-                    continue
-                seen_unique_ids.add(unique_id)
-
-                entities.append(
-                    AjaxVideoEdgeBinarySensor(
-                        coordinator=coordinator,
-                        space_id=space_id,
-                        video_edge_id=target_ve_id,
-                        sensor_key=sensor_desc["key"],
-                        sensor_desc=sensor_desc,
-                    )
-                )
-                # Log with target device name if different from source
-                if sensor_desc.get("target_video_edge_id"):
-                    target_ve = all_video_edges.get(target_ve_id)
-                    target_name = target_ve.name if target_ve else target_ve_id
-                    _LOGGER.debug(
-                        "Created video edge binary sensor '%s' for camera: %s (data from NVR: %s)",
-                        sensor_desc["key"],
-                        target_name,
-                        video_edge.name,
-                    )
-                else:
-                    _LOGGER.debug(
-                        "Created video edge binary sensor '%s' for: %s",
-                        sensor_desc["key"],
-                        video_edge.name,
-                    )
-
-        # Create binary sensors for smart locks (door open/close)
-        for sl_id, smart_lock in space.smart_locks.items():
-            unique_id = f"{sl_id}_door"
-            if unique_id not in seen_unique_ids:
-                seen_unique_ids.add(unique_id)
-                entities.append(
-                    AjaxSmartLockBinarySensor(
-                        coordinator=coordinator,
-                        space_id=space_id,
-                        smart_lock_id=sl_id,
-                    )
-                )
-                _LOGGER.debug(
-                    "Created smart lock door sensor for: %s",
-                    smart_lock.name,
-                )
-
-        # Create hub-level binary sensors from hub_details
-        if space.hub_details:
-            hub_id = space.hub_id
-
-            # Create all hub binary sensors
-            for sensor_key in AjaxHubBinarySensor.HUB_BINARY_SENSORS:
-                unique_id = f"{hub_id}_{sensor_key}"
-                if unique_id not in seen_unique_ids:
-                    seen_unique_ids.add(unique_id)
-                    entities.append(
-                        AjaxHubBinarySensor(
-                            coordinator=coordinator,
-                            space_id=space_id,
-                            sensor_key=sensor_key,
-                        )
-                    )
-                    _LOGGER.debug(
-                        "Created hub binary sensor '%s' for space: %s",
-                        sensor_key,
-                        space.name,
-                    )
-
-    async_add_entities(entities)
-    if entities:
-        _LOGGER.info("Added %d Ajax binary sensor(s)", len(entities))
 
     def _build_device(space_id: str, device_id: str) -> list[tuple[str, BinarySensorEntity]]:
         """Build binary sensors for a newly-discovered regular device."""
@@ -213,6 +89,8 @@ async def async_setup_entry(
         handler = VideoEdgeHandler(video_edge, space.video_edges)
         pairs: list[tuple[str, BinarySensorEntity]] = []
         for sensor_desc in handler.get_binary_sensors():
+            # Use target_video_edge_id if present (for NVR channels linked to
+            # cameras) — attaches the entity to the camera device, not the NVR.
             target_ve_id = sensor_desc.get("target_video_edge_id") or video_edge_id
             pairs.append(
                 (
@@ -251,6 +129,32 @@ async def async_setup_entry(
             for sensor_key in AjaxHubBinarySensor.HUB_BINARY_SENSORS
         ]
 
+    # Static setup: reuse the discovery builders so the construction logic
+    # exists once. The seen-set dedup matters for NVR-linked cameras: the
+    # same target unique_id can be produced from several source video edges.
+    entities: list[BinarySensorEntity] = []
+    seen_unique_ids: set[str] = set()
+
+    for space_id, space in coordinator.account.spaces.items():
+        built: list[tuple[str, BinarySensorEntity]] = []
+        for device_id in space.devices:
+            built.extend(_build_device(space_id, device_id))
+        for ve_id in space.video_edges:
+            built.extend(_build_video_edge(space_id, ve_id))
+        for sl_id in space.smart_locks:
+            built.extend(_build_smart_lock_door(space_id, sl_id))
+        built.extend(_build_space(space_id, space_id))
+
+        for unique_id, entity in built:
+            if unique_id in seen_unique_ids:
+                continue
+            seen_unique_ids.add(unique_id)
+            entities.append(entity)
+
+    async_add_entities(entities)
+    if entities:
+        _LOGGER.info("Added %d Ajax binary sensor(s)", len(entities))
+
     connect_new_entity_signal(
         hass,
         entry,
@@ -287,415 +191,3 @@ async def async_setup_entry(
         _build_smart_lock_door,
         label="smart lock door sensor(s)",
     )
-
-
-class AjaxBinarySensor(CoordinatorEntity[AjaxDataCoordinator], BinarySensorEntity):
-    """Representation of an Ajax binary sensor."""
-
-    _attr_has_entity_name = True
-
-    def __init__(
-        self,
-        coordinator: AjaxDataCoordinator,
-        space_id: str,
-        device_id: str,
-        sensor_key: str,
-        sensor_desc: dict[str, Any],
-    ) -> None:
-        """Initialize the Ajax binary sensor."""
-        super().__init__(coordinator)
-        self._space_id = space_id
-        self._device_id = device_id
-        self._sensor_key = sensor_key
-        self._sensor_desc = sensor_desc
-
-        # Set unique ID
-        self._attr_unique_id = f"{self.coordinator.entry_id}_{device_id}_{sensor_key}"
-
-        # Set device class if provided
-        if "device_class" in sensor_desc:
-            self._attr_device_class = sensor_desc["device_class"]
-
-        # Set translation key only if explicitly provided
-        # If device_class is set and no translation_key, HA will use automatic naming
-        if "translation_key" in sensor_desc:
-            self._attr_translation_key = sensor_desc["translation_key"]
-        elif "device_class" not in sensor_desc:
-            # No device_class, use sensor_key as fallback translation key
-            self._attr_translation_key = sensor_key
-
-        # Set enabled by default
-        if "enabled_by_default" in sensor_desc:
-            self._attr_entity_registry_enabled_default = sensor_desc["enabled_by_default"]
-
-        if "entity_category" in sensor_desc:
-            self._attr_entity_category = resolve_entity_category(sensor_desc["entity_category"])
-
-        # Force name on entity. Mainly used to assign None (=device name)
-        if "name" in sensor_desc:
-            self._attr_name = sensor_desc["name"]
-
-    @property
-    def is_on(self) -> bool | None:
-        """Return true if the binary sensor is on."""
-        device = self._get_device()
-        if not device:
-            return None
-
-        # Use value_fn from sensor description
-        value_fn = self._sensor_desc.get("value_fn")
-        if value_fn:
-            try:
-                return value_fn()  # type: ignore[no-any-return]
-            except Exception as err:
-                _LOGGER.error(
-                    "Error getting value for sensor %s: %s",
-                    self._sensor_key,
-                    err,
-                )
-                return None
-        return None
-
-    @property
-    def available(self) -> bool:
-        """Return True if entity is available."""
-        if not self.coordinator.last_update_success:
-            return False
-        device = self._get_device()
-        if not device:
-            return False
-        return bool(device.online)
-
-    async def async_added_to_hass(self) -> None:
-        """When entity is added to hass, update device info in registry."""
-        await super().async_added_to_hass()
-        self._update_device_registry()
-
-    @callback
-    def _handle_coordinator_update(self) -> None:
-        """Handle updated data from the coordinator."""
-        # Update device registry once on first update (for existing entities)
-        if not getattr(self, "_device_info_updated", False):
-            self._device_info_updated = True
-            self._update_device_registry()
-        self.async_write_ha_state()
-
-    def _update_device_registry(self) -> None:
-        """Update device info in registry with model, firmware, and color."""
-        device = self._get_device()
-        if not device:
-            return
-
-        device_registry = dr.async_get(self.hass)
-        device_entry = device_registry.async_get_device(
-            identifiers={device_identifier(self.coordinator.entry_id, self._device_id)}
-        )
-        if not device_entry:
-            return
-
-        # Get model name - use raw_type from API (e.g., "DoorProtect Plus")
-        model_name = device.raw_type or device.type.value.replace("_", " ").title()
-        if device.device_color:
-            # Keep color as-is from API (WHITE/BLACK are product colors)
-            color = str(device.device_color).title()
-            model_name = f"{model_name} ({color})"
-
-        device_registry.async_update_device(
-            device_entry.id,
-            model=model_name,
-            sw_version=device.firmware_version,
-            hw_version=device.hardware_version,
-        )
-
-    @property
-    def device_info(self) -> DeviceInfo | None:
-        """Return device information."""
-        device = self._get_device()
-        if not device:
-            return None
-
-        # Get model name - use raw_type from API (e.g., "DoorProtect Plus")
-        model_name = device.raw_type or device.type.value.replace("_", " ").title()
-        if device.device_color:
-            # Keep color as-is from API (WHITE/BLACK are product colors)
-            color = str(device.device_color).title()
-            model_name = f"{model_name} ({color})"
-
-        return DeviceInfo(
-            identifiers={device_identifier(self.coordinator.entry_id, self._device_id)},
-            name=device.name,
-            manufacturer=MANUFACTURER,
-            model=model_name,
-            via_device=device_identifier(self.coordinator.entry_id, self._space_id),
-            sw_version=device.firmware_version,
-            hw_version=device.hardware_version,
-            suggested_area=device.room_name,
-        )
-
-    def _get_device(self) -> AjaxDevice | None:
-        """Get the device from coordinator data."""
-        space = self.coordinator.get_space(self._space_id)
-        if not space:
-            return None
-        return space.devices.get(self._device_id)
-
-
-class AjaxVideoEdgeBinarySensor(CoordinatorEntity[AjaxDataCoordinator], BinarySensorEntity):
-    """Representation of an Ajax Video Edge binary sensor."""
-
-    _attr_has_entity_name = True
-
-    def __init__(
-        self,
-        coordinator: AjaxDataCoordinator,
-        space_id: str,
-        video_edge_id: str,
-        sensor_key: str,
-        sensor_desc: dict[str, Any],
-    ) -> None:
-        """Initialize the Ajax video edge binary sensor."""
-        super().__init__(coordinator)
-        self._space_id = space_id
-        self._video_edge_id = video_edge_id
-        self._sensor_key = sensor_key
-        self._sensor_desc = sensor_desc
-
-        # Set unique ID
-        self._attr_unique_id = f"{self.coordinator.entry_id}_{video_edge_id}_{sensor_key}"
-
-        # Set translation key
-        self._attr_translation_key = sensor_desc.get("translation_key", sensor_key)
-
-        # Set device class if provided
-        if "device_class" in sensor_desc:
-            self._attr_device_class = sensor_desc["device_class"]
-
-        # Set enabled by default
-        if "enabled_by_default" in sensor_desc:
-            self._attr_entity_registry_enabled_default = sensor_desc["enabled_by_default"]
-
-    @property
-    def is_on(self) -> bool | None:
-        """Return true if the binary sensor is on."""
-        video_edge = self._get_video_edge()
-        if not video_edge:
-            return None
-
-        value_fn = self._sensor_desc.get("value_fn")
-        if value_fn:
-            try:
-                return value_fn()  # type: ignore[no-any-return]
-            except Exception as err:
-                _LOGGER.error(
-                    "Error getting value for video edge sensor %s: %s",
-                    self._sensor_key,
-                    err,
-                )
-                return None
-        return None
-
-    @property
-    def available(self) -> bool:
-        """Return True if entity is available."""
-        if not self.coordinator.last_update_success:
-            return False
-        video_edge = self._get_video_edge()
-        if video_edge is None:
-            return False
-        return video_edge.online
-
-    @property
-    def extra_state_attributes(self) -> dict[str, Any] | None:
-        """Return extra state attributes (e.g., linked_nvr for cameras recorded by NVR)."""
-        attrs = self._sensor_desc.get("extra_state_attributes")
-        return attrs if attrs else None
-
-    @property
-    def device_info(self) -> DeviceInfo | None:
-        """Return device information."""
-        video_edge = self._get_video_edge()
-        if not video_edge:
-            return None
-
-        # Use human-readable model name
-        model_name = VIDEO_EDGE_MODEL_NAMES.get(video_edge.video_edge_type, video_edge.video_edge_type.value)
-        if video_edge.color:
-            model_name = f"{model_name} ({video_edge.color.title()})"
-
-        # Determine via_device: if camera is recorded by NVR, link to NVR
-        # Otherwise link to hub (space_id)
-        via_device_id = self._space_id
-        nvr_id = self._get_recording_nvr_id()
-        if nvr_id:
-            via_device_id = nvr_id
-
-        return DeviceInfo(
-            identifiers={device_identifier(self.coordinator.entry_id, self._video_edge_id)},
-            name=video_edge.name,
-            manufacturer=MANUFACTURER,
-            model=model_name,
-            via_device=device_identifier(self.coordinator.entry_id, via_device_id),
-            sw_version=video_edge.firmware_version,
-            suggested_area=video_edge.room_name,
-        )
-
-    def _get_video_edge(self) -> AjaxVideoEdge | None:
-        """Get the video edge from coordinator data."""
-        space = self.coordinator.get_space(self._space_id)
-        if not space:
-            return None
-        return space.video_edges.get(self._video_edge_id)
-
-    def _get_recording_nvr_id(self) -> str | None:
-        """Return the NVR that records this camera (if any)."""
-        space = self.coordinator.get_space(self._space_id)
-        if not space:
-            return None
-        return space.get_recording_nvr_id(self._video_edge_id)
-
-
-class AjaxHubBinarySensor(CoordinatorEntity[AjaxDataCoordinator], BinarySensorEntity):
-    """Representation of an Ajax Hub binary sensor.
-
-    This is for hub-level sensors that come from space.hub_details,
-    not from a device in space.devices.
-    """
-
-    _attr_has_entity_name = True
-
-    # Hub binary sensor definitions
-    HUB_BINARY_SENSORS: dict[str, dict[str, Any]] = {
-        "tamper": {
-            "device_class": BinarySensorDeviceClass.TAMPER,
-            "value_key": "tampered",
-        },
-        "external_power": {
-            "device_class": BinarySensorDeviceClass.PLUG,
-            "translation_key": "external_power",
-            "value_fn": lambda hd: hd.get("externallyPowered"),
-        },
-    }
-
-    def __init__(
-        self,
-        coordinator: AjaxDataCoordinator,
-        space_id: str,
-        sensor_key: str,
-    ) -> None:
-        """Initialize the Ajax hub binary sensor."""
-        super().__init__(coordinator)
-        self._space_id = space_id
-        self._sensor_key = sensor_key
-        self._sensor_config: dict[str, Any] = self.HUB_BINARY_SENSORS.get(sensor_key, {})
-
-        # Get space for hub_id
-        space = coordinator.get_space(space_id)
-        hub_id = space.hub_id if space else space_id
-
-        # Set unique ID
-        self._attr_unique_id = f"{self.coordinator.entry_id}_{hub_id}_{sensor_key}"
-
-        # Set device class
-        if "device_class" in self._sensor_config:
-            self._attr_device_class = self._sensor_config["device_class"]
-
-        # Set translation key if provided
-        if "translation_key" in self._sensor_config:
-            self._attr_translation_key = self._sensor_config["translation_key"]
-
-    @property
-    def is_on(self) -> bool | None:
-        """Return true if the binary sensor is on."""
-        space = self.coordinator.get_space(self._space_id)
-        if not space or not space.hub_details:
-            return None
-
-        # Support both value_key (direct key) and value_fn (function)
-        value_fn = self._sensor_config.get("value_fn")
-        if value_fn:
-            try:
-                return value_fn(space.hub_details)  # type: ignore[no-any-return]
-            except Exception:
-                return None
-
-        value_key = self._sensor_config.get("value_key")
-        if value_key:
-            return space.hub_details.get(value_key, False)  # type: ignore[no-any-return]
-        return None
-
-    @property
-    def available(self) -> bool:
-        """Return True if entity is available."""
-        if not self.coordinator.last_update_success:
-            return False
-        space = self.coordinator.get_space(self._space_id)
-        return space is not None and space.hub_details is not None
-
-    @property
-    def device_info(self) -> DeviceInfo | None:
-        """Return device information linking to the hub/space device."""
-        space = self.coordinator.get_space(self._space_id)
-        if not space:
-            return None
-
-        # Link to the space device (hub)
-        return DeviceInfo(
-            identifiers={device_identifier(self.coordinator.entry_id, self._space_id)},
-        )
-
-
-class AjaxSmartLockBinarySensor(CoordinatorEntity[AjaxDataCoordinator], BinarySensorEntity):
-    """Binary sensor for Ajax smart lock door open/close state."""
-
-    _attr_has_entity_name = True
-    _attr_device_class = BinarySensorDeviceClass.DOOR
-
-    def __init__(
-        self,
-        coordinator: AjaxDataCoordinator,
-        space_id: str,
-        smart_lock_id: str,
-    ) -> None:
-        """Initialize the smart lock door sensor."""
-        super().__init__(coordinator)
-        self._space_id = space_id
-        self._smart_lock_id = smart_lock_id
-        self._attr_unique_id = f"{self.coordinator.entry_id}_{smart_lock_id}_door"
-        self._attr_translation_key = "smart_lock_door"
-
-    @property
-    def is_on(self) -> bool | None:
-        """Return true if the door is open."""
-        smart_lock = self._get_smart_lock()
-        if not smart_lock:
-            return None
-        return smart_lock.is_door_open
-
-    @property
-    def available(self) -> bool:
-        """Return True if entity is available."""
-        if not self.coordinator.last_update_success:
-            return False
-        return self._get_smart_lock() is not None
-
-    @property
-    def device_info(self) -> DeviceInfo | None:
-        """Return device information (same device as the lock entity)."""
-        smart_lock = self._get_smart_lock()
-        if not smart_lock:
-            return None
-
-        return DeviceInfo(
-            identifiers={device_identifier(self.coordinator.entry_id, self._smart_lock_id)},
-            name=smart_lock.name,
-            manufacturer=MANUFACTURER,
-            model="LockBridge Jeweller",
-            via_device=device_identifier(self.coordinator.entry_id, self._space_id),
-        )
-
-    def _get_smart_lock(self) -> AjaxSmartLock | None:
-        """Get the smart lock from coordinator data."""
-        space = self.coordinator.get_space(self._space_id)
-        if not space:
-            return None
-        return space.smart_locks.get(self._smart_lock_id)

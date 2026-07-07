@@ -57,6 +57,32 @@ _AUTH_ERROR_MAP = {
 }
 
 
+def _build_api(
+    *,
+    email: str,
+    password: str,
+    auth_mode: str,
+    api_key: str = "",
+    proxy_url: str | None = None,
+    verify_ssl: bool = True,
+) -> AjaxRestApi:
+    """Build the REST client for either auth mode (single construction point).
+
+    Direct mode authenticates with the enterprise API key; proxy modes get
+    their key from the proxy and carry the proxy URL / TLS preference.
+    """
+    if auth_mode == AUTH_MODE_DIRECT:
+        return AjaxRestApi(api_key=api_key, email=email, password=password)
+    return AjaxRestApi(
+        api_key="",
+        email=email,
+        password=password,
+        proxy_url=proxy_url,
+        proxy_mode=auth_mode,
+        verify_ssl=verify_ssl,
+    )
+
+
 class AjaxConfigFlow(ConfigFlow, domain=DOMAIN):
     """Handle a config flow for Ajax Security Systems."""
 
@@ -155,10 +181,11 @@ class AjaxConfigFlow(ConfigFlow, domain=DOMAIN):
             self._abort_if_unique_id_configured()
             # Validate API credentials
             try:
-                self._api = AjaxRestApi(
-                    api_key=user_input[CONF_API_KEY],
+                self._api = _build_api(
                     email=user_input[CONF_EMAIL],
                     password=user_input[CONF_PASSWORD],
+                    auth_mode=AUTH_MODE_DIRECT,
+                    api_key=user_input[CONF_API_KEY],
                 )
 
                 # Test API connection by logging in
@@ -277,12 +304,11 @@ class AjaxConfigFlow(ConfigFlow, domain=DOMAIN):
                 try:
                     # For proxy mode, we authenticate via the proxy
                     # The proxy will provide API key (hybrid) or handle all requests (secure)
-                    self._api = AjaxRestApi(
-                        api_key="",  # Will be provided by proxy
+                    self._api = _build_api(
                         email=user_input[CONF_EMAIL],
                         password=user_input[CONF_PASSWORD],
+                        auth_mode=self._auth_mode,
                         proxy_url=proxy_url,
-                        proxy_mode=self._auth_mode,
                         verify_ssl=verify_ssl,
                     )
 
@@ -626,21 +652,14 @@ class AjaxConfigFlow(ConfigFlow, domain=DOMAIN):
 
             try:
                 # Create API client based on auth mode
-                if auth_mode == AUTH_MODE_DIRECT:
-                    self._api = AjaxRestApi(
-                        api_key=reauth_entry.data.get(CONF_API_KEY, ""),
-                        email=reauth_entry.data.get(CONF_EMAIL, ""),
-                        password=user_input[CONF_PASSWORD],
-                    )
-                else:
-                    self._api = AjaxRestApi(
-                        api_key="",
-                        email=reauth_entry.data.get(CONF_EMAIL, ""),
-                        password=user_input[CONF_PASSWORD],
-                        proxy_url=proxy_url,
-                        proxy_mode=auth_mode,
-                        verify_ssl=reauth_entry.data.get(CONF_VERIFY_SSL, True),
-                    )
+                self._api = _build_api(
+                    email=reauth_entry.data.get(CONF_EMAIL, ""),
+                    password=user_input[CONF_PASSWORD],
+                    auth_mode=auth_mode,
+                    api_key=reauth_entry.data.get(CONF_API_KEY, ""),
+                    proxy_url=proxy_url,
+                    verify_ssl=reauth_entry.data.get(CONF_VERIFY_SSL, True),
+                )
 
                 # Test login
                 await self._api.async_login()
@@ -701,24 +720,16 @@ class AjaxConfigFlow(ConfigFlow, domain=DOMAIN):
 
             try:
                 # Validate new credentials
-                if auth_mode == AUTH_MODE_DIRECT:
-                    self._api = AjaxRestApi(
-                        api_key=user_input.get(CONF_API_KEY, reconfigure_entry.data.get(CONF_API_KEY, "")),
-                        email=user_input[CONF_EMAIL],
-                        password=user_input[CONF_PASSWORD],
-                    )
-                else:
-                    proxy_url = user_input.get(CONF_PROXY_URL, reconfigure_entry.data.get(CONF_PROXY_URL))
-                    proxy_url = proxy_url.rstrip("/") if proxy_url else proxy_url
-                    verify_ssl = user_input.get(CONF_VERIFY_SSL, reconfigure_entry.data.get(CONF_VERIFY_SSL, True))
-                    self._api = AjaxRestApi(
-                        api_key="",
-                        email=user_input[CONF_EMAIL],
-                        password=user_input[CONF_PASSWORD],
-                        proxy_url=proxy_url,
-                        proxy_mode=auth_mode,
-                        verify_ssl=verify_ssl,
-                    )
+                proxy_url = user_input.get(CONF_PROXY_URL, reconfigure_entry.data.get(CONF_PROXY_URL))
+                proxy_url = proxy_url.rstrip("/") if proxy_url else proxy_url
+                self._api = _build_api(
+                    email=user_input[CONF_EMAIL],
+                    password=user_input[CONF_PASSWORD],
+                    auth_mode=auth_mode,
+                    api_key=user_input.get(CONF_API_KEY, reconfigure_entry.data.get(CONF_API_KEY, "")),
+                    proxy_url=proxy_url,
+                    verify_ssl=user_input.get(CONF_VERIFY_SSL, reconfigure_entry.data.get(CONF_VERIFY_SSL, True)),
+                )
 
                 # Test login
                 await self._api.async_login()

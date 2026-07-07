@@ -15,6 +15,7 @@ from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from homeassistant.config_entries import ConfigEntryState
 
 from custom_components.ajax.api import (
     AjaxRest2FARequiredError,
@@ -583,6 +584,7 @@ async def test_step_2fa_reauth_success() -> None:
     reauth_entry = MagicMock()
     reauth_entry.data = {CONF_EMAIL: "u@e.com"}
     reauth_entry.entry_id = "entry-1"
+    reauth_entry.state = ConfigEntryState.LOADED
     flow.hass.config_entries.async_get_entry = MagicMock(return_value=reauth_entry)
     flow.hass.config_entries.async_update_entry = MagicMock()
     flow.hass.config_entries.async_schedule_reload = MagicMock()
@@ -593,6 +595,37 @@ async def test_step_2fa_reauth_success() -> None:
     # async_update_and_abort → update only; the update listener owns the reload.
     flow.hass.config_entries.async_update_entry.assert_called_once()
     flow.hass.config_entries.async_schedule_reload.assert_not_called()
+
+
+async def test_step_2fa_reauth_not_loaded_schedules_reload() -> None:
+    """2FA reauth on an entry that isn't LOADED must reschedule the setup itself.
+
+    Mirrors ``test_step_reauth_confirm_changed_password_not_loaded_schedules_reload``
+    for the 2FA branch of the reauth flow.
+    """
+    flow = _make_flow(source="reauth")
+    flow.context["entry_id"] = "entry-1"
+    flow._api = _mock_api(hubs=[])
+    flow._request_id = "rid"
+    flow._user_input = {
+        CONF_AUTH_MODE: AUTH_MODE_DIRECT,
+        CONF_API_KEY: "key",
+        CONF_EMAIL: "u@e.com",
+        CONF_PASSWORD: "secret",
+    }
+    reauth_entry = MagicMock()
+    reauth_entry.data = {CONF_EMAIL: "u@e.com"}
+    reauth_entry.entry_id = "entry-1"
+    reauth_entry.state = ConfigEntryState.SETUP_ERROR
+    flow.hass.config_entries.async_get_entry = MagicMock(return_value=reauth_entry)
+    flow.hass.config_entries.async_update_entry = MagicMock()
+    flow.hass.config_entries.async_schedule_reload = MagicMock()
+
+    result = await flow.async_step_2fa({"code": "123456"})
+    assert result["type"] == "abort"
+    assert result["reason"] == "reauth_successful"
+    flow.hass.config_entries.async_update_entry.assert_called_once()
+    flow.hass.config_entries.async_schedule_reload.assert_called_once_with("entry-1")
 
 
 async def test_step_2fa_invalid_code() -> None:
@@ -801,6 +834,7 @@ async def test_step_reauth_confirm_direct_success() -> None:
     flow.context["entry_id"] = "e1"
     entry = MagicMock()
     entry.entry_id = "e1"
+    entry.state = ConfigEntryState.LOADED
     entry.data = {CONF_EMAIL: "u@e.com", CONF_AUTH_MODE: AUTH_MODE_DIRECT, CONF_API_KEY: "key"}
     flow.hass.config_entries.async_get_entry = MagicMock(return_value=entry)
     flow.hass.config_entries.async_update_entry = MagicMock()
@@ -841,6 +875,61 @@ async def test_step_reauth_confirm_same_password_schedules_reload() -> None:
     assert result["type"] == "abort"
     assert result["reason"] == "reauth_successful"
     flow.hass.config_entries.async_schedule_reload.assert_called_once_with("e1")
+
+
+async def test_step_reauth_confirm_changed_password_not_loaded_schedules_reload() -> None:
+    """A changed password on an entry that isn't LOADED must reschedule the setup.
+
+    An entry that failed setup (e.g. ConfigEntryAuthFailed on a stale
+    password) never reaches the point where the update listener is
+    registered, so nothing would ever reload it once reauth succeeds unless
+    the flow schedules the reload itself.
+    """
+    flow = _make_flow()
+    flow.context["entry_id"] = "e1"
+    entry = MagicMock()
+    entry.entry_id = "e1"
+    entry.state = ConfigEntryState.SETUP_ERROR
+    entry.data = {
+        CONF_EMAIL: "u@e.com",
+        CONF_AUTH_MODE: AUTH_MODE_DIRECT,
+        CONF_API_KEY: "key",
+        CONF_PASSWORD: "oldhash",
+    }
+    flow.hass.config_entries.async_get_entry = MagicMock(return_value=entry)
+    flow.hass.config_entries.async_update_entry = MagicMock()
+    flow.hass.config_entries.async_schedule_reload = MagicMock()
+    api = _mock_api()
+    with patch(API_PATH, return_value=api):
+        result = await flow.async_step_reauth_confirm({CONF_PASSWORD: "newpass"})
+    assert result["type"] == "abort"
+    assert result["reason"] == "reauth_successful"
+    flow.hass.config_entries.async_schedule_reload.assert_called_once_with("e1")
+    flow.hass.config_entries.async_update_entry.assert_called_once()
+
+
+async def test_step_reauth_confirm_changed_password_loaded_no_reload() -> None:
+    """A changed password on a LOADED entry lets the update listener reload it."""
+    flow = _make_flow()
+    flow.context["entry_id"] = "e1"
+    entry = MagicMock()
+    entry.entry_id = "e1"
+    entry.state = ConfigEntryState.LOADED
+    entry.data = {
+        CONF_EMAIL: "u@e.com",
+        CONF_AUTH_MODE: AUTH_MODE_DIRECT,
+        CONF_API_KEY: "key",
+        CONF_PASSWORD: "oldhash",
+    }
+    flow.hass.config_entries.async_get_entry = MagicMock(return_value=entry)
+    flow.hass.config_entries.async_update_entry = MagicMock()
+    flow.hass.config_entries.async_schedule_reload = MagicMock()
+    api = _mock_api()
+    with patch(API_PATH, return_value=api):
+        result = await flow.async_step_reauth_confirm({CONF_PASSWORD: "newpass"})
+    assert result["type"] == "abort"
+    assert result["reason"] == "reauth_successful"
+    flow.hass.config_entries.async_schedule_reload.assert_not_called()
 
 
 async def test_step_reauth_confirm_proxy_success() -> None:
@@ -921,11 +1010,14 @@ async def test_step_reauth_confirm_unknown_exception() -> None:
 # --------------------------------------------------------------------------- #
 # async_step_reconfigure
 # --------------------------------------------------------------------------- #
-def _reconfigure_flow(entry_data: dict[str, Any]) -> AjaxConfigFlow:
+def _reconfigure_flow(
+    entry_data: dict[str, Any], *, state: ConfigEntryState = ConfigEntryState.LOADED
+) -> AjaxConfigFlow:
     flow = _make_flow()
     entry = MagicMock()
     entry.entry_id = "e1"
     entry.data = entry_data
+    entry.state = state
     flow._get_reconfigure_entry = MagicMock(return_value=entry)
     flow.async_update_and_abort = MagicMock(
         side_effect=lambda *a, **kw: {
@@ -989,6 +1081,43 @@ async def test_step_reconfigure_proxy_success_strips_url() -> None:
     assert result["reason"] == "reconfigure_successful"
     assert result["data"][CONF_PROXY_URL] == "https://new"
     assert result["data"][CONF_VERIFY_SSL] is False
+
+
+async def test_step_reconfigure_changed_data_not_loaded_schedules_reload() -> None:
+    """Changed data on an entry that isn't LOADED must reschedule the setup.
+
+    Mirrors ``test_step_reauth_confirm_changed_password_not_loaded_schedules_reload``:
+    an entry stuck in SETUP_ERROR never registered an update listener, so the
+    flow must schedule the reload itself once reconfigure succeeds.
+    """
+    flow = _reconfigure_flow(
+        {CONF_AUTH_MODE: AUTH_MODE_DIRECT, CONF_API_KEY: "oldkey", CONF_EMAIL: "old@e.com"},
+        state=ConfigEntryState.SETUP_ERROR,
+    )
+    api = _mock_api()
+    with patch(API_PATH, return_value=api):
+        result = await flow.async_step_reconfigure(
+            {CONF_API_KEY: "newkey", CONF_EMAIL: "new@e.com", CONF_PASSWORD: "newpass"}
+        )
+    assert result["type"] == "abort"
+    assert result["reason"] == "reconfigure_successful"
+    flow.hass.config_entries.async_schedule_reload.assert_called_once_with("e1")
+
+
+async def test_step_reconfigure_changed_data_loaded_no_reload() -> None:
+    """Changed data on a LOADED entry lets the update listener reload it."""
+    flow = _reconfigure_flow(
+        {CONF_AUTH_MODE: AUTH_MODE_DIRECT, CONF_API_KEY: "oldkey", CONF_EMAIL: "old@e.com"},
+        state=ConfigEntryState.LOADED,
+    )
+    api = _mock_api()
+    with patch(API_PATH, return_value=api):
+        result = await flow.async_step_reconfigure(
+            {CONF_API_KEY: "newkey", CONF_EMAIL: "new@e.com", CONF_PASSWORD: "newpass"}
+        )
+    assert result["type"] == "abort"
+    assert result["reason"] == "reconfigure_successful"
+    flow.hass.config_entries.async_schedule_reload.assert_not_called()
 
 
 async def test_step_reconfigure_auth_error() -> None:

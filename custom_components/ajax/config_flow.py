@@ -8,6 +8,7 @@ from typing import Any
 
 import voluptuous as vol
 from homeassistant.config_entries import (
+    ConfigEntryState,
     ConfigFlow,
     ConfigFlowResult,
     OptionsFlow,
@@ -456,8 +457,15 @@ class AjaxConfigFlow(ConfigFlow, domain=DOMAIN):
                         # listener schedules the reload (HA deprecates the
                         # flow-side reload helper on entries with a listener).
                         # Same password (expired-token case) → the listener
-                        # will not fire, so retry the setup explicitly.
-                        if reauth_entry.data.get(CONF_PASSWORD) == password_hash:
+                        # will not fire, so retry the setup explicitly. Same
+                        # if the entry isn't loaded (setup failed before the
+                        # listener could be registered, e.g. a previous
+                        # ConfigEntryAuthFailed) — there is no listener to
+                        # rely on, so the flow must reschedule the setup.
+                        if (
+                            reauth_entry.data.get(CONF_PASSWORD) == password_hash
+                            or reauth_entry.state is not ConfigEntryState.LOADED
+                        ):
                             self.hass.config_entries.async_schedule_reload(reauth_entry.entry_id)
                         return self.async_update_and_abort(
                             reauth_entry,
@@ -677,8 +685,14 @@ class AjaxConfigFlow(ConfigFlow, domain=DOMAIN):
                 # schedules the reload (HA deprecates the flow-side reload
                 # helper on entries with a listener). Same password
                 # (expired-token case) → the listener will not fire, so
-                # retry the setup explicitly.
-                if reauth_entry.data.get(CONF_PASSWORD) == password_hash:
+                # retry the setup explicitly. Same if the entry isn't loaded
+                # (setup failed before the listener could be registered,
+                # e.g. a previous ConfigEntryAuthFailed) — there is no
+                # listener to rely on, so the flow must reschedule the setup.
+                if (
+                    reauth_entry.data.get(CONF_PASSWORD) == password_hash
+                    or reauth_entry.state is not ConfigEntryState.LOADED
+                ):
                     self.hass.config_entries.async_schedule_reload(reauth_entry.entry_id)
                 return self.async_update_and_abort(
                     reauth_entry,
@@ -767,7 +781,10 @@ class AjaxConfigFlow(ConfigFlow, domain=DOMAIN):
 
                 # The update listener schedules the reload on data change;
                 # identical resubmission still retries the setup explicitly.
-                if new_data == dict(reconfigure_entry.data):
+                # Same if the entry isn't loaded (setup failed before the
+                # listener could be registered) — there is no listener to
+                # rely on, so the flow must reschedule the setup itself.
+                if new_data == dict(reconfigure_entry.data) or reconfigure_entry.state is not ConfigEntryState.LOADED:
                     self.hass.config_entries.async_schedule_reload(reconfigure_entry.entry_id)
                 return self.async_update_and_abort(
                     reconfigure_entry,

@@ -1607,6 +1607,9 @@
         "data": {
           "enabled_spaces": "Ingeschakelde ruimtes"
         },
+        "data_description": {
+          "enabled_spaces": "Alleen de geselecteerde ruimtes worden geladen; hun apparaten maken entiteiten aan in Home Assistant."
+        },
         "description": "Selecteer welke ruimtes in Home Assistant moeten worden ingeschakeld.\n\nUitgeschakelde ruimtes maken geen apparaten of entiteiten aan. Wijzigen hiervan herlaadt de integratie.",
         "title": "Ingeschakelde ruimtes"
       },
@@ -1627,6 +1630,11 @@
           "monitored_spaces": "Te monitoren ruimtes",
           "notification_filter": "Meldingsfilter",
           "persistent_notification": "Toon permanente meldingen"
+        },
+        "data_description": {
+          "monitored_spaces": "Ruimtes waarvoor meldingen worden aangemaakt. Laat alles geselecteerd (of leeg) om voor elke ruimte een melding te ontvangen.",
+          "notification_filter": "Gebeurteniscategorieën die een permanente melding veroorzaken.",
+          "persistent_notification": "Toont gebeurtenissen als permanente meldingen op het Home Assistant-dashboard."
         },
         "description": "Configureer je Ajax-integratiemeldingen",
         "title": "Meldingsopties"

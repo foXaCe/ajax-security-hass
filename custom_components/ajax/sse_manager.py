@@ -487,6 +487,7 @@ class SSEManager(EventHandlerMixin):
             action=notification_action,
             source_name=source_name,
             space_name=space.name,
+            space_id=space.id,
         )
 
         # Fire HA bus event so automations can react to who triggered the
@@ -557,6 +558,7 @@ class SSEManager(EventHandlerMixin):
                 action=action_key,
                 source_name=source_name,
                 space_name=space.name,
+                space_id=space.id,
             )
         )
 

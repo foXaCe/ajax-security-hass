@@ -314,11 +314,15 @@ class AjaxOptionsFlow(OptionsFlow):
             if user_input.get(CONF_QUEUE_NAME):
                 new_data[CONF_QUEUE_NAME] = user_input[CONF_QUEUE_NAME]
 
-            # Update the config entry data
-            self.hass.config_entries.async_update_entry(
-                self.config_entry,
-                data=new_data,
-            )
+            # Update the config entry data and reload so the running
+            # SQSManager actually picks the new credentials up — without
+            # the reload it keeps polling with the old ones forever.
+            if new_data != dict(self.config_entry.data):
+                self.hass.config_entries.async_update_entry(
+                    self.config_entry,
+                    data=new_data,
+                )
+                await self.hass.config_entries.async_reload(self.config_entry.entry_id)
 
             return self.async_create_entry(title="", data=self.config_entry.options)
 
@@ -366,6 +370,17 @@ class AjaxOptionsFlow(OptionsFlow):
             # Store credentials (even if empty to clear them)
             new_options[CONF_RTSP_USERNAME] = user_input.get(CONF_RTSP_USERNAME, "")
             new_options[CONF_RTSP_PASSWORD] = user_input.get(CONF_RTSP_PASSWORD, "")
+
+            # The ONVIF manager only reads these credentials at bootstrap
+            # (`_async_init_onvif`), so a reload is required for local AI
+            # detections to use them. The RTSP camera stream path reads the
+            # options on every request and would work either way.
+            if new_options != dict(self.config_entry.options):
+                self.hass.config_entries.async_update_entry(
+                    self.config_entry,
+                    options=new_options,
+                )
+                await self.hass.config_entries.async_reload(self.config_entry.entry_id)
 
             return self.async_create_entry(title="", data=new_options)
 

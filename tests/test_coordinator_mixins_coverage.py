@@ -31,6 +31,7 @@ from custom_components.ajax._event_helpers import (
 )
 from custom_components.ajax.api import AjaxRestApiError
 from custom_components.ajax.const import (
+    CONF_MONITORED_SPACES,
     CONF_NOTIFICATION_FILTER,
     CONF_PERSISTENT_NOTIFICATION,
     NOTIFICATION_FILTER_ALARMS_ONLY,
@@ -247,6 +248,32 @@ async def test_create_sqs_notification_alarms_only_drops_arming_event(mock_creat
 async def test_create_sqs_notification_alarms_only_keeps_alarm_event(mock_create) -> None:
     mixin = _make_event_mixin(options={CONF_NOTIFICATION_FILTER: NOTIFICATION_FILTER_ALARMS_ONLY})
     await mixin._create_sqs_notification("intrusion", "Stéphane", "Maison")
+    mock_create.assert_called_once()
+
+
+@pytest.mark.asyncio
+@patch("custom_components.ajax._coordinator_events.async_create")
+async def test_create_sqs_notification_monitored_spaces_drops_other_space(mock_create) -> None:
+    """A space outside the monitored_spaces selection must be silenced."""
+    mixin = _make_event_mixin(options={CONF_MONITORED_SPACES: ["s1"]})
+    await mixin._create_sqs_notification("armed", "Stéphane", "Maison", space_id="s2")
+    mock_create.assert_not_called()
+
+
+@pytest.mark.asyncio
+@patch("custom_components.ajax._coordinator_events.async_create")
+async def test_create_sqs_notification_monitored_spaces_keeps_selected_space(mock_create) -> None:
+    mixin = _make_event_mixin(options={CONF_MONITORED_SPACES: ["s1"]})
+    await mixin._create_sqs_notification("armed", "Stéphane", "Maison", space_id="s1")
+    mock_create.assert_called_once()
+
+
+@pytest.mark.asyncio
+@patch("custom_components.ajax._coordinator_events.async_create")
+async def test_create_sqs_notification_empty_monitored_spaces_means_all(mock_create) -> None:
+    """Empty selection (or entries saved before the filter) keeps everything."""
+    mixin = _make_event_mixin(options={CONF_MONITORED_SPACES: []})
+    await mixin._create_sqs_notification("armed", "Stéphane", "Maison", space_id="s2")
     mock_create.assert_called_once()
 
 

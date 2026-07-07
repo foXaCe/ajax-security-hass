@@ -25,6 +25,7 @@ from typing import TYPE_CHECKING, Any
 from homeassistant.components.persistent_notification import async_create
 
 from .const import (
+    CONF_MONITORED_SPACES,
     CONF_NOTIFICATION_FILTER,
     CONF_PERSISTENT_NOTIFICATION,
     EVENT_AJAX_ARMED,
@@ -162,7 +163,9 @@ class AjaxEventDispatchMixin:
     # Persistent notification
     # ------------------------------------------------------------------
 
-    async def _create_sqs_notification(self, action: str, source_name: str, space_name: str) -> None:
+    async def _create_sqs_notification(
+        self, action: str, source_name: str, space_name: str, space_id: str = ""
+    ) -> None:
         """Create a persistent notification in HA for an SQS / SSE event."""
         options = self.config_entry.options if self.config_entry else {}
 
@@ -172,6 +175,13 @@ class AjaxEventDispatchMixin:
         notification_filter = options.get(CONF_NOTIFICATION_FILTER, NOTIFICATION_FILTER_ALL)
 
         if notification_filter == NOTIFICATION_FILTER_NONE:
+            return
+
+        # Per-space filter from the "notifications" options step. An empty
+        # selection means "all spaces" (backwards compatible with entries
+        # saved before the filter was enforced).
+        monitored_spaces = options.get(CONF_MONITORED_SPACES, [])
+        if monitored_spaces and space_id and space_id not in monitored_spaces:
             return
 
         # Arm/disarm are security events, not alarms.

@@ -585,13 +585,14 @@ async def test_step_2fa_reauth_success() -> None:
     reauth_entry.entry_id = "entry-1"
     flow.hass.config_entries.async_get_entry = MagicMock(return_value=reauth_entry)
     flow.hass.config_entries.async_update_entry = MagicMock()
-    flow.hass.config_entries.async_reload = AsyncMock()
+    flow.hass.config_entries.async_schedule_reload = MagicMock()
 
     result = await flow.async_step_2fa({"code": "123456"})
     assert result["type"] == "abort"
     assert result["reason"] == "reauth_successful"
+    # async_update_reload_and_abort → update + scheduled reload.
     flow.hass.config_entries.async_update_entry.assert_called_once()
-    flow.hass.config_entries.async_reload.assert_awaited_once_with("entry-1")
+    flow.hass.config_entries.async_schedule_reload.assert_called_once_with("entry-1")
 
 
 async def test_step_2fa_invalid_code() -> None:
@@ -1219,6 +1220,7 @@ async def test_options_aws_credentials_form() -> None:
 async def test_options_aws_credentials_saves() -> None:
     flow = _make_options_flow(data={})
     flow.hass.config_entries.async_update_entry = MagicMock()
+    flow.hass.config_entries.async_reload = AsyncMock()
     result = await flow.async_step_aws_credentials(
         {CONF_AWS_ACCESS_KEY_ID: "AKIA", CONF_AWS_SECRET_ACCESS_KEY: "SEC", CONF_QUEUE_NAME: "queue"}
     )
@@ -1227,6 +1229,19 @@ async def test_options_aws_credentials_saves() -> None:
     assert new_data[CONF_AWS_ACCESS_KEY_ID] == "AKIA"
     assert new_data[CONF_AWS_SECRET_ACCESS_KEY] == "SEC"
     assert new_data[CONF_QUEUE_NAME] == "queue"
+    # New credentials must restart the SQS manager → entry reload.
+    flow.hass.config_entries.async_reload.assert_awaited_once()
+
+
+async def test_options_aws_credentials_unchanged_no_reload() -> None:
+    flow = _make_options_flow(data={CONF_AWS_ACCESS_KEY_ID: "AKIA"})
+    flow.hass.config_entries.async_update_entry = MagicMock()
+    flow.hass.config_entries.async_reload = AsyncMock()
+    # Empty form (user kept everything) → no update, no reload.
+    result = await flow.async_step_aws_credentials({})
+    assert result["type"] == "create_entry"
+    flow.hass.config_entries.async_update_entry.assert_not_called()
+    flow.hass.config_entries.async_reload.assert_not_awaited()
 
 
 async def test_options_rtsp_credentials_form() -> None:
@@ -1246,8 +1261,24 @@ async def test_options_rtsp_credentials_form_empty() -> None:
 
 async def test_options_rtsp_credentials_saves() -> None:
     flow = _make_options_flow(options={"keep": "me"})
+    flow.hass.config_entries.async_update_entry = MagicMock()
+    flow.hass.config_entries.async_reload = AsyncMock()
     result = await flow.async_step_rtsp_credentials({CONF_RTSP_USERNAME: "admin", CONF_RTSP_PASSWORD: "pass"})
     assert result["type"] == "create_entry"
     assert result["data"][CONF_RTSP_USERNAME] == "admin"
     assert result["data"][CONF_RTSP_PASSWORD] == "pass"
     assert result["data"]["keep"] == "me"
+    # The ONVIF manager only reads credentials at bootstrap → reload required.
+    new_options = flow.hass.config_entries.async_update_entry.call_args.kwargs["options"]
+    assert new_options[CONF_RTSP_USERNAME] == "admin"
+    flow.hass.config_entries.async_reload.assert_awaited_once()
+
+
+async def test_options_rtsp_credentials_unchanged_no_reload() -> None:
+    flow = _make_options_flow(options={CONF_RTSP_USERNAME: "admin", CONF_RTSP_PASSWORD: "pass"})
+    flow.hass.config_entries.async_update_entry = MagicMock()
+    flow.hass.config_entries.async_reload = AsyncMock()
+    result = await flow.async_step_rtsp_credentials({CONF_RTSP_USERNAME: "admin", CONF_RTSP_PASSWORD: "pass"})
+    assert result["type"] == "create_entry"
+    flow.hass.config_entries.async_update_entry.assert_not_called()
+    flow.hass.config_entries.async_reload.assert_not_awaited()

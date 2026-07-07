@@ -502,6 +502,7 @@ class SQSManager(EventHandlerMixin):
             action=notification_action,
             source_name=source_name,
             space_name=space.name,
+            space_id=space.id,
         )
 
         # Fire HA bus event so automations can branch on who triggered
@@ -906,6 +907,7 @@ class SQSManager(EventHandlerMixin):
         from homeassistant.components.persistent_notification import async_create
 
         from .const import (
+            CONF_MONITORED_SPACES,
             CONF_NOTIFICATION_FILTER,
             CONF_PERSISTENT_NOTIFICATION,
             NOTIFICATION_FILTER_ALL,
@@ -922,6 +924,12 @@ class SQSManager(EventHandlerMixin):
         # Check notification filter - alarm notifications are shown for all filters except NONE
         notification_filter = options.get(CONF_NOTIFICATION_FILTER, NOTIFICATION_FILTER_ALL)
         if notification_filter == NOTIFICATION_FILTER_NONE:
+            return
+
+        # Per-space filter from the "notifications" options step. An empty
+        # selection means "all spaces" (backwards compatible).
+        monitored_spaces = options.get(CONF_MONITORED_SPACES, [])
+        if monitored_spaces and space.id not in monitored_spaces:
             return
 
         source = event_record.get("source_name", "")

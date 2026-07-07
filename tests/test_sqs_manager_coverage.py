@@ -1047,6 +1047,32 @@ async def test_create_alarm_notification_filter_none(monkeypatch) -> None:
     created.assert_not_called()
 
 
+async def test_create_alarm_notification_monitored_spaces_drops_other_space(monkeypatch) -> None:
+    mgr = _make_manager()
+    mgr.coordinator.config_entry = SimpleNamespace(options={"monitored_spaces": ["other-space"]})
+    space = _space()  # id="s1", outside the monitored selection
+    created = MagicMock()
+    monkeypatch.setattr(
+        "homeassistant.components.persistent_notification.async_create",
+        created,
+    )
+    await mgr._create_alarm_notification(space, {"message": "X"})
+    created.assert_not_called()
+
+
+async def test_create_alarm_notification_monitored_spaces_keeps_selected(monkeypatch) -> None:
+    mgr = _make_manager()
+    mgr.coordinator.config_entry = SimpleNamespace(options={"monitored_spaces": ["s1"]})
+    space = _space()
+    created = MagicMock()
+    monkeypatch.setattr(
+        "homeassistant.components.persistent_notification.async_create",
+        created,
+    )
+    await mgr._create_alarm_notification(space, {"message": "X"})
+    created.assert_called_once()
+
+
 # ---------------------------------------------------------------------------
 # _handle_event dispatcher
 # ---------------------------------------------------------------------------

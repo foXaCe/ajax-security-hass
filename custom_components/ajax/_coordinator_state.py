@@ -261,7 +261,9 @@ class AjaxStateUpdaterMixin:
             return
 
         try:
-            smart_locks_data = await self.api.async_get_smart_locks(space.real_space_id)
+            smart_locks_data = await self.api.async_get_smart_locks(
+                space.real_space_id, known_ids=set(space.smart_locks)
+            )
             _LOGGER.debug(
                 "Found %d smart lock(s) for space %s",
                 len(smart_locks_data),

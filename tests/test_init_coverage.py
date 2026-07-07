@@ -30,10 +30,12 @@ from custom_components.ajax import (
     _async_setup_areas,
     _async_setup_services,
     _async_update_options,
+    _reload_relevant_config,
     async_remove_config_entry_device,
     async_setup,
     async_unload_entry,
 )
+from custom_components.ajax.const import CONF_DISCOVERED_MACS, CONF_PASSWORD
 from custom_components.ajax.models import SecurityState
 
 
@@ -1038,6 +1040,45 @@ async def test_update_options_rtsp_change_schedules_reload() -> None:
     coord = MagicMock()
     coord._reload_config_snapshot = _synced_snapshot()
     entry.runtime_data = coord
+
+    await _async_update_options(hass, entry)
+
+    hass.config_entries.async_schedule_reload.assert_called_once_with("e1")
+
+
+async def test_update_options_discovered_macs_change_no_reload() -> None:
+    """Associating a DHCP-discovered hub (CONF_DISCOVERED_MACS) must not reload.
+
+    The key only feeds config-flow dedup for discovery and has no runtime
+    effect, so ``_reload_relevant_config`` excludes it from the snapshot.
+    """
+    entry = _options_entry(fast_poll=False)
+    entry.data = {CONF_DISCOVERED_MACS: ["AA:BB:CC:DD:EE:FF"]}
+    coord = MagicMock()
+    coord._reload_config_snapshot = _reload_relevant_config(entry)
+    coord._door_sensor_fast_poll_enabled = False
+    coord._manage_door_sensor_polling = MagicMock()
+    entry.runtime_data = coord
+
+    # Associate a second discovered hub — only CONF_DISCOVERED_MACS changes.
+    entry.data = {CONF_DISCOVERED_MACS: ["AA:BB:CC:DD:EE:FF", "11:22:33:44:55:66"]}
+    hass = MagicMock()
+
+    await _async_update_options(hass, entry)
+
+    hass.config_entries.async_schedule_reload.assert_not_called()
+
+
+async def test_update_options_password_change_schedules_reload() -> None:
+    """A changed CONF_PASSWORD is connection-relevant and must schedule a reload."""
+    entry = _options_entry(fast_poll=False)
+    entry.data = {CONF_PASSWORD: "oldhash"}
+    coord = MagicMock()
+    coord._reload_config_snapshot = _reload_relevant_config(entry)
+    entry.runtime_data = coord
+
+    entry.data = {CONF_PASSWORD: "newhash"}
+    hass = MagicMock()
 
     await _async_update_options(hass, entry)
 

@@ -36,6 +36,7 @@ from .const import (
     CONF_AUTH_MODE,
     CONF_AWS_ACCESS_KEY_ID,
     CONF_AWS_SECRET_ACCESS_KEY,
+    CONF_DISCOVERED_MACS,
     CONF_DOOR_SENSOR_FAST_POLL,
     CONF_EMAIL,
     CONF_ENABLED_SPACES,
@@ -239,15 +240,20 @@ async def async_setup_entry(hass: HomeAssistant, entry: AjaxConfigEntry) -> bool
 def _reload_relevant_config(entry: AjaxConfigEntry) -> tuple[dict[str, Any], str, str]:
     """Return the part of the entry config that requires a reload to apply.
 
-    ``entry.data`` only holds connection/credential settings (auth mode,
-    email/password, API key, proxy, AWS SQS, enabled spaces, discovered
-    MACs). In ``entry.options`` only the RTSP/ONVIF credentials need a
+    ``entry.data`` mostly holds connection/credential settings (auth mode,
+    email/password, API key, proxy, AWS SQS, enabled spaces) that do need a
+    reload to take effect. ``CONF_DISCOVERED_MACS`` is excluded: it only
+    tracks which DHCP-discovered hubs have been associated with this entry
+    for deduplication in the config flow and has no runtime effect, so
+    changing it (e.g. associating a newly discovered hub) must not trigger a
+    reload. In ``entry.options`` only the RTSP/ONVIF credentials need a
     reload — the ONVIF manager reads them at bootstrap only; everything
     else is either applied live (fast poll) or read dynamically
     (notification settings).
     """
+    data = {k: v for k, v in entry.data.items() if k != CONF_DISCOVERED_MACS}
     return (
-        dict(entry.data),
+        data,
         entry.options.get(CONF_RTSP_USERNAME, ""),
         entry.options.get(CONF_RTSP_PASSWORD, ""),
     )

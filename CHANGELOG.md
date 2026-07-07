@@ -2,9 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [0.35.0] - 2026-07-07
 
 ### Fixed
+- **Re-authenticating after a password change now actually revives the integration (#190).** An entry that failed setup (expired/changed credentials) never registers its reload listener, so completing the reauth flow with the new password wrote the credentials but nothing ever reloaded the entry — it stayed dead until a manual reload or restart. The reauth, 2FA and reconfigure flows now reschedule the setup themselves whenever the entry isn't loaded.
+- **Associating a DHCP-discovered hub with an existing entry no longer forces a full reload (#190).** The discovered-MACs bookkeeping key has no runtime effect but was counted as a connection-relevant change, needlessly dropping SSE/SQS and making entities briefly unavailable.
+- **Video-edge and smart-lock polling is no longer throttled while everything is disarmed (#194).** The every-Nth-cycle REST throttle assumed real-time freshness from the SSE/SQS managers' mere existence — but Ajax pushes no events while disarmed, so camera connection state could lag ~90 s exactly when polling was the only source. The throttle now also requires at least one armed / partially-armed / night-mode space.
 - **Changing AWS SQS or RTSP/ONVIF credentials in the options now takes effect immediately.** Both steps saved the new values but the running SQS / ONVIF managers kept the old ones until a manual reload; the integration now reloads itself when the values actually change.
 - **The "Spaces to monitor" notification option is now enforced.** It was shown in the options UI but never read — notifications fired for every space regardless of the selection. An empty selection still means "all spaces".
 - **Proxy mode: devices identified by their parent's 8-character prefix (MultiTransmitter children) now update in real time.** The SSE manager was missing the prefix-match strategy the SQS manager already had, so the same device updated in direct mode but silently not in proxy mode.
@@ -16,6 +19,8 @@ All notable changes to this project will be documented in this file.
 - Options flow: field descriptions for the notifications and enabled-spaces steps, in all 7 languages.
 
 ### Changed
+- **Minimum supported Home Assistant is now declared as 2025.11.0 (#191)** (was 2024.11.0). The code already required it — the config flow imports helpers introduced in 2025.2 and 2025.11, so installs on older HA broke at setup; HACS now says so upfront instead.
+- **Fewer cloud API calls, as requested by the community proxy maintainer:** known smart locks no longer get a redundant per-lock detail request on every poll cycle — that endpoint only returns the id, the real lock state already rides the enriched devices payload (#192); and arming/disarming no longer triggers an account-wide metadata refresh (rooms/users/devices of every hub) — a light immediate refresh suffices since group states are fetched on every cycle anyway (#193). The SQS path also gained the proxy-cache bypass after arm/disarm that the SSE path already had.
 - **The update listener is now the single reload decision point** (HA deprecates flow-side reload helpers on entries with an update listener — error in HA 2026.12). Config flows and options steps only update the entry; the listener compares the connection-relevant config against a snapshot and schedules the reload when needed, while fast-poll and notification options keep applying live.
 - Read-only platforms (sensor, binary_sensor, device_tracker) now set the recommended `PARALLEL_UPDATES = 0`.
 - Internal: static entity setup reuses the dynamic-discovery builders across 10 platforms (event descriptors and NVR/dimmer branching now live in one place); the five copy-pasted optimistic-update blocks of the alarm panels folded into one helper; never-called `get_alarm_control_panels()` removed; arm/disarm event tags named in `event_maps`.

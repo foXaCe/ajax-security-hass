@@ -435,7 +435,24 @@ class AjaxDataCoordinator(
                 # we only poll their full state every Nth cycle (or always on
                 # forced metadata refresh). Direct mode without realtime keeps
                 # the previous behaviour.
-                realtime_active = (self.sse_manager is not None) or (self.sqs_manager is not None)
+                #
+                # SSE/SQS only deliver events while the alarm is armed
+                # (documented Ajax limitation — nothing is pushed while
+                # disarmed). A manager being instantiated is therefore not
+                # enough on its own: require at least one armed / partially
+                # armed / night-mode space before trusting realtime freshness.
+                # All spaces disarmed → REST becomes the only source again,
+                # so poll every cycle, same as the no-manager case.
+                any_space_armed = any(
+                    space.security_state
+                    in (
+                        SecurityState.ARMED,
+                        SecurityState.PARTIALLY_ARMED,
+                        SecurityState.NIGHT_MODE,
+                    )
+                    for space in self.account.spaces.values()
+                )
+                realtime_active = ((self.sse_manager is not None) or (self.sqs_manager is not None)) and any_space_armed
                 refresh_video_smart = (
                     need_metadata_refresh
                     or not realtime_active

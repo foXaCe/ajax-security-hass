@@ -68,6 +68,14 @@ def test_find_device_by_wire_input_suffix() -> None:
     assert mgr._find_device(space, source_name="", source_id="12345678") is dev
 
 
+def test_find_device_by_parent_prefix() -> None:
+    """MultiTransmitter children resolve by the parent's 8-char prefix (SQS parity)."""
+    mgr = _make_manager()
+    dev = AjaxDevice(id="ABCDEFGH12345678", name="Wire 1", type=DeviceType.WIRE_INPUT, space_id="s1", hub_id="hub1")
+    space = _space_with(dev)
+    assert mgr._find_device(space, source_name="", source_id="ABCDEFGH") is dev
+
+
 def test_find_device_by_name_fallback() -> None:
     mgr = _make_manager()
     dev = _door(name="Garage Door")

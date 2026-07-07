@@ -585,6 +585,19 @@ class SSEManager(EventHandlerMixin):
                         )
                         return device
 
+            # Try matching by prefix (parent ID) — parity with the SQS
+            # manager: a MultiTransmitter child identified by its parent's
+            # 8-char prefix must resolve in proxy mode too.
+            if len(source_id) == 8:
+                for device in space.devices.values():
+                    if len(device.id) == 16 and device.id.startswith(source_id):
+                        _LOGGER.debug(
+                            "SSE: Matched device %s by prefix %s",
+                            device.name,
+                            source_id,
+                        )
+                        return device
+
         # Fall back to name match
         if source_name:
             for device in space.devices.values():

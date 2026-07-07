@@ -108,18 +108,28 @@ class _VideoMixin(AjaxRestClientBase):
             f"user/{self.user_id}/spaces/{space_id}/devices/video-edges/{video_edge_id}/rtsp",
         )
 
-    async def async_get_smart_locks(self, space_id: str) -> list[dict[str, Any]]:
+    async def async_get_smart_locks(self, space_id: str, known_ids: set[str] | None = None) -> list[dict[str, Any]]:
         """Get all smart lock devices for a space.
 
         Smart locks are discovered from the space's devices array
-        with type "SMART_LOCK", then fetched individually.
+        with type "SMART_LOCK". Only *unknown* ids (not in ``known_ids``)
+        are fetched individually via the per-lock detail endpoint — that
+        endpoint returns just the id (occasionally a name), which is only
+        useful the first time a lock is seen, to feed the Yale-cloud
+        discovery filter. Once a lock is known, its real state
+        (lockStatus/doorStatus) is read from the enriched devices payload
+        fetched on the same tick (see ``_coordinator_devices.py``), so the
+        space device entry is returned as-is instead of re-fetching detail.
 
         Args:
             space_id: Space ID (real_space_id from spaceBinding)
+            known_ids: Ids of smart locks already discovered; their detail
+                fetch is skipped and the space device entry is used instead.
 
         Returns:
             List of smart lock dictionaries
         """
+        known_ids = known_ids or set()
         space_data = await self.async_get_space(space_id)
         devices = space_data.get("devices", [])
         _LOGGER.debug(
@@ -132,6 +142,11 @@ class _VideoMixin(AjaxRestClientBase):
             if device.get("type") == "SMART_LOCK":
                 smart_lock_id = device.get("id")
                 if smart_lock_id:
+                    if smart_lock_id in known_ids:
+                        # Already discovered: the detail endpoint would add
+                        # nothing (see docstring) — reuse the space entry.
+                        smart_locks.append(device)
+                        continue
                     try:
                         smart_lock = await self.async_get_smart_lock(space_id, smart_lock_id)
                         # Merge name from space device listing if detail endpoint lacks it

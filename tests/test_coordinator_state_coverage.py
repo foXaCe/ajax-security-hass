@@ -362,6 +362,25 @@ async def test_smart_locks_update_existing_keeps_name_when_absent() -> None:
 
 
 @pytest.mark.asyncio
+async def test_smart_locks_passes_known_ids_to_api() -> None:
+    """The coordinator must pass already-discovered lock ids so the API layer
+    can skip their per-lock detail GET (perf: avoids one GET per known lock
+    on every video/smart cycle, see api/_video.py::async_get_smart_locks).
+    """
+    space = AjaxSpace(id="s1", name="Maison", real_space_id="real1")
+    space.smart_locks["lock1"] = AjaxSmartLock(id="lock1", name="Old", space_id="s1")
+    space.smart_locks["sse_lock"] = AjaxSmartLock(id="sse_lock", name="SSE", space_id="s1")
+    mixin = _ve_mixin(space)
+    mixin.api.async_get_smart_locks = AsyncMock(return_value=[{"id": "lock1", "name": "Renamed", "type": "smartlock"}])
+
+    await mixin._async_update_smart_locks("s1")
+
+    mixin.api.async_get_smart_locks.assert_awaited_once_with("real1", known_ids={"lock1", "sse_lock"})
+    # Existing lock updated from the (now detail-skipped) space entry.
+    assert space.smart_locks["lock1"].name == "Renamed"
+
+
+@pytest.mark.asyncio
 async def test_smart_locks_cleanup_removes_api_lock_preserves_sse_lock() -> None:
     space = AjaxSpace(id="s1", name="Maison", real_space_id="real1")
     # API-discovered lock that will disappear (has raw_data) -> removed.

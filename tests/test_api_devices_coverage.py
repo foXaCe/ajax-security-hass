@@ -316,6 +316,65 @@ async def test_async_get_smart_locks_skips_device_without_id() -> None:
     assert result == []
 
 
+@pytest.mark.asyncio
+async def test_async_get_smart_locks_known_id_skips_detail_fetch() -> None:
+    """A lock already known (known_ids) must not trigger the per-lock detail GET.
+
+    The detail endpoint only returns the id (occasionally a name) — useful
+    once, at discovery, to feed the Yale-cloud filter. For an already-known
+    lock, its real state comes from the enriched devices payload fetched on
+    the same tick, so the space device entry is reused as-is.
+    """
+    api = _api()
+    space_device = {"id": "lock1", "type": "SMART_LOCK", "name": "Front"}
+    api._request.return_value = {"devices": [space_device]}
+
+    result = await api.async_get_smart_locks("space1", known_ids={"lock1"})
+
+    assert result == [space_device]
+    # Only the space GET happened; no detail GET for the known lock.
+    api._request.assert_awaited_once_with("GET", "user/USER123/spaces/space1")
+
+
+@pytest.mark.asyncio
+async def test_async_get_smart_locks_unknown_id_still_fetches_detail() -> None:
+    """An id absent from known_ids preserves discovery behavior (detail GET)."""
+    api = _api()
+
+    async def fake_request(method: str, endpoint: str, *args: object) -> object:
+        if endpoint == "user/USER123/spaces/space1":
+            return {"devices": [{"id": "lock1", "type": "SMART_LOCK", "name": "Door"}]}
+        return {"id": "lock1", "name": "Detailed"}
+
+    api._request.side_effect = fake_request
+    result = await api.async_get_smart_locks("space1", known_ids=set())
+
+    assert len(result) == 1
+    assert result[0]["name"] == "Detailed"
+    assert api._request.await_count == 2
+
+
+@pytest.mark.asyncio
+async def test_async_get_smart_locks_mixed_known_and_unknown() -> None:
+    """Known locks reuse the space entry; unknown ones still get a single detail GET."""
+    api = _api()
+    known_device = {"id": "lock-known", "type": "SMART_LOCK", "name": "Known"}
+    unknown_device = {"id": "lock-unknown", "type": "SMART_LOCK", "name": "Unknown"}
+
+    async def fake_request(method: str, endpoint: str, *args: object) -> object:
+        if endpoint == "user/USER123/spaces/space1":
+            return {"devices": [known_device, unknown_device]}
+        return {"id": "lock-unknown", "name": "Detailed"}
+
+    api._request.side_effect = fake_request
+    result = await api.async_get_smart_locks("space1", known_ids={"lock-known"})
+
+    assert known_device in result
+    assert any(sl.get("name") == "Detailed" for sl in result)
+    # 1 space GET + exactly 1 detail GET (for the unknown lock only).
+    assert api._request.await_count == 2
+
+
 # ---------------------------------------------------------------------------
 # Automation endpoints
 # ---------------------------------------------------------------------------

@@ -1607,6 +1607,9 @@
         "data": {
           "enabled_spaces": "Enabled Spaces"
         },
+        "data_description": {
+          "enabled_spaces": "Only the selected spaces are loaded; their devices create entities in Home Assistant."
+        },
         "description": "Select which spaces to enable in Home Assistant.\n\nDisabled spaces will not create any devices or entities. Changing this will reload the integration.",
         "title": "Enabled Spaces"
       },
@@ -1627,6 +1630,11 @@
           "monitored_spaces": "Spaces to monitor",
           "notification_filter": "Notification filter",
           "persistent_notification": "Show persistent notifications"
+        },
+        "data_description": {
+          "monitored_spaces": "Spaces for which notifications are created. Leave all selected (or empty) to be notified for every space.",
+          "notification_filter": "Which event categories raise a persistent notification.",
+          "persistent_notification": "Show events as persistent notifications on the Home Assistant dashboard."
         },
         "description": "Configure your Ajax integration notifications",
         "title": "Notification Options"

@@ -1607,6 +1607,9 @@
         "data": {
           "enabled_spaces": "Aktiverade space"
         },
+        "data_description": {
+          "enabled_spaces": "Endast de valda space läses in; deras enheter skapar entiteter i Home Assistant."
+        },
         "description": "Markera de space som ska aktiveras i Home Assistant.\nOmarkerade space kommer inte skapa enheter eller entiteter i Home Assistant.",
         "title": "Aktiverade space"
       },
@@ -1627,6 +1630,11 @@
           "monitored_spaces": "Spaces som ska monitoreras",
           "notification_filter": "Notisfilter",
           "persistent_notification": "Visa beständiga notiser"
+        },
+        "data_description": {
+          "monitored_spaces": "Spaces som notiser skapas för. Lämna alla valda (eller tomt) för att få notiser för alla spaces.",
+          "notification_filter": "Händelsekategorier som skapar en beständig notis.",
+          "persistent_notification": "Visar händelser som beständiga notiser på Home Assistant-instrumentpanelen."
         },
         "description": "Konfigurera notiser för Ajax-integrationen",
         "title": "Notisinställningar"

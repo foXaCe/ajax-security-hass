@@ -1607,6 +1607,9 @@
         "data": {
           "enabled_spaces": "Aktivierte Bereiche"
         },
+        "data_description": {
+          "enabled_spaces": "Nur die ausgewählten Bereiche werden geladen; ihre Geräte erstellen Entitäten in Home Assistant."
+        },
         "description": "Wählen Sie aus, welche Bereiche in Home Assistant aktiviert werden sollen.\n\nDeaktivierte Bereiche erstellen keine Geräte oder Entitäten. Änderungen laden die Integration neu.",
         "title": "Aktivierte Bereiche"
       },
@@ -1627,6 +1630,11 @@
           "monitored_spaces": "Zu überwachende Bereiche",
           "notification_filter": "Benachrichtigungsfilter",
           "persistent_notification": "Dauerhafte Benachrichtigungen anzeigen"
+        },
+        "data_description": {
+          "monitored_spaces": "Bereiche, für die Benachrichtigungen erstellt werden. Lassen Sie alle ausgewählt (oder leer), um für jeden Bereich benachrichtigt zu werden.",
+          "notification_filter": "Ereigniskategorien, die eine dauerhafte Benachrichtigung auslösen.",
+          "persistent_notification": "Zeigt Ereignisse als dauerhafte Benachrichtigungen im Home-Assistant-Dashboard an."
         },
         "description": "Konfigurieren Sie Ihre Ajax-Integrationsbenachrichtigungen",
         "title": "Benachrichtigungsoptionen"

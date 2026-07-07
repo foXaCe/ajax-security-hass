@@ -1607,6 +1607,9 @@
         "data": {
           "enabled_spaces": "Espacios activados"
         },
+        "data_description": {
+          "enabled_spaces": "Solo se cargan los espacios seleccionados; sus dispositivos crean entidades en Home Assistant."
+        },
         "description": "Seleccione qué espacios activar en Home Assistant.\n\nLos espacios desactivados no crearán dispositivos ni entidades. Cambiar esto recargará la integración.",
         "title": "Espacios activados"
       },
@@ -1627,6 +1630,11 @@
           "monitored_spaces": "Espacios a monitorear",
           "notification_filter": "Filtro de notificaciones",
           "persistent_notification": "Mostrar notificaciones persistentes"
+        },
+        "data_description": {
+          "monitored_spaces": "Espacios para los que se crean notificaciones. Deje todos seleccionados (o vacío) para recibir notificaciones de todos los espacios.",
+          "notification_filter": "Categorías de eventos que generan una notificación persistente.",
+          "persistent_notification": "Muestra los eventos como notificaciones persistentes en el panel de Home Assistant."
         },
         "description": "Configure las notificaciones de su integración Ajax",
         "title": "Opciones de notificaciones"

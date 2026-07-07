@@ -377,6 +377,17 @@
         "name": "Panic Button"
       }
     },
+    "camera": {
+      "camera_sub_stream": {
+        "name": "Sub stream"
+      },
+      "nvr_channel": {
+        "name": "Channel {number}"
+      },
+      "nvr_channel_sub": {
+        "name": "Channel {number} Sub"
+      }
+    },
     "device_tracker": {
       "position": {
         "name": "Position"
@@ -647,11 +658,11 @@
         "state": {
           "black": "Black",
           "blue": "Blue",
+          "graphite": "Graphite",
+          "green": "Green",
           "red": "Red",
           "white": "White",
-          "yellow": "Yellow",
-          "green": "Green",
-          "graphite": "Graphite"
+          "yellow": "Yellow"
         }
       },
       "device_label": {
@@ -1147,8 +1158,8 @@
       "waterstop_external_power": {
         "name": "Power source",
         "state": {
-          "supply": "External power",
-          "no_supply": "No external power"
+          "no_supply": "No external power",
+          "supply": "External power"
         }
       },
       "waterstop_motor_state": {
@@ -1488,17 +1499,6 @@
         }
       }
     },
-    "camera": {
-      "camera_sub_stream": {
-        "name": "Sub stream"
-      },
-      "nvr_channel": {
-        "name": "Channel {number}"
-      },
-      "nvr_channel_sub": {
-        "name": "Channel {number} Sub"
-      }
-    },
     "update": {
       "hub_firmware": {
         "name": "Firmware"
@@ -1558,29 +1558,29 @@
     }
   },
   "issues": {
-    "verify_ssl_disabled": {
-      "title": "SSL verification is disabled",
-      "description": "The Ajax integration is connecting to the proxy with SSL certificate verification disabled. Session tokens and credentials travel over a channel that cannot be authenticated, exposing them to man-in-the-middle attacks. Re-enable \"Verify SSL Certificate\" in the integration's Reconfigure step as soon as your proxy has a valid certificate."
-    },
     "onvif_init_failed": {
-      "title": "ONVIF local AI detections unavailable",
-      "description": "Ajax could not start ONVIF, so local AI detections (motion, human, vehicle, pet, doorbell) are disabled and the integration falls back to cloud REST polling.\n\nError: {error}\n\nCheck the RTSP/ONVIF credentials in the integration's Configure step and that the cameras are reachable on the network."
+      "description": "Ajax could not start ONVIF, so local AI detections (motion, human, vehicle, pet, doorbell) are disabled and the integration falls back to cloud REST polling.\n\nError: {error}\n\nCheck the RTSP/ONVIF credentials in the integration's Configure step and that the cameras are reachable on the network.",
+      "title": "ONVIF local AI detections unavailable"
     },
     "onvif_no_cameras": {
-      "title": "ONVIF: no cameras connected",
-      "description": "ONVIF started but no camera accepted the credentials. Local AI detections (human, vehicle, pet, doorbell ring) will not fire — the cloud REST API is the only source.\n\nVerify the RTSP/ONVIF username and password in the integration's Configure step, and that the cameras' network ports (80, 554) are reachable from Home Assistant."
+      "description": "ONVIF started but no camera accepted the credentials. Local AI detections (human, vehicle, pet, doorbell ring) will not fire — the cloud REST API is the only source.\n\nVerify the RTSP/ONVIF username and password in the integration's Configure step, and that the cameras' network ports (80, 554) are reachable from Home Assistant.",
+      "title": "ONVIF: no cameras connected"
     },
     "onvif_partial_cameras": {
-      "title": "ONVIF: only {connected}/{total} cameras connected",
-      "description": "ONVIF accepted the credentials but only {connected} of {total} cameras connected. The remaining cameras will not produce local AI detections; the cloud REST API is the only source for those.\n\nCheck the network and ONVIF support on the unreachable cameras."
+      "description": "ONVIF accepted the credentials but only {connected} of {total} cameras connected. The remaining cameras will not produce local AI detections; the cloud REST API is the only source for those.\n\nCheck the network and ONVIF support on the unreachable cameras.",
+      "title": "ONVIF: only {connected}/{total} cameras connected"
     },
     "sqs_init_failed": {
-      "title": "AWS SQS real-time events unavailable",
-      "description": "Ajax could not connect to AWS SQS, so real-time event notifications are disabled and the integration falls back to REST API polling (slower).\n\nError: {error}\n\nVerify the AWS Access Key, Secret Key, and Queue Name in the integration's Configure step."
+      "description": "Ajax could not connect to AWS SQS, so real-time event notifications are disabled and the integration falls back to REST API polling (slower).\n\nError: {error}\n\nVerify the AWS Access Key, Secret Key, and Queue Name in the integration's Configure step.",
+      "title": "AWS SQS real-time events unavailable"
     },
     "sse_init_failed": {
-      "title": "SSE real-time events unavailable",
-      "description": "Ajax could not connect to the SSE endpoint, so real-time event notifications are disabled and the integration falls back to REST API polling (slower).\n\nError: {error}\n\nVerify that the proxy URL is reachable and that the session token is valid (try Reconfigure to refresh)."
+      "description": "Ajax could not connect to the SSE endpoint, so real-time event notifications are disabled and the integration falls back to REST API polling (slower).\n\nError: {error}\n\nVerify that the proxy URL is reachable and that the session token is valid (try Reconfigure to refresh).",
+      "title": "SSE real-time events unavailable"
+    },
+    "verify_ssl_disabled": {
+      "description": "The Ajax integration is connecting to the proxy with SSL certificate verification disabled. Session tokens and credentials travel over a channel that cannot be authenticated, exposing them to man-in-the-middle attacks. Re-enable \"Verify SSL Certificate\" in the integration's Reconfigure step as soon as your proxy has a valid certificate.",
+      "title": "SSL verification is disabled"
     }
   },
   "options": {
@@ -1607,6 +1607,9 @@
         "data": {
           "enabled_spaces": "Enabled Spaces"
         },
+        "data_description": {
+          "enabled_spaces": "Only the selected spaces are loaded; their devices create entities in Home Assistant."
+        },
         "description": "Select which spaces to enable in Home Assistant.\n\nDisabled spaces will not create any devices or entities. Changing this will reload the integration.",
         "title": "Enabled Spaces"
       },
@@ -1627,6 +1630,11 @@
           "monitored_spaces": "Spaces to monitor",
           "notification_filter": "Notification filter",
           "persistent_notification": "Show persistent notifications"
+        },
+        "data_description": {
+          "monitored_spaces": "Spaces for which notifications are created. Leave all selected (or empty) to be notified for every space.",
+          "notification_filter": "Which event categories raise a persistent notification.",
+          "persistent_notification": "Show events as persistent notifications on the Home Assistant dashboard."
         },
         "description": "Configure your Ajax integration notifications",
         "title": "Notification Options"

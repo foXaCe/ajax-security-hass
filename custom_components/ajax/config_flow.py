@@ -426,10 +426,12 @@ class AjaxConfigFlow(ConfigFlow, domain=DOMAIN):
                 if self.context.get("source") == "reauth":
                     reauth_entry = self.hass.config_entries.async_get_entry(self.context.get("entry_id", ""))
                     if reauth_entry:
-                        new_data = {**reauth_entry.data, CONF_PASSWORD: password_hash}
-                        self.hass.config_entries.async_update_entry(reauth_entry, data=new_data)
-                        await self.hass.config_entries.async_reload(reauth_entry.entry_id)
-                        return self.async_abort(reason="reauth_successful")
+                        # Update + reload + abort("reauth_successful") via the
+                        # modern helper (single reload, no listener overlap).
+                        return self.async_update_reload_and_abort(
+                            reauth_entry,
+                            data_updates={CONF_PASSWORD: password_hash},
+                        )
 
                 # If multiple spaces, let user select which to enable
                 if len(self._spaces) > 1:
@@ -647,12 +649,12 @@ class AjaxConfigFlow(ConfigFlow, domain=DOMAIN):
                 # Hash new password
                 password_hash = hashlib.sha256(user_input[CONF_PASSWORD].encode()).hexdigest()
 
-                # Update config entry with new password
-                new_data = {**reauth_entry.data, CONF_PASSWORD: password_hash}
-                self.hass.config_entries.async_update_entry(reauth_entry, data=new_data)
-
-                await self.hass.config_entries.async_reload(reauth_entry.entry_id)
-                return self.async_abort(reason="reauth_successful")
+                # Update + reload + abort("reauth_successful") via the modern
+                # helper (single reload, no listener overlap).
+                return self.async_update_reload_and_abort(
+                    reauth_entry,
+                    data_updates={CONF_PASSWORD: password_hash},
+                )
 
             except AjaxRest2FARequiredError as err:
                 # Store info for 2FA

@@ -22,6 +22,7 @@ from custom_components.ajax.devices import (
     DoorbellHandler,
     DoorContactHandler,
     FloodDetectorHandler,
+    GenericHandler,
     GlassBreakHandler,
     HubHandler,
     LifeQualityHandler,
@@ -1426,3 +1427,35 @@ def test_repeater_sensors_and_binary() -> None:
     assert _by_key(sensors, "battery")["value_fn"]() == 99
     binary = handler.get_binary_sensors()
     assert _by_key(binary, "tamper")["value_fn"]() is False
+
+
+# ---------------------------------------------------------------------------
+# GenericHandler (fallback for recognised types without a dedicated module)
+# ---------------------------------------------------------------------------
+
+
+def test_generic_handler_mapped_for_orphan_types() -> None:
+    """THERMOSTAT / TEMPERATURE_SENSOR / LINE_SPLITTER must not be silently skipped."""
+    for device_type in (DeviceType.THERMOSTAT, DeviceType.TEMPERATURE_SENSOR, DeviceType.LINE_SPLITTER):
+        handler_class = get_device_handler(_device(device_type))
+        assert handler_class is GenericHandler, device_type
+
+
+def test_generic_handler_standard_diagnostics() -> None:
+    handler = GenericHandler(
+        _device(DeviceType.LINE_SPLITTER, {"tampered": True}, battery_level=88, signal_strength=70)
+    )
+    sensors = handler.get_sensors()
+    assert _keys(sensors) == {"battery", "signal_strength", "firmware_version"}
+    assert _by_key(sensors, "battery")["value_fn"]() == 88
+    binary = handler.get_binary_sensors()
+    assert _keys(binary) == {"tamper", "problem"}
+    assert _by_key(binary, "tamper")["value_fn"]() is True
+    _run_all_value_fns(sensors + binary)
+
+
+def test_generic_handler_temperature_when_reported() -> None:
+    handler = GenericHandler(_device(DeviceType.TEMPERATURE_SENSOR, {"temperature": 21.5}))
+    sensors = handler.get_sensors()
+    assert "temperature" in _keys(sensors)
+    assert _by_key(sensors, "temperature")["value_fn"]() == 21.5

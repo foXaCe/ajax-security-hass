@@ -130,8 +130,9 @@ rules:
     comment: |
       `PARALLEL_UPDATES = 1` is set on every entity platform that mutates
       device state (switch, light, select, number, valve, lock, camera,
-      button, event, alarm_control_panel). Read-only platforms (sensor,
-      binary_sensor) leave it at the default.
+      button, event, alarm_control_panel). Read-only coordinator-driven
+      platforms (sensor, binary_sensor, device_tracker) set the
+      recommended `PARALLEL_UPDATES = 0` (unlimited — no per-entity I/O).
   reauthentication-flow:
     status: done
     comment: |

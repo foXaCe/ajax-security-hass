@@ -4,6 +4,22 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+- **Changing AWS SQS or RTSP/ONVIF credentials in the options now takes effect immediately.** Both steps saved the new values but the running SQS / ONVIF managers kept the old ones until a manual reload; the integration now reloads itself when the values actually change.
+- **The "Spaces to monitor" notification option is now enforced.** It was shown in the options UI but never read — notifications fired for every space regardless of the selection. An empty selection still means "all spaces".
+- **Proxy mode: devices identified by their parent's 8-character prefix (MultiTransmitter children) now update in real time.** The SSE manager was missing the prefix-match strategy the SQS manager already had, so the same device updated in direct mode but silently not in proxy mode.
+- **Event messages now speak all 7 supported languages.** German, Dutch, Swedish and Ukrainian translations existed in the event tables (~550 entries) but were unreachable — notifications and event history fell back to English for those languages.
+
+### Added
+- **Thermostat, temperature-sensor and Fibra LineSplitter devices now create entities.** These recognised types had no handler and were silently skipped; they now expose the standard Jeweller diagnostics (battery, tamper, signal, firmware, malfunction — plus temperature when reported).
+- **The last-event sensor exposes a `category` attribute** (security / alarm / malfunction / …) so automations can branch on the event category.
+- Options flow: field descriptions for the notifications and enabled-spaces steps, in all 7 languages.
+
+### Changed
+- Re-authentication (password and 2FA paths) uses the modern `async_update_reload_and_abort` helper — single reload, no manual update/reload/abort triplet.
+- Read-only platforms (sensor, binary_sensor, device_tracker) now set the recommended `PARALLEL_UPDATES = 0`.
+- Internal: static entity setup reuses the dynamic-discovery builders across 7 platforms (event descriptors and NVR/dimmer branching now live in one place); the five copy-pasted optimistic-update blocks of the alarm panels folded into one helper; never-called `get_alarm_control_panels()` removed; arm/disarm event tags named in `event_maps`.
+
 ## [0.34.3] - 2026-07-02
 
 ### Fixed

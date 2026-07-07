@@ -46,8 +46,8 @@ Ajax cloud ──REST──▶ api.AjaxRestApi ──▶ coordinator.AjaxDataCoo
 | `event_codes.py` | Vendored Ajax event-code table (excluded from coverage). |
 | `config_flow.py` / `config_flow_options.py` | `ConfigFlow` (user/direct/proxy/2FA/select_spaces/dhcp/reauth/reconfigure); `OptionsFlow` lives in `config_flow_options.py`. |
 | `diagnostics.py` | Redacted config-entry / device diagnostics. |
-| `devices/` | One handler per Ajax device type (`base.py` + 18 handlers); `DEVICE_HANDLERS` map + `get_device_handler` / `is_dimmer_device`. |
-| Platforms | `sensor.py` (thin: setup + re-exports; entities in `_sensor_space.py` / `_sensor_device.py` / `_sensor_hub.py` / `_sensor_smart_lock.py`), `binary_sensor.py`, `switch.py` (+ `_switch_entity.py` / `_switch_dimmer.py`), `number.py`, `select.py`, `light.py`, `valve.py`, `lock.py`, `camera.py`, `event.py`, `alarm_control_panel.py`, `device_tracker.py`, `update.py`, `button.py`. Every platform (not just alarm) listens to `SIGNAL_NEW_SPACE` for hubs added after startup. |
+| `devices/` | One handler per Ajax device type (`base.py` + 19 handlers); `DEVICE_HANDLERS` map + `get_device_handler` / `is_dimmer_device`. `generic.py` is the fallback for recognised types without a dedicated module (Thermostat, TemperatureSensor, LineSplitter) — standard Jeweller diagnostics instead of a silent skip. |
+| Platforms | `sensor.py` (thin: setup + re-exports; entities in `_sensor_space.py` / `_sensor_device.py` / `_sensor_hub.py` / `_sensor_smart_lock.py`), `binary_sensor.py`, `switch.py` (+ `_switch_entity.py` / `_switch_dimmer.py`), `number.py`, `select.py`, `light.py`, `valve.py`, `lock.py`, `camera.py`, `event.py`, `alarm_control_panel.py`, `device_tracker.py`, `update.py`, `button.py`. Every platform (not just alarm) listens to `SIGNAL_NEW_SPACE` for hubs added after startup. In most platforms the static setup **reuses the discovery builders** (`_build_*`), so entity-construction logic exists in exactly one place. |
 
 ## Identifier namespacing (schema v1.3)
 
@@ -106,7 +106,7 @@ AjaxRestApi(_HubsMixin, _DevicesMixin, _CamerasMixin, _VideoMixin, _ArmMixin)
 
 ## How to add a new platform
 
-1. Create `<platform>.py` with `async_setup_entry` that iterates `coordinator.account` and instantiates entities.
+1. Create `<platform>.py` with `async_setup_entry`. Define the discovery builder(s) first (`_build_*(space_id, obj_id) -> list[(key, entity)]`), then let the static setup iterate `coordinator.account` **through the same builders** — construction logic must exist in one place only.
 2. Entities subclass `CoordinatorEntity[AjaxDataCoordinator]`; build `unique_id` as `f"{self.coordinator.entry_id}_{...}"` and `device_info` identifiers via `device_identifier(self.coordinator.entry_id, raw)`.
 3. Wire dynamic discovery with `connect_new_entity_signal` (builders return `(key, entity)` pairs; the key is informational — dedup is on `entity.unique_id`).
 4. Add the platform to `PLATFORMS` in `__init__.py`.

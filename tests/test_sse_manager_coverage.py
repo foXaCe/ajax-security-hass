@@ -66,6 +66,7 @@ def _make_manager() -> SSEManager:
         async_set_updated_data=MagicMock(),
         async_request_refresh=AsyncMock(),
         async_force_metadata_refresh=AsyncMock(),
+        async_force_state_refresh=AsyncMock(),
         _create_sqs_notification=AsyncMock(),
         _fire_security_state_event=MagicMock(),
         _update_polling_interval=MagicMock(),
@@ -369,7 +370,8 @@ async def test_security_event_full_arm_triggers_refresh() -> None:
     mgr = _make_manager()
     space = _space(SecurityState.DISARMED)
     await mgr._handle_security_event(space, "arm", "User", "USER")
-    mgr.coordinator.async_force_metadata_refresh.assert_awaited_once()
+    mgr.coordinator.async_force_state_refresh.assert_awaited_once()
+    mgr.coordinator.async_force_metadata_refresh.assert_not_awaited()
     assert mgr.coordinator._bypass_cache_next_refresh is True
     # Skip flag added then removed.
     assert "hub1" not in mgr.coordinator._skipped_state_change_hubs
@@ -378,7 +380,7 @@ async def test_security_event_full_arm_triggers_refresh() -> None:
 async def test_security_event_refresh_failure_applies_fallback_state() -> None:
     mgr = _make_manager()
     space = _space(SecurityState.DISARMED)
-    mgr.coordinator.async_force_metadata_refresh = AsyncMock(side_effect=RuntimeError("api down"))
+    mgr.coordinator.async_force_state_refresh = AsyncMock(side_effect=RuntimeError("api down"))
     await mgr._handle_security_event(space, "arm", "User", "USER")
     # Fallback applied the new state because refresh failed and state changed.
     assert space.security_state == SecurityState.ARMED

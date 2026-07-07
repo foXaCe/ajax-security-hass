@@ -52,6 +52,7 @@ def _make_coordinator() -> MagicMock:
     # Async coordinator hooks
     coord.has_pending_ha_action = MagicMock(return_value=False)
     coord.async_force_metadata_refresh = AsyncMock()
+    coord.async_force_state_refresh = AsyncMock()
     coord._create_sqs_notification = AsyncMock()
     coord._async_save_smart_locks = AsyncMock()
     coord._fire_security_state_event = MagicMock()
@@ -344,7 +345,9 @@ async def test_handle_security_event_arm_refreshes_and_fires(monkeypatch) -> Non
     result = await mgr._handle_security_event(space, "arm", "John", "USER")
     assert result is True
     assert space.security_state == SecurityState.ARMED
-    mgr.coordinator.async_force_metadata_refresh.assert_awaited_once()
+    mgr.coordinator.async_force_state_refresh.assert_awaited_once()
+    mgr.coordinator.async_force_metadata_refresh.assert_not_awaited()
+    assert mgr.coordinator._bypass_cache_next_refresh is True
     mgr.coordinator._create_sqs_notification.assert_awaited_once()
     mgr.coordinator._fire_security_state_event.assert_called_once()
 
@@ -385,6 +388,7 @@ async def test_handle_security_event_night_mode_no_refresh() -> None:
     assert result is True
     assert space.security_state == SecurityState.NIGHT_MODE
     mgr.coordinator.async_force_metadata_refresh.assert_not_awaited()
+    mgr.coordinator.async_force_state_refresh.assert_not_awaited()
 
 
 # ---------------------------------------------------------------------------
@@ -1314,7 +1318,7 @@ def test_create_event_record_security_tag_fallback() -> None:
 async def test_handle_security_event_refresh_failure_clears_flag(monkeypatch) -> None:
     mgr = _make_manager()
     monkeypatch.setattr("custom_components.ajax.sqs_manager.asyncio.sleep", AsyncMock())
-    mgr.coordinator.async_force_metadata_refresh = AsyncMock(side_effect=RuntimeError("boom"))
+    mgr.coordinator.async_force_state_refresh = AsyncMock(side_effect=RuntimeError("boom"))
     space = _space(SecurityState.DISARMED)
     result = await mgr._handle_security_event(space, "arm", "John", "USER")
     assert result is True

@@ -439,13 +439,15 @@ class SSEManager(EventHandlerMixin):
                     _LOGGER.debug("SSE: Sleep completed at t=%dms", int((time.time() - start_time) * 1000))
                     # CRITICAL: Bypass proxy cache to get fresh group states from Ajax API
                     self.coordinator._bypass_cache_next_refresh = True
-                    # Use async_force_metadata_refresh to ensure full_refresh=True
-                    # This updates groups, not just hub state
-                    await self.coordinator.async_force_metadata_refresh()
+                    # Group states are already fetched on every tick (#150), so an
+                    # arm/disarm event only needs an immediate light refresh - not a
+                    # full account-wide metadata pass (rooms/users/video re-fetches
+                    # across all hubs).
+                    await self.coordinator.async_force_state_refresh()
                     elapsed = int((time.time() - start_time) * 1000)
                     _LOGGER.info("SSE: Group refresh completed at t=%dms", elapsed)
                 except Exception as err:
-                    _LOGGER.error("SSE: Metadata refresh failed after security event: %s", err)
+                    _LOGGER.error("SSE: State refresh failed after security event: %s", err)
                     # Fallback: apply SSE state directly since refresh failed
                     if state_changed:
                         space.security_state = new_state

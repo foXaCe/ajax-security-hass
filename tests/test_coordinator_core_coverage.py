@@ -601,6 +601,18 @@ async def test_async_force_metadata_refresh_sets_flag_and_refreshes() -> None:
     coord.async_refresh.assert_awaited_once()
 
 
+async def test_async_force_state_refresh_refreshes_without_full_flag() -> None:
+    coord = _coordinator()
+    coord._force_metadata_refresh = False
+    coord.async_refresh = AsyncMock()
+
+    await coord.async_force_state_refresh()
+
+    # Light refresh must NOT force the account-wide metadata pass.
+    assert coord._force_metadata_refresh is False
+    coord.async_refresh.assert_awaited_once()
+
+
 async def test_async_request_refresh_bypass_cache_sets_flag() -> None:
     coord = _coordinator()
     coord._bypass_cache_next_refresh = False

@@ -19,6 +19,7 @@ from .dimmer import DimmerHandler
 from .door_contact import DoorContactHandler, WireInputHandler
 from .doorbell import DoorbellHandler
 from .flood_detector import FloodDetectorHandler
+from .generic import GenericHandler
 from .glass_break import GlassBreakHandler
 from .hub import HubHandler
 from .life_quality import LifeQualityHandler
@@ -64,6 +65,11 @@ DEVICE_HANDLERS: dict[DeviceType, type[AjaxDeviceHandler]] = {
     DeviceType.HUB: HubHandler,
     DeviceType.WATERSTOP: WaterStopHandler,
     DeviceType.LIFE_QUALITY: LifeQualityHandler,
+    # Recognised types without a dedicated module yet — standard Jeweller
+    # diagnostics via the generic fallback instead of a silent skip.
+    DeviceType.THERMOSTAT: GenericHandler,
+    DeviceType.TEMPERATURE_SENSOR: GenericHandler,
+    DeviceType.LINE_SPLITTER: GenericHandler,
 }
 
 
@@ -98,6 +104,7 @@ __all__ = [
     "DoorbellHandler",
     "DoorContactHandler",
     "FloodDetectorHandler",
+    "GenericHandler",
     "GlassBreakHandler",
     "HubHandler",
     "LifeQualityHandler",

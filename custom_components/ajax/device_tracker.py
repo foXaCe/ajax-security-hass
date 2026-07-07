@@ -22,7 +22,9 @@ from .const import MANUFACTURER, SIGNAL_NEW_SPACE
 from .coordinator import AjaxDataCoordinator
 
 _LOGGER = logging.getLogger(__name__)
-PARALLEL_UPDATES = 1
+# Read-only coordinator-driven platform: no per-entity I/O to throttle
+# (Quality Scale parallel-updates: 0 = unlimited is the recommendation).
+PARALLEL_UPDATES = 0
 
 
 async def async_setup_entry(

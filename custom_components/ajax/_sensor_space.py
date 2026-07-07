@@ -156,6 +156,10 @@ def get_last_event_attributes(space: AjaxSpace) -> dict[str, Any]:
         "event_type": last_event.get("event_type", ""),
         "event_tag": last_event.get("event_tag", ""),
         "action": last_event.get("action", ""),
+        # Category from ACTION_CATEGORIES (security/alarm/malfunction/…) —
+        # parse_event_code computes it for every event; exposed so
+        # automations can branch on it.
+        "category": last_event.get("category", ""),
         "source_name": last_event.get("source_name", ""),
         "source_type": last_event.get("source_type", ""),
         "room_name": last_event.get("room_name", ""),

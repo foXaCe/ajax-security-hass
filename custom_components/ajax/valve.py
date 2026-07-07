@@ -43,37 +43,6 @@ async def async_setup_entry(
     if coordinator.account is None:
         return
 
-    entities: list[ValveEntity] = []
-
-    # Create valves for each device using handlers
-    for space_id, space in coordinator.account.spaces.items():
-        for device_id, device in space.devices.items():
-            handler_class = DEVICE_HANDLERS.get(device.type)
-            if handler_class:
-                handler = handler_class(device)
-                valves = handler.get_valves()
-
-                for valve_desc in valves:
-                    entities.append(
-                        AjaxValve(
-                            coordinator=coordinator,
-                            space_id=space_id,
-                            device_id=device_id,
-                            valve_key=valve_desc["key"],
-                            valve_desc=valve_desc,
-                        )
-                    )
-                    _LOGGER.debug(
-                        "Created valve '%s' for device: %s (type: %s)",
-                        valve_desc["key"],
-                        device.name,
-                        device.type.value,
-                    )
-
-    if entities:
-        async_add_entities(entities)
-        _LOGGER.info("Added %d Ajax valve(s)", len(entities))
-
     def _build_valves(space_id: str, device_id: str) -> list[tuple[str, ValveEntity]]:
         """Build valve entities for a newly-discovered WaterStop device."""
         space = coordinator.get_space(space_id)
@@ -99,6 +68,18 @@ async def async_setup_entry(
             )
             for valve_desc in handler.get_valves()
         ]
+
+    # Static setup: reuse the discovery builder.
+    entities: list[ValveEntity] = [
+        entity
+        for space_id, space in coordinator.account.spaces.items()
+        for device_id in space.devices
+        for _uid, entity in _build_valves(space_id, device_id)
+    ]
+
+    if entities:
+        async_add_entities(entities)
+        _LOGGER.info("Added %d Ajax valve(s)", len(entities))
 
     connect_new_entity_signal(
         hass,

@@ -90,7 +90,8 @@ async def test_valve_setup_entry_no_account_returns_early() -> None:
 @pytest.mark.asyncio
 async def test_valve_setup_entry_creates_valve() -> None:
     space = _waterstop_space()
-    coordinator = SimpleNamespace(account=_account(space), get_space=lambda sid: None, entry_id="entry_test")
+    account = _account(space)
+    coordinator = SimpleNamespace(account=account, get_space=account.spaces.get, entry_id="entry_test")
     entry = SimpleNamespace(runtime_data=coordinator, async_on_unload=lambda _f: None)
     add = MagicMock()
     with patch("custom_components.ajax.valve.connect_new_entity_signal"):
@@ -105,7 +106,8 @@ async def test_valve_setup_entry_no_handler_skips_add() -> None:
     device = AjaxDevice(id="d1", name="Mystery", type=DeviceType.UNKNOWN, space_id="s1", hub_id="hub1")
     space = AjaxSpace(id="s1", name="Home", hub_id="hub1")
     space.devices[device.id] = device
-    coordinator = SimpleNamespace(account=_account(space), get_space=lambda sid: None)
+    account = _account(space)
+    coordinator = SimpleNamespace(account=account, get_space=account.spaces.get)
     entry = SimpleNamespace(runtime_data=coordinator, async_on_unload=lambda _f: None)
     add = MagicMock()
     with patch("custom_components.ajax.valve.connect_new_entity_signal"):
@@ -359,7 +361,8 @@ async def test_tracker_setup_entry_no_account_returns_early() -> None:
 @pytest.mark.asyncio
 async def test_tracker_setup_entry_creates_tracker_with_geofence() -> None:
     space = _hub_space(geofence={"latitude": 48.85, "longitude": 2.35})
-    coordinator = SimpleNamespace(account=_account(space), entry_id="entry_test")
+    account = _account(space)
+    coordinator = SimpleNamespace(account=account, get_space=account.spaces.get, entry_id="entry_test")
     entry = SimpleNamespace(runtime_data=coordinator, async_on_unload=lambda _f: None)
     add = MagicMock()
     await dt_mod.async_setup_entry(MagicMock(), entry, add)
@@ -373,7 +376,8 @@ async def test_tracker_setup_entry_creates_tracker_with_geofence() -> None:
 async def test_tracker_setup_entry_skips_space_without_coordinates() -> None:
     # hub_details present but geoFence has no lat/lon -> no tracker.
     space = _hub_space(geofence={"radiusMeters": 100})
-    coordinator = SimpleNamespace(account=_account(space))
+    account = _account(space)
+    coordinator = SimpleNamespace(account=account, get_space=account.spaces.get)
     entry = SimpleNamespace(runtime_data=coordinator, async_on_unload=lambda _f: None)
     add = MagicMock()
     await dt_mod.async_setup_entry(MagicMock(), entry, add)
@@ -383,7 +387,8 @@ async def test_tracker_setup_entry_skips_space_without_coordinates() -> None:
 @pytest.mark.asyncio
 async def test_tracker_setup_entry_skips_space_without_hub_details() -> None:
     space = _hub_space(geofence=None)
-    coordinator = SimpleNamespace(account=_account(space))
+    account = _account(space)
+    coordinator = SimpleNamespace(account=account, get_space=account.spaces.get)
     entry = SimpleNamespace(runtime_data=coordinator, async_on_unload=lambda _f: None)
     add = MagicMock()
     await dt_mod.async_setup_entry(MagicMock(), entry, add)

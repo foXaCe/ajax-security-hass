@@ -196,6 +196,12 @@ LOCK_DOOR_EVENTS: set[str] = {
     "smartlockdoorbellbuttonpressed",
 }
 
+# Event tags that target a single Ajax group (vs the whole space) and the
+# full space arm/disarm pair — shared by the SQS and SSE managers so the
+# routing logic stays literal-free and in sync between transports.
+GROUP_ARM_EVENT_TAGS = frozenset({"grouparm", "groupdisarm"})
+FULL_ARM_EVENT_TAGS = frozenset({"arm", "disarm"})
+
 # Map event tags to action keys for security events
 SECURITY_EVENT_ACTIONS = {
     "arm": "armed",

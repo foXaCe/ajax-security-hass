@@ -36,7 +36,9 @@ from .event_maps import (  # Single source of truth for event mappings
     DOORBELL_EVENTS,
     EVENT_TAG_TO_STATE,
     FLOOD_EVENTS,
+    FULL_ARM_EVENT_TAGS,
     GLASS_EVENTS,
+    GROUP_ARM_EVENT_TAGS,
     HUB_EVENTS,
     LOCK_DOOR_EVENT_CODE_STATES,
     LOCK_DOOR_EVENTS,
@@ -265,7 +267,7 @@ class SSEManager(EventHandlerMixin):
             # Deduplication: ignore duplicate events within window
             # For group events, include group ID to allow multiple zones from same user
             group_id = None
-            if event_tag in ("grouparm", "groupdisarm"):
+            if event_tag in GROUP_ARM_EVENT_TAGS:
                 # Extract group ID from event data
                 related_groups = event.get("additionalData", {}).get("relatedGroupsInfo", [])
                 if related_groups:
@@ -410,10 +412,10 @@ class SSEManager(EventHandlerMixin):
 
         # Group arm/disarm events need a FULL refresh to update group states
         # because the final state depends on how many groups are armed
-        is_group_event = event_tag in ("grouparm", "groupdisarm")
+        is_group_event = event_tag in GROUP_ARM_EVENT_TAGS
 
         # Full arm/disarm also affects all groups - need refresh to update them
-        is_full_arm_disarm = event_tag in ("arm", "disarm")
+        is_full_arm_disarm = event_tag in FULL_ARM_EVENT_TAGS
 
         if is_group_event or is_full_arm_disarm:
             start_time = time.time()

@@ -38,128 +38,6 @@ async def async_setup_entry(
     if coordinator.account is None:
         return
 
-    entities: list[AjaxEventEntity] = []
-    seen_unique_ids: set[str] = set()
-
-    for space_id, space in coordinator.account.spaces.items():
-        for device_id, device in space.devices.items():
-            handler_class = get_device_handler(device)
-            if handler_class:
-                handler = handler_class(device)
-                events = handler.get_events()
-
-                for event_desc in events:
-                    unique_id = f"{device_id}_{event_desc['key']}"
-
-                    if unique_id in seen_unique_ids:
-                        continue
-                    seen_unique_ids.add(unique_id)
-
-                    entity = AjaxEventEntity(
-                        coordinator=coordinator,
-                        space_id=space_id,
-                        device_id=device_id,
-                        event_key=event_desc["key"],
-                        event_desc=event_desc,
-                    )
-                    entities.append(entity)
-                    _LOGGER.debug(
-                        "Created event entity '%s' for device: %s",
-                        event_desc["key"],
-                        device.name,
-                    )
-
-        # Create event entities for Video Edge cameras
-        for ve_id, video_edge in space.video_edges.items():
-            if video_edge.video_edge_type == VideoEdgeType.NVR:
-                continue
-
-            ve_events = []
-
-            # Doorbell ring event
-            if video_edge.video_edge_type == VideoEdgeType.DOORBELL:
-                ve_events.append(
-                    {
-                        "key": "doorbell_press",
-                        "translation_key": "doorbell_press",
-                        "device_class": EventDeviceClass.DOORBELL,
-                        "event_types": ["ring"],
-                        "enabled_by_default": True,
-                    }
-                )
-
-            # AI detection event (all cameras including doorbell)
-            ve_events.append(
-                {
-                    "key": "detection",
-                    "translation_key": "camera_detection",
-                    "device_class": EventDeviceClass.MOTION,
-                    "event_types": [
-                        "motion",
-                        "human",
-                        "vehicle",
-                        "pet",
-                        "line_crossing",
-                    ],
-                    "enabled_by_default": True,
-                }
-            )
-
-            for event_desc in ve_events:
-                unique_id = f"{ve_id}_{event_desc['key']}"
-                if unique_id in seen_unique_ids:
-                    continue
-                seen_unique_ids.add(unique_id)
-
-                entity = AjaxEventEntity(
-                    coordinator=coordinator,
-                    space_id=space_id,
-                    device_id=ve_id,
-                    event_key=str(event_desc["key"]),
-                    event_desc=event_desc,
-                )
-                entities.append(entity)
-                _LOGGER.debug(
-                    "Created event entity '%s' for video edge: %s",
-                    event_desc["key"],
-                    video_edge.name,
-                )
-
-        # Create event entities for smart locks
-        for sl_id, smart_lock in space.smart_locks.items():
-            event_desc = {
-                "key": "smart_lock_event",
-                "translation_key": "smart_lock_event",
-                "device_class": EventDeviceClass.DOORBELL,
-                # A DOORBELL event entity must expose "ring" — Home Assistant
-                # warns from 2026.x and drops support in 2027.4 otherwise. The
-                # doorbell button fires "ring"; door_left_open rides along as an
-                # extra (HA only requires "ring" to be present).
-                "event_types": ["ring", "door_left_open"],
-                "enabled_by_default": True,
-            }
-            unique_id = f"{sl_id}_smart_lock_event"
-            if unique_id in seen_unique_ids:
-                continue
-            seen_unique_ids.add(unique_id)
-
-            entity = AjaxEventEntity(
-                coordinator=coordinator,
-                space_id=space_id,
-                device_id=sl_id,
-                event_key="smart_lock_event",
-                event_desc=event_desc,
-            )
-            entities.append(entity)
-            _LOGGER.debug(
-                "Created event entity 'smart_lock_event' for smart lock: %s",
-                smart_lock.name,
-            )
-
-    async_add_entities(entities)
-    if entities:
-        _LOGGER.info("Added %d Ajax event entit(ies)", len(entities))
-
     def _build_device(space_id: str, device_id: str) -> list[tuple[str, EventEntity]]:
         """Build event entities for a newly-discovered regular device."""
         space = coordinator.get_space(space_id)
@@ -247,6 +125,30 @@ async def async_setup_entry(
                 ),
             )
         ]
+
+    # Static setup: reuse the discovery builders so the event descriptors
+    # exist in exactly one place (they previously drifted between the two).
+    entities: list[EventEntity] = []
+    seen_unique_ids: set[str] = set()
+
+    for space_id, space in coordinator.account.spaces.items():
+        built: list[tuple[str, EventEntity]] = []
+        for device_id in space.devices:
+            built.extend(_build_device(space_id, device_id))
+        for ve_id in space.video_edges:
+            built.extend(_build_video_edge(space_id, ve_id))
+        for sl_id in space.smart_locks:
+            built.extend(_build_smart_lock(space_id, sl_id))
+
+        for unique_id, entity in built:
+            if unique_id in seen_unique_ids:
+                continue
+            seen_unique_ids.add(unique_id)
+            entities.append(entity)
+
+    async_add_entities(entities)
+    if entities:
+        _LOGGER.info("Added %d Ajax event entit(ies)", len(entities))
 
     connect_new_entity_signal(
         hass,

@@ -260,16 +260,3 @@ class HubHandler(AjaxDeviceHandler):
             sensors.append(self._firmware_version_sensor())
 
         return sensors
-
-    def get_alarm_control_panels(self) -> list[dict[str, Any]]:
-        """Return alarm control panel for hub.
-
-        The hub is the only device that creates an alarm control panel.
-        """
-        return [
-            {
-                "key": "alarm",
-                "name": f"{self.device.name} Alarm",
-                "space_id": self.device.space_id,
-            }
-        ]

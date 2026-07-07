@@ -560,10 +560,11 @@ async def test_async_setup_entry_no_account_returns_early() -> None:
 @pytest.mark.asyncio
 async def test_async_setup_entry_creates_relay_switch() -> None:
     device = _device(attributes={"is_on": True})
+    account = _account_with(device)
     coordinator = SimpleNamespace(
         entry_id="entry_test",
-        account=_account_with(device),
-        get_space=lambda sid: None,
+        account=account,
+        get_space=account.spaces.get,
     )
     entry = SimpleNamespace(runtime_data=coordinator)
     add = MagicMock()
@@ -585,10 +586,11 @@ async def test_async_setup_entry_creates_dimmer_switches() -> None:
             "dimmerSettings": {"calibration": "DISABLED"},
         },
     )
+    account = _account_with(device)
     coordinator = SimpleNamespace(
         entry_id="entry_test",
-        account=_account_with(device),
-        get_space=lambda sid: None,
+        account=account,
+        get_space=account.spaces.get,
     )
     entry = SimpleNamespace(runtime_data=coordinator)
     add = MagicMock()
@@ -608,10 +610,11 @@ async def test_async_setup_entry_creates_lightswitch_settings_switches() -> None
         raw_type="LightSwitchOneGang",
         attributes={"is_on": False, "settingsSwitch": []},
     )
+    account = _account_with(device)
     coordinator = SimpleNamespace(
         entry_id="entry_test",
-        account=_account_with(device),
-        get_space=lambda sid: None,
+        account=account,
+        get_space=account.spaces.get,
     )
     entry = SimpleNamespace(runtime_data=coordinator)
     add = MagicMock()
@@ -627,10 +630,11 @@ async def test_async_setup_entry_creates_lightswitch_settings_switches() -> None
 async def test_async_setup_entry_no_entities_skips_add() -> None:
     # A device with no handler and no switches -> nothing added.
     device = _device(device_type=DeviceType.UNKNOWN, raw_type="MYSTERY", attributes={})
+    account = _account_with(device)
     coordinator = SimpleNamespace(
         entry_id="entry_test",
-        account=_account_with(device),
-        get_space=lambda sid: None,
+        account=account,
+        get_space=account.spaces.get,
     )
     entry = SimpleNamespace(runtime_data=coordinator)
     add = MagicMock()

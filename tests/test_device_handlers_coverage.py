@@ -139,7 +139,6 @@ def test_base_default_collections_return_empty() -> None:
     assert handler.get_switches() == []
     assert handler.get_buttons() == []
     assert handler.get_events() == []
-    assert handler.get_alarm_control_panels() == []
 
 
 def test_base_resolve_entity_category() -> None:
@@ -814,14 +813,6 @@ def test_hub_active_connection_string_and_gsm_type_empty() -> None:
 def test_hub_malfunctions_non_list() -> None:
     handler = HubHandler(_device(DeviceType.HUB, battery_level=50, malfunctions=2))
     assert _by_key(handler.get_sensors(), "malfunctions")["value_fn"]() == "2"
-
-
-def test_hub_alarm_control_panel() -> None:
-    handler = HubHandler(_device(DeviceType.HUB))
-    panels = handler.get_alarm_control_panels()
-    assert panels[0]["key"] == "alarm"
-    assert panels[0]["space_id"] == "space1"
-    assert panels[0]["name"] == "Test device Alarm"
 
 
 # ---------------------------------------------------------------------------

@@ -36,25 +36,6 @@ async def async_setup_entry(
     if coordinator.account is None:
         return
 
-    entities: list[AjaxHubTracker] = []
-
-    # Create device tracker for each space/hub with geofence data
-    for space_id, space in coordinator.account.spaces.items():
-        if space.hub_details:
-            geofence = space.hub_details.get("geoFence") or {}
-            if geofence.get("latitude") and geofence.get("longitude"):
-                entities.append(AjaxHubTracker(coordinator, space_id))
-                _LOGGER.debug(
-                    "Created device tracker for hub: %s (lat: %s, lon: %s)",
-                    space.name,
-                    geofence.get("latitude"),
-                    geofence.get("longitude"),
-                )
-
-    if entities:
-        async_add_entities(entities)
-        _LOGGER.info("Added %d Ajax device tracker(s)", len(entities))
-
     def _build_space(space_id: str, _obj_id: str) -> list[tuple[str, AjaxHubTracker]]:
         """Build the hub tracker for a hub added after startup (#multi-hub)."""
         space = coordinator.get_space(space_id)
@@ -64,6 +45,15 @@ async def async_setup_entry(
         if not (geofence.get("latitude") and geofence.get("longitude")):
             return []
         return [(f"{space_id}_location", AjaxHubTracker(coordinator, space_id))]
+
+    # Static setup: reuse the discovery builder (geofence guard in one place).
+    entities: list[AjaxHubTracker] = [
+        entity for space_id in coordinator.account.spaces for _uid, entity in _build_space(space_id, space_id)
+    ]
+
+    if entities:
+        async_add_entities(entities)
+        _LOGGER.info("Added %d Ajax device tracker(s)", len(entities))
 
     connect_new_entity_signal(
         hass,

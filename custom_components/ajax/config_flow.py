@@ -452,9 +452,14 @@ class AjaxConfigFlow(ConfigFlow, domain=DOMAIN):
                 if self.context.get("source") == "reauth":
                     reauth_entry = self.hass.config_entries.async_get_entry(self.context.get("entry_id", ""))
                     if reauth_entry:
-                        # Update + reload + abort("reauth_successful") via the
-                        # modern helper (single reload, no listener overlap).
-                        return self.async_update_reload_and_abort(
+                        # Update + abort("reauth_successful"); the update
+                        # listener schedules the reload (HA deprecates the
+                        # flow-side reload helper on entries with a listener).
+                        # Same password (expired-token case) → the listener
+                        # will not fire, so retry the setup explicitly.
+                        if reauth_entry.data.get(CONF_PASSWORD) == password_hash:
+                            self.hass.config_entries.async_schedule_reload(reauth_entry.entry_id)
+                        return self.async_update_and_abort(
                             reauth_entry,
                             data_updates={CONF_PASSWORD: password_hash},
                         )
@@ -668,9 +673,14 @@ class AjaxConfigFlow(ConfigFlow, domain=DOMAIN):
                 # Hash new password
                 password_hash = hashlib.sha256(user_input[CONF_PASSWORD].encode()).hexdigest()
 
-                # Update + reload + abort("reauth_successful") via the modern
-                # helper (single reload, no listener overlap).
-                return self.async_update_reload_and_abort(
+                # Update + abort("reauth_successful"); the update listener
+                # schedules the reload (HA deprecates the flow-side reload
+                # helper on entries with a listener). Same password
+                # (expired-token case) → the listener will not fire, so
+                # retry the setup explicitly.
+                if reauth_entry.data.get(CONF_PASSWORD) == password_hash:
+                    self.hass.config_entries.async_schedule_reload(reauth_entry.entry_id)
+                return self.async_update_and_abort(
                     reauth_entry,
                     data_updates={CONF_PASSWORD: password_hash},
                 )
@@ -755,7 +765,11 @@ class AjaxConfigFlow(ConfigFlow, domain=DOMAIN):
                 if auth_mode != AUTH_MODE_DIRECT and CONF_VERIFY_SSL in user_input:
                     new_data[CONF_VERIFY_SSL] = user_input[CONF_VERIFY_SSL]
 
-                return self.async_update_reload_and_abort(
+                # The update listener schedules the reload on data change;
+                # identical resubmission still retries the setup explicitly.
+                if new_data == dict(reconfigure_entry.data):
+                    self.hass.config_entries.async_schedule_reload(reconfigure_entry.entry_id)
+                return self.async_update_and_abort(
                     reconfigure_entry,
                     data_updates=new_data,
                 )

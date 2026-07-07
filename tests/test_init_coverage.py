@@ -939,13 +939,19 @@ async def test_setup_areas_missing_ha_device_skipped() -> None:
 # _async_update_options
 # --------------------------------------------------------------------------- #
 def _options_entry(*, fast_poll: bool) -> SimpleNamespace:
-    return SimpleNamespace(options={"door_sensor_fast_poll": fast_poll})
+    return SimpleNamespace(entry_id="e1", data={}, options={"door_sensor_fast_poll": fast_poll})
+
+
+def _synced_snapshot() -> tuple[dict, str, str]:
+    """Snapshot matching ``_options_entry`` (no data, no RTSP creds)."""
+    return ({}, "", "")
 
 
 async def test_update_options_disable_with_entry_runtime() -> None:
     """When disabled, _manage_door_sensor_polling(False, ...) is invoked."""
     entry = _options_entry(fast_poll=False)
     coord = MagicMock()
+    coord._reload_config_snapshot = _synced_snapshot()
     coord._door_sensor_fast_poll_enabled = True
     coord._door_sensor_poll_task = MagicMock()
     coord._door_sensor_poll_security_state = SecurityState.DISARMED
@@ -962,6 +968,7 @@ async def test_update_options_enable_restarts_polling_for_disarmed_space() -> No
     """Enabling re-evaluates polling and starts it for a disarmed space."""
     entry = _options_entry(fast_poll=True)
     coord = MagicMock()
+    coord._reload_config_snapshot = _synced_snapshot()
     coord._door_sensor_fast_poll_enabled = False
     coord._door_sensor_poll_task = None
     coord._manage_door_sensor_polling = MagicMock()
@@ -978,6 +985,7 @@ async def test_update_options_enable_no_account_no_restart() -> None:
     """Enabling with no account does not start any polling task."""
     entry = _options_entry(fast_poll=True)
     coord = MagicMock()
+    coord._reload_config_snapshot = _synced_snapshot()
     coord._door_sensor_fast_poll_enabled = False
     coord._door_sensor_poll_task = None
     coord._manage_door_sensor_polling = MagicMock()
@@ -993,6 +1001,7 @@ async def test_update_options_enable_armed_space_not_polled() -> None:
     """An armed space does not trigger door-sensor polling."""
     entry = _options_entry(fast_poll=True)
     coord = MagicMock()
+    coord._reload_config_snapshot = _synced_snapshot()
     coord._door_sensor_fast_poll_enabled = False
     coord._door_sensor_poll_task = None
     coord._manage_door_sensor_polling = MagicMock()
@@ -1005,10 +1014,57 @@ async def test_update_options_enable_armed_space_not_polled() -> None:
     coord._manage_door_sensor_polling.assert_not_called()
 
 
+async def test_update_options_data_change_schedules_reload() -> None:
+    """A connection-relevant change (entry.data) schedules a reload and stops there."""
+    entry = _options_entry(fast_poll=False)
+    entry.data = {"proxy_url": "https://new"}  # differs from the snapshot
+    hass = MagicMock()
+    coord = MagicMock()
+    coord._reload_config_snapshot = _synced_snapshot()
+    coord._manage_door_sensor_polling = MagicMock()
+    entry.runtime_data = coord
+
+    await _async_update_options(hass, entry)
+
+    hass.config_entries.async_schedule_reload.assert_called_once_with("e1")
+    coord._manage_door_sensor_polling.assert_not_called()
+
+
+async def test_update_options_rtsp_change_schedules_reload() -> None:
+    """New RTSP/ONVIF credentials require a reload (ONVIF reads them at bootstrap)."""
+    entry = _options_entry(fast_poll=False)
+    entry.options = {**entry.options, "rtsp_username": "admin", "rtsp_password": "secret"}
+    hass = MagicMock()
+    coord = MagicMock()
+    coord._reload_config_snapshot = _synced_snapshot()
+    entry.runtime_data = coord
+
+    await _async_update_options(hass, entry)
+
+    hass.config_entries.async_schedule_reload.assert_called_once_with("e1")
+
+
+async def test_update_options_notification_change_no_reload() -> None:
+    """Notification options are read dynamically — no reload scheduled."""
+    entry = _options_entry(fast_poll=False)
+    entry.options = {**entry.options, "notification_filter": "alarms_only"}
+    hass = MagicMock()
+    coord = MagicMock()
+    coord._reload_config_snapshot = _synced_snapshot()
+    coord._door_sensor_fast_poll_enabled = False
+    coord._manage_door_sensor_polling = MagicMock()
+    entry.runtime_data = coord
+
+    await _async_update_options(hass, entry)
+
+    hass.config_entries.async_schedule_reload.assert_not_called()
+
+
 async def test_update_options_no_change_is_noop() -> None:
     """When the option value is unchanged, no polling management occurs."""
     entry = _options_entry(fast_poll=False)
     coord = MagicMock()
+    coord._reload_config_snapshot = _synced_snapshot()
     coord._door_sensor_fast_poll_enabled = False  # same as new value
     coord._manage_door_sensor_polling = MagicMock()
     entry.runtime_data = coord

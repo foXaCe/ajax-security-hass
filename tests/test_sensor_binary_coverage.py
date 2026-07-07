@@ -477,7 +477,7 @@ def test_binary_sensor_update_device_registry_updates_entry() -> None:
     registry = MagicMock()
     registry.async_get_device.return_value = device_entry
 
-    with patch("custom_components.ajax.binary_sensor.dr.async_get", return_value=registry):
+    with patch("custom_components.ajax._binary_sensor_entities.dr.async_get", return_value=registry):
         sensor._update_device_registry()
 
     registry.async_update_device.assert_called_once()
@@ -490,7 +490,7 @@ def test_binary_sensor_update_device_registry_updates_entry() -> None:
 def test_binary_sensor_update_device_registry_noop_without_device() -> None:
     sensor = _binary_sensor(None)
     sensor.hass = MagicMock()
-    with patch("custom_components.ajax.binary_sensor.dr.async_get") as get:
+    with patch("custom_components.ajax._binary_sensor_entities.dr.async_get") as get:
         sensor._update_device_registry()
         get.assert_not_called()
 
@@ -500,7 +500,7 @@ def test_binary_sensor_update_device_registry_noop_when_entry_missing() -> None:
     sensor.hass = MagicMock()
     registry = MagicMock()
     registry.async_get_device.return_value = None
-    with patch("custom_components.ajax.binary_sensor.dr.async_get", return_value=registry):
+    with patch("custom_components.ajax._binary_sensor_entities.dr.async_get", return_value=registry):
         sensor._update_device_registry()
     registry.async_update_device.assert_not_called()
 

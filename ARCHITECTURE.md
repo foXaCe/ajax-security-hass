@@ -26,7 +26,8 @@ Ajax cloud ──REST──▶ api.AjaxRestApi ──▶ coordinator.AjaxDataCoo
 | `_services.py` | Integration service registration (`force_arm`, `force_arm_night`, `get_raw_devices`, `refresh_metadata`, `get_nvr_recordings`, `get_smart_locks`) + handlers. |
 | `coordinator.py` | `AjaxDataCoordinator` — composed from the `_coordinator_*` mixins. Exposes `entry_id: str` for entity namespacing. |
 | `_coordinator_init.py` | Coordinator init, stores. |
-| `_coordinator_devices.py` | Device reconciliation pipeline, stale-device cleanup. Inherits `_device_normalize`. |
+| `_coordinator_devices.py` | Device reconciliation pipeline (fetch, dedup, create/remove, dispatch), stale-device cleanup. Inherits `_device_normalize`; delegates the per-device payload application to `_device_apply`. |
+| `_device_apply.py` | Pure appliers `(device, device_data)` grouped by device family (common state, contacts, siren, FireProtect, LifeQuality, WaterStop, socket/power, button, lightswitch) — `apply_device_payload` runs them in order, honouring the per-key optimistic guards. |
 | `_device_normalize.py` | `AjaxDeviceNormalizeMixin` — stateless attribute normalisation (raw Ajax field names → handler shapes) + motion-impulse expiry. |
 | `_coordinator_door_poll.py` | `AjaxDoorPollingMixin` — fast 5 s door/transmitter/wire-input polling while disarmed / night mode; also applies bridged smart-lock `lockStatus`/`doorStatus` from the same payload (#88). |
 | `_coordinator_state.py` | Payload parsers (security state, device type), video-edge / smart-lock pollers. |
@@ -47,7 +48,7 @@ Ajax cloud ──REST──▶ api.AjaxRestApi ──▶ coordinator.AjaxDataCoo
 | `config_flow.py` / `config_flow_options.py` | `ConfigFlow` (user/direct/proxy/2FA/select_spaces/dhcp/reauth/reconfigure); `OptionsFlow` lives in `config_flow_options.py`. |
 | `diagnostics.py` | Redacted config-entry / device diagnostics. |
 | `devices/` | One handler per Ajax device type (`base.py` + 19 handlers); `DEVICE_HANDLERS` map + `get_device_handler` / `is_dimmer_device`. `generic.py` is the fallback for recognised types without a dedicated module (Thermostat, TemperatureSensor, LineSplitter) — standard Jeweller diagnostics instead of a silent skip. |
-| Platforms | `sensor.py` (thin: setup + re-exports; entities in `_sensor_space.py` / `_sensor_device.py` / `_sensor_hub.py` / `_sensor_smart_lock.py`), `binary_sensor.py`, `switch.py` (+ `_switch_entity.py` / `_switch_dimmer.py`), `number.py`, `select.py`, `light.py`, `valve.py`, `lock.py`, `camera.py`, `event.py`, `alarm_control_panel.py`, `device_tracker.py`, `update.py`, `button.py`. Every platform (not just alarm) listens to `SIGNAL_NEW_SPACE` for hubs added after startup. In most platforms the static setup **reuses the discovery builders** (`_build_*`), so entity-construction logic exists in exactly one place. |
+| Platforms | `sensor.py` (thin: setup + re-exports; entities in `_sensor_space.py` / `_sensor_device.py` / `_sensor_hub.py` / `_sensor_smart_lock.py`), `binary_sensor.py` (+ `_binary_sensor_entities.py`), `switch.py` (+ `_switch_entity.py` / `_switch_dimmer.py`), `number.py` (+ `_number_entities.py`), `select.py` (+ `_select_entities.py`), `light.py`, `valve.py`, `lock.py`, `camera.py`, `event.py`, `alarm_control_panel.py`, `device_tracker.py`, `update.py`, `button.py`. Every platform (not just alarm) listens to `SIGNAL_NEW_SPACE` for hubs added after startup. The static setup **reuses the discovery builders** (`_build_*`), so entity-construction logic exists in exactly one place; platform modules re-export their entity classes for backwards compatibility. |
 
 ## Identifier namespacing (schema v1.3)
 

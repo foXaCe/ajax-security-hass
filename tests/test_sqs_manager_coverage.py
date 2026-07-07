@@ -1007,7 +1007,7 @@ async def test_create_alarm_notification_default(monkeypatch) -> None:
     space = _space()
     created = MagicMock()
     monkeypatch.setattr(
-        "homeassistant.components.persistent_notification.async_create",
+        "custom_components.ajax.sqs_manager.async_create",
         created,
     )
     rec = {
@@ -1027,7 +1027,7 @@ async def test_create_alarm_notification_persistent_disabled(monkeypatch) -> Non
     space = _space()
     created = MagicMock()
     monkeypatch.setattr(
-        "homeassistant.components.persistent_notification.async_create",
+        "custom_components.ajax.sqs_manager.async_create",
         created,
     )
     await mgr._create_alarm_notification(space, {"message": "X"})
@@ -1040,7 +1040,7 @@ async def test_create_alarm_notification_filter_none(monkeypatch) -> None:
     space = _space()
     created = MagicMock()
     monkeypatch.setattr(
-        "homeassistant.components.persistent_notification.async_create",
+        "custom_components.ajax.sqs_manager.async_create",
         created,
     )
     await mgr._create_alarm_notification(space, {"message": "X"})
@@ -1053,7 +1053,7 @@ async def test_create_alarm_notification_monitored_spaces_drops_other_space(monk
     space = _space()  # id="s1", outside the monitored selection
     created = MagicMock()
     monkeypatch.setattr(
-        "homeassistant.components.persistent_notification.async_create",
+        "custom_components.ajax.sqs_manager.async_create",
         created,
     )
     await mgr._create_alarm_notification(space, {"message": "X"})
@@ -1066,7 +1066,7 @@ async def test_create_alarm_notification_monitored_spaces_keeps_selected(monkeyp
     space = _space()
     created = MagicMock()
     monkeypatch.setattr(
-        "homeassistant.components.persistent_notification.async_create",
+        "custom_components.ajax.sqs_manager.async_create",
         created,
     )
     await mgr._create_alarm_notification(space, {"message": "X"})
@@ -1124,7 +1124,7 @@ async def test_handle_event_alarm_creates_notification(monkeypatch) -> None:
     space.devices["d1"] = dev
     created = MagicMock()
     monkeypatch.setattr(
-        "homeassistant.components.persistent_notification.async_create",
+        "custom_components.ajax.sqs_manager.async_create",
         created,
     )
     await mgr._handle_event(_event(eventTag="SmokeDetected", eventTypeV2="ALARM", sourceObjectId="d1"))

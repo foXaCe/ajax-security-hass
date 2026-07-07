@@ -25,14 +25,20 @@ from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
+from homeassistant.components.persistent_notification import async_create
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 
 from ._event_helpers import EventHandlerMixin
 from .const import (
+    CONF_MONITORED_SPACES,
+    CONF_NOTIFICATION_FILTER,
+    CONF_PERSISTENT_NOTIFICATION,
     EVENT_AJAX_BUTTON_PRESSED,
     EVENT_AJAX_DOORBELL_RING,
     EVENT_AJAX_SCENARIO_TRIGGERED,
     EVENT_AJAX_SMART_LOCK_DOORBELL,
+    NOTIFICATION_FILTER_ALL,
+    NOTIFICATION_FILTER_NONE,
     SIGNAL_NEW_SMART_LOCK,
 )
 from .event_codes import (
@@ -907,16 +913,6 @@ class SQSManager(EventHandlerMixin):
         - SECURITY_EVENTS: show alarm + arm/disarm notifications
         - ALL: show all notifications
         """
-        from homeassistant.components.persistent_notification import async_create
-
-        from .const import (
-            CONF_MONITORED_SPACES,
-            CONF_NOTIFICATION_FILTER,
-            CONF_PERSISTENT_NOTIFICATION,
-            NOTIFICATION_FILTER_ALL,
-            NOTIFICATION_FILTER_NONE,
-        )
-
         # Check notification filter settings
         options = self.coordinator.config_entry.options if self.coordinator.config_entry else {}
 

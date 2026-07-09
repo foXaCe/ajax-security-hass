@@ -5,7 +5,7 @@ Covers the bits not exercised by the focused per-entity tests:
 * ``valve.async_setup_entry`` / ``_build_valves`` discovery plus the
   optimistic-write + rollback machinery of ``_set_valve_state``.
 * ``lock.async_setup_entry`` / ``_build_lock`` discovery and the
-  read-only ``async_lock`` / ``async_unlock`` guards.
+  ``async_lock`` / ``async_unlock`` device-not-found guards.
 * ``device_tracker.async_setup_entry`` geofence filtering.
 * ``alarm_control_panel.async_setup_entry`` (space + group panels) and
   the ``AjaxGroupAlarmControlPanel.__init__`` name fallback.
@@ -322,15 +322,18 @@ def _lock_entity() -> AjaxLock:
 
 
 @pytest.mark.asyncio
-async def test_lock_async_lock_not_supported() -> None:
+async def test_lock_async_lock_device_not_found() -> None:
+    """async_lock sends LOCK_SMART_LOCK; with no space it guards with device_not_found."""
+    lk = _lock_entity()
+    lk.coordinator = SimpleNamespace(get_space=lambda sid: None)
     with pytest.raises(HomeAssistantError) as err:
-        await _lock_entity().async_lock()
-    assert err.value.translation_key == "lock_not_supported"
+        await lk.async_lock()
+    assert err.value.translation_key == "device_not_found"
 
 
 @pytest.mark.asyncio
 async def test_lock_async_unlock_device_not_found() -> None:
-    """async_unlock now sends UNLOCK_DEVICE; with no space it guards with device_not_found."""
+    """async_unlock sends UNLOCK_SMART_LOCK; with no space it guards with device_not_found."""
     lk = _lock_entity()
     lk.coordinator = SimpleNamespace(get_space=lambda sid: None)
     with pytest.raises(HomeAssistantError) as err:

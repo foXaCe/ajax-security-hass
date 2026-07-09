@@ -1535,9 +1535,6 @@
     "invalid_target": {
       "message": "Ogiltigt mål för tjänsten."
     },
-    "lock_not_supported": {
-      "message": "Fjärrlåsning stöds inte av Ajax smart locks."
-    },
     "no_api_key": {
       "message": "Ingen API-nyckel konfigurerad för denna entitet."
     },

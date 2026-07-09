@@ -11,26 +11,16 @@
     "error": {
       "cannot_connect": "Misslyckades att ansluta till Ajax API. Kontollera internetanslutningen.",
       "entry_not_found": "Konfigurationen hittades inte. Försök igen.",
-      "invalid_2fa": "Ogiltig verifikationskod. Vänligen försök igen.",
       "invalid_account_type": "Kontotypen stöds ej. Använd ett användarkonto (inte ett PRO/Enterprise konto).",
       "invalid_api_key": "Ogiltig eller saknad API nyckel. Kontrollera din enterprise API-nyckel.",
       "invalid_auth": "Ogiltiga inloggningsuppgifter för API. Kontrollera API Nyckel, epost and lösenord.",
       "invalid_password": "Ogiltig epost eller lösenord. Kontrollera inloggningsuppgifter för Ajax-kontot.",
       "invalid_proxy_url": "Ogiltig proxy URL. URL måste börja med http:// eller https://",
+      "invalid_totp_secret": "Ogiltig TOTP-hemlighet. Ange Base32-nyckeln som visades när du aktiverade tvåfaktorsautentisering.",
       "no_spaces_selected": "Välj minst ett space för aktivering.",
       "unknown": "Oväntat fel. Kontrollera loggar för mer information."
     },
     "step": {
-      "2fa": {
-        "data": {
-          "code": "Verifikationskod"
-        },
-        "data_description": {
-          "code": "6-siffrig kod från din autentikatorapp eller SMS"
-        },
-        "description": "Ange den 6-siffriga koden som skickats till din enhet för {email}",
-        "title": "Tvåfaktorautentisering"
-      },
       "dhcp_confirm": {
         "data": {
           "action": "Åtgärd"
@@ -45,7 +35,8 @@
           "aws_secret_access_key": "AWS Secret Access Key (Ej obligatorisk)",
           "email": "Epostadress",
           "password": "Lösenord",
-          "queue_name": "SQS Queue Name (Ej obligatorisk)"
+          "queue_name": "SQS Queue Name (Ej obligatorisk)",
+          "totp_secret": "Tvåfaktorshemlighet (valfritt)"
         },
         "data_description": {
           "api_key": "Din API-nyckel som erhållits från Ajax Systems",
@@ -53,7 +44,8 @@
           "aws_secret_access_key": "AWS Secret Access Key för realtids SQS-händelser",
           "email": "Din epostadress för Ajax-kontot",
           "password": "Ditt lösenord till Ajax-kontot",
-          "queue_name": "Namn på SQS Queue (t ex ajax-events-xxxxx-prod.fifo)"
+          "queue_name": "Namn på SQS Queue (t ex ajax-events-xxxxx-prod.fifo)",
+          "totp_secret": "Base32-nyckel från din autentiseringsapp. Lämna tomt om 2FA inte är aktiverat på ditt Ajax-konto."
         },
         "description": "Ange inloggningsuppgifter till Ajax API.\n\n⚠️ **Endast konto för användare** (Ej PRO/Enterprise-konton).\n\nValfritt: Ange AWS-uppgifter för realtids-uppdateringar.",
         "title": "Direktanslutning"
@@ -63,12 +55,14 @@
           "email": "Epostadress",
           "password": "Lösenord",
           "proxy_url": "Proxy URL",
+          "totp_secret": "Tvåfaktorshemlighet (valfritt)",
           "verify_ssl": "Verifiera SSL-certifikat"
         },
         "data_description": {
           "email": "Din epostadress för Ajax-kontot",
           "password": "Ditt lösenord för Ajax-kontot",
           "proxy_url": "URL till Ajax proxyserver",
+          "totp_secret": "Base32-nyckel från din autentiseringsapp. Lämna tomt om 2FA inte är aktiverat på ditt Ajax-konto.",
           "verify_ssl": "Inaktivera vid självsignerat certifikat (HTTPS)"
         },
         "description": "Anslut via en Ajax proxy server.\n\n⚠️ **Endats konto för användare** (Ej PRO/Enterprise-konto).\n\nHändelser tas emot i realtid via SSE.",
@@ -76,7 +70,11 @@
       },
       "reauth_confirm": {
         "data": {
-          "password": "Lösenord"
+          "password": "Lösenord",
+          "totp_secret": "Tvåfaktorshemlighet (valfritt)"
+        },
+        "data_description": {
+          "totp_secret": "Base32-nyckel från din autentiseringsapp. Lämna tomt om 2FA inte är aktiverat på ditt Ajax-konto."
         },
         "description": "Din session har löpt ut. Vänligen ange lösenord för {email}.",
         "title": "Logga in igen"
@@ -87,9 +85,11 @@
           "email": "E-post",
           "password": "Lösenord",
           "proxy_url": "Proxy-URL",
+          "totp_secret": "Tvåfaktorshemlighet (valfritt)",
           "verify_ssl": "Verifiera SSL-certifikat"
         },
         "data_description": {
+          "totp_secret": "Base32-nyckel från din autentiseringsapp. Lämna tomt om 2FA inte är aktiverat på ditt Ajax-konto.",
           "verify_ssl": "Inaktivera om proxyn använder ett självsignerat certifikat."
         },
         "description": "Uppdatera dina Ajax-inloggningsuppgifter.",

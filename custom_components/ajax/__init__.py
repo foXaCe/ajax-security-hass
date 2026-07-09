@@ -45,6 +45,7 @@ from .const import (
     CONF_QUEUE_NAME,
     CONF_RTSP_PASSWORD,
     CONF_RTSP_USERNAME,
+    CONF_TOTP_SECRET,
     CONF_VERIFY_SSL,
     DOMAIN,
     INTEGRATION_VERSION,
@@ -96,6 +97,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: AjaxConfigEntry) -> bool
     # Get common credentials
     email = entry.data[CONF_EMAIL]
     password_hash = entry.data[CONF_PASSWORD]  # Already hashed in config_flow
+    totp_secret = entry.data.get(CONF_TOTP_SECRET)
 
     # Variables for different modes
     api_key: str | None = None
@@ -150,6 +152,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: AjaxConfigEntry) -> bool
         email=email,
         password=password_hash,
         password_is_hashed=True,  # Password is already SHA256 hash
+        totp_secret=totp_secret,
         proxy_url=proxy_url,
         proxy_mode=proxy_mode,
         session=session,

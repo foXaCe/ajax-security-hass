@@ -14,3 +14,4 @@ pytest-mock
 # Integration runtime dep needed to import the package under test (kept in sync
 # with manifest.json).
 aiobotocore>=3.7.0
+pyotp>=2.9.0

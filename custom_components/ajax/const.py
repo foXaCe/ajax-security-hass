@@ -43,6 +43,7 @@ MANUFACTURER = "Ajax Systems"
 CONF_API_KEY = "api_key"
 CONF_EMAIL = "email"
 CONF_PASSWORD = "password"
+CONF_TOTP_SECRET = "totp_secret"  # Optional Base32 TOTP secret (2FA, mandatory 2025-09-01)
 CONF_NOTIFICATION_FILTER = "notification_filter"
 CONF_PERSISTENT_NOTIFICATION = "persistent_notification"
 CONF_MONITORED_SPACES = "monitored_spaces"

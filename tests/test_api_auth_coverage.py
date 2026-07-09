@@ -1,9 +1,9 @@
 """Tests for AjaxRestApi authentication and HTTP transport.
 
 These cover the wire-level paths that ``test_api_helpers``/``test_api_endpoints``
-deliberately skip: the login / 2FA / refresh handshakes, the proactive and
-recovery auth flows, and the retry/backoff machinery inside ``_request`` and
-``_request_no_response``.
+deliberately skip: the login (including the optional single-step TOTP code) /
+refresh handshakes, the proactive and recovery auth flows, and the
+retry/backoff machinery inside ``_request`` and ``_request_no_response``.
 
 We mock at the lowest practical layer — the ``aiohttp.ClientSession`` —
 substituting it with a fake whose ``post``/``request``/``get`` return an async
@@ -20,7 +20,6 @@ import pytest
 
 from custom_components.ajax.api import (
     MAX_RETRIES,
-    AjaxRest2FARequiredError,
     AjaxRestApi,
     AjaxRestApiError,
     AjaxRestAuthError,
@@ -28,6 +27,9 @@ from custom_components.ajax.api import (
     AjaxRestRateLimitError,
 )
 from custom_components.ajax.const import AUTH_MODE_PROXY_SECURE
+
+# pyotp's well-known public test vector (RFC 6238 example secret).
+_TEST_TOTP_SECRET = "JBSWY3DPEHPK3PXP"
 
 # ---------------------------------------------------------------------------
 # Mock aiohttp plumbing
@@ -134,12 +136,14 @@ def _api(
     refresh_token: str | None = "refresh",
     proxy_mode: str | None = None,
     proxy_url: str | None = None,
+    totp_secret: str | None = None,
     responses: list[object] | None = None,
 ) -> AjaxRestApi:
     api = AjaxRestApi(
         api_key="KEY",
         email="u@example.com",
         password="p",
+        totp_secret=totp_secret,
         proxy_mode=proxy_mode,
         proxy_url=proxy_url,
     )
@@ -232,12 +236,14 @@ async def test_login_500_invalid_api_key() -> None:
 
 
 @pytest.mark.asyncio
-async def test_login_403_raises_2fa_required() -> None:
+async def test_login_403_raises_auth_error() -> None:
+    # API 1.147.0 has no distinct "2FA required" signal on /login; a 403 is
+    # surfaced as a plain auth failure so the config flow re-prompts.
     api = _api(session_token=None)
-    api.session = _FakeSession([_FakeResponse(403, {"requestId": "REQ-1"})])  # type: ignore[assignment]
-    with pytest.raises(AjaxRest2FARequiredError) as exc:
+    api.session = _FakeSession([_FakeResponse(403)])  # type: ignore[assignment]
+    with pytest.raises(AjaxRestAuthError) as exc:
         await api.async_login()
-    assert exc.value.request_id == "REQ-1"
+    assert exc.value.error_type == "invalid_password"
 
 
 @pytest.mark.asyncio
@@ -301,73 +307,44 @@ async def test_login_timeout_wrapped() -> None:
 
 
 # ---------------------------------------------------------------------------
-# async_verify_2fa
+# async_login — TOTP (single-step 2FA, mandatory on Ajax's side 2025-09-01)
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.asyncio
-async def test_verify_2fa_success() -> None:
-    api = _api(session_token=None, user_id=None)
-    api.session = _FakeSession([_FakeResponse(200, {"sessionToken": "S2", "refreshToken": "R2", "userId": "U2"})])  # type: ignore[assignment]
-    token = await api.async_verify_2fa("REQ", "123456")
-    assert token == "S2"
-    assert api.user_id == "U2"
-    assert api.refresh_token == "R2"
+async def test_login_with_totp_secret_includes_code_in_payload() -> None:
+    api = _api(session_token=None, totp_secret=_TEST_TOTP_SECRET)
+    session = _FakeSession([_FakeResponse(200, {"sessionToken": "S", "refreshToken": "R", "userId": "U1"})])
+    api.session = session  # type: ignore[assignment]
+    # Pin the code so the assertion cannot flake across a 30s window roll.
+    with patch("pyotp.TOTP.now", return_value="654321"):
+        await api.async_login()
+    _, _, kwargs = session.calls[0]
+    payload = kwargs["json"]
+    assert payload["totp"] == "654321"
+    assert len(payload["totp"]) == 6
+    assert payload["totp"].isdigit()
 
 
 @pytest.mark.asyncio
-async def test_verify_2fa_invalid_code_raises() -> None:
-    api = _api(session_token=None)
-    api.session = _FakeSession([_FakeResponse(401)])  # type: ignore[assignment]
-    with pytest.raises(AjaxRestAuthError, match="Invalid 2FA code"):
-        await api.async_verify_2fa("REQ", "000000")
+async def test_login_without_totp_secret_omits_code() -> None:
+    api = _api(session_token=None, totp_secret=None)
+    session = _FakeSession([_FakeResponse(200, {"sessionToken": "S", "refreshToken": "R", "userId": "U1"})])
+    api.session = session  # type: ignore[assignment]
+    await api.async_login()
+    _, _, kwargs = session.calls[0]
+    assert "totp" not in kwargs["json"]
 
 
 @pytest.mark.asyncio
-async def test_verify_2fa_no_session_token_raises() -> None:
-    api = _api(session_token=None)
-    api.session = _FakeSession([_FakeResponse(200, {"userId": "U2"})])  # type: ignore[assignment]
-    with pytest.raises(AjaxRestApiError, match="No sessionToken"):
-        await api.async_verify_2fa("REQ", "123456")
-
-
-@pytest.mark.asyncio
-async def test_verify_2fa_no_user_id_raises() -> None:
-    api = _api(session_token=None, user_id=None)
-    api.session = _FakeSession([_FakeResponse(200, {"sessionToken": "S2"})])  # type: ignore[assignment]
-    with pytest.raises(AjaxRestApiError, match="No userId"):
-        await api.async_verify_2fa("REQ", "123456")
-
-
-@pytest.mark.asyncio
-async def test_verify_2fa_proxy_extras() -> None:
-    api = _api(
-        session_token=None,
-        user_id=None,
-        proxy_mode=AUTH_MODE_PROXY_SECURE,
-        proxy_url="https://proxy.example.com",
-    )
-    api.session = _FakeSession([_FakeResponse(200, {"user_id": "PU2", "apiKey": "K2"})])  # type: ignore[assignment]
-    token = await api.async_verify_2fa("REQ", "123456")
-    assert token == "PU2"
-    assert api.api_key == "K2"
-    assert api.sse_url == "https://proxy.example.com/events?userId=PU2"
-
-
-@pytest.mark.asyncio
-async def test_verify_2fa_client_error_wrapped() -> None:
-    api = _api(session_token=None)
-    api.session = _FakeSession([aiohttp.ClientError("net")])  # type: ignore[assignment]
-    with pytest.raises(AjaxRestApiError, match="2FA verification failed"):
-        await api.async_verify_2fa("REQ", "123456")
-
-
-@pytest.mark.asyncio
-async def test_verify_2fa_timeout_wrapped() -> None:
-    api = _api(session_token=None)
-    api.session = _FakeSession([TimeoutError()])  # type: ignore[assignment]
-    with pytest.raises(AjaxRestApiError, match="2FA verification timeout"):
-        await api.async_verify_2fa("REQ", "123456")
+async def test_login_invalid_totp_secret_raises_without_logging_secret(caplog) -> None:
+    bad_secret = "not-a-valid-base32-secret!"
+    api = _api(session_token=None, totp_secret=bad_secret)
+    api.session = _FakeSession([])  # type: ignore[assignment]  # never reached: fails before the request
+    with caplog.at_level("DEBUG"), pytest.raises(AjaxRestAuthError) as exc:
+        await api.async_login()
+    assert exc.value.error_type == "invalid_totp_secret"
+    assert bad_secret not in caplog.text
 
 
 # ---------------------------------------------------------------------------

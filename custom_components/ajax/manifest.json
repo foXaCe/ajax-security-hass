@@ -22,7 +22,8 @@
   "quality_scale": "platinum",
   "requirements": [
     "aiobotocore>=3.7.0",
-    "onvif-zeep-async>=4.2.1"
+    "onvif-zeep-async>=4.2.1",
+    "pyotp>=2.9.0"
   ],
   "version": "0.35.0"
 }

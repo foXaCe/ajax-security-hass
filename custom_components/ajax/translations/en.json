@@ -11,26 +11,16 @@
     "error": {
       "cannot_connect": "Failed to connect to Ajax API. Check your internet connection.",
       "entry_not_found": "Configuration not found. Please try again.",
-      "invalid_2fa": "Invalid verification code. Please try again.",
       "invalid_account_type": "Account type not supported. Use a user account (not a PRO/Enterprise account).",
       "invalid_api_key": "Invalid or missing API key. Check your enterprise API key.",
       "invalid_auth": "Invalid API credentials. Check your API Key, email, and password.",
       "invalid_password": "Invalid email or password. Check your Ajax account credentials.",
       "invalid_proxy_url": "Invalid proxy URL. URL must start with http:// or https://",
+      "invalid_totp_secret": "Invalid TOTP secret. Enter the Base32 key shown when you enabled two-factor authentication.",
       "no_spaces_selected": "Please select at least one space to enable.",
       "unknown": "Unexpected error. Check the logs for more details."
     },
     "step": {
-      "2fa": {
-        "data": {
-          "code": "Verification Code"
-        },
-        "data_description": {
-          "code": "6-digit code from your authenticator app or SMS"
-        },
-        "description": "Enter the 6-digit verification code sent to your device for {email}",
-        "title": "Two-Factor Authentication"
-      },
       "dhcp_confirm": {
         "data": {
           "action": "Action"
@@ -45,7 +35,8 @@
           "aws_secret_access_key": "AWS Secret Access Key (Optional)",
           "email": "Email Address",
           "password": "Password",
-          "queue_name": "SQS Queue Name (Optional)"
+          "queue_name": "SQS Queue Name (Optional)",
+          "totp_secret": "Two-factor secret (optional)"
         },
         "data_description": {
           "api_key": "Your API Key provided by Ajax Systems",
@@ -53,7 +44,8 @@
           "aws_secret_access_key": "AWS Secret Access Key for real-time SQS events",
           "email": "Your Ajax account email address",
           "password": "Your Ajax account password",
-          "queue_name": "SQS Queue name (e.g., ajax-events-xxxxx-prod.fifo)"
+          "queue_name": "SQS Queue name (e.g., ajax-events-xxxxx-prod.fifo)",
+          "totp_secret": "Base32 key from your authenticator app setup. Leave blank if 2FA is not enabled on your Ajax account."
         },
         "description": "Enter your Ajax API credentials.\n\n⚠️ **User account only** (not PRO/Enterprise accounts).\n\nOptional: Add AWS credentials for real-time event notifications.",
         "title": "Direct Connection"
@@ -63,12 +55,14 @@
           "email": "Email Address",
           "password": "Password",
           "proxy_url": "Proxy URL",
+          "totp_secret": "Two-factor secret (optional)",
           "verify_ssl": "Verify SSL Certificate"
         },
         "data_description": {
           "email": "Your Ajax account email address",
           "password": "Your Ajax account password",
           "proxy_url": "Ajax proxy server URL",
+          "totp_secret": "Base32 key from your authenticator app setup. Leave blank if 2FA is not enabled on your Ajax account.",
           "verify_ssl": "Disable if using self-signed certificate (HTTPS)"
         },
         "description": "Connect via an Ajax proxy server.\n\n⚠️ **User account only** (not PRO/Enterprise accounts).\n\nEvents will be received in real-time via SSE.",
@@ -76,7 +70,11 @@
       },
       "reauth_confirm": {
         "data": {
-          "password": "Password"
+          "password": "Password",
+          "totp_secret": "Two-factor secret (optional)"
+        },
+        "data_description": {
+          "totp_secret": "Base32 key from your authenticator app setup. Leave blank if 2FA is not enabled on your Ajax account."
         },
         "description": "Your session has expired. Please re-enter your password for {email}.",
         "title": "Re-authenticate"
@@ -87,9 +85,11 @@
           "email": "Email",
           "password": "Password",
           "proxy_url": "Proxy URL",
+          "totp_secret": "Two-factor secret (optional)",
           "verify_ssl": "Verify SSL Certificate"
         },
         "data_description": {
+          "totp_secret": "Base32 key from your authenticator app setup. Leave blank if 2FA is not enabled on your Ajax account.",
           "verify_ssl": "Disable if the proxy uses a self-signed certificate."
         },
         "description": "Update your Ajax credentials.",

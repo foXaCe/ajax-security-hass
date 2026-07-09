@@ -134,6 +134,7 @@ def _spaces_summary(coordinator: Any) -> list[dict[str, Any]]:
 TO_REDACT = {
     "email",
     "password",
+    "totp_secret",
     "proxy_url",
     "aws_access_key_id",
     "aws_secret_access_key",

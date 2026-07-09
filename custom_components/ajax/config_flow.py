@@ -24,7 +24,6 @@ from homeassistant.helpers.service_info.dhcp import DhcpServiceInfo
 
 from . import AjaxConfigEntry
 from .api import (
-    AjaxRest2FARequiredError,
     AjaxRestApi,
     AjaxRestApiError,
     AjaxRestAuthError,
@@ -43,6 +42,7 @@ from .const import (
     CONF_PASSWORD,
     CONF_PROXY_URL,
     CONF_QUEUE_NAME,
+    CONF_TOTP_SECRET,
     CONF_VERIFY_SSL,
     DOMAIN,
 )
@@ -64,6 +64,7 @@ def _build_api(
     password: str,
     auth_mode: str,
     api_key: str = "",
+    totp_secret: str | None = None,
     proxy_url: str | None = None,
     verify_ssl: bool = True,
 ) -> AjaxRestApi:
@@ -73,11 +74,12 @@ def _build_api(
     their key from the proxy and carry the proxy URL / TLS preference.
     """
     if auth_mode == AUTH_MODE_DIRECT:
-        return AjaxRestApi(api_key=api_key, email=email, password=password)
+        return AjaxRestApi(api_key=api_key, email=email, password=password, totp_secret=totp_secret)
     return AjaxRestApi(
         api_key="",
         email=email,
         password=password,
+        totp_secret=totp_secret,
         proxy_url=proxy_url,
         proxy_mode=auth_mode,
         verify_ssl=verify_ssl,
@@ -102,10 +104,23 @@ class AjaxConfigFlow(ConfigFlow, domain=DOMAIN):
         """Initialize the config flow."""
         self._api: AjaxRestApi | None = None
         self._user_input: dict[str, Any] = {}
-        self._request_id: str | None = None
         self._auth_mode: str = AUTH_MODE_DIRECT
         self._spaces: list[dict[str, str]] = []  # List of {id, name} for discovered spaces
         self._entry_data: dict[str, Any] = {}  # Prepared entry data
+
+    @staticmethod
+    def _clean_totp_secret(raw: str | None) -> str | None:
+        """Normalise a user-entered Base32 TOTP secret (spaces, case)."""
+        if not raw:
+            return None
+        secret = raw.replace(" ", "").upper()
+        import pyotp
+
+        try:
+            pyotp.TOTP(secret).now()  # validates Base32
+        except Exception as err:
+            raise ValueError("invalid_totp_secret") from err
+        return secret
 
     def _add_discovered_mac_to_entry_data(self) -> None:
         """Add discovered MAC address to entry data if available."""
@@ -174,92 +189,100 @@ class AjaxConfigFlow(ConfigFlow, domain=DOMAIN):
         errors: dict[str, str] = {}
 
         if user_input is not None:
-            # Store user input for potential 2FA step
+            # Store user input for the config flow lifetime
             self._user_input = user_input
             self._user_input[CONF_AUTH_MODE] = AUTH_MODE_DIRECT
 
             await self.async_set_unique_id(user_input[CONF_EMAIL].lower())
             self._abort_if_unique_id_configured()
-            # Validate API credentials
+
+            # Validated on its own, outside the network try/except below —
+            # otherwise an unrelated ValueError from the login/hubs calls
+            # would be misreported as an invalid TOTP secret.
             try:
-                self._api = _build_api(
-                    email=user_input[CONF_EMAIL],
-                    password=user_input[CONF_PASSWORD],
-                    auth_mode=AUTH_MODE_DIRECT,
-                    api_key=user_input[CONF_API_KEY],
-                )
+                totp_secret = self._clean_totp_secret(user_input.get(CONF_TOTP_SECRET))
+            except ValueError:
+                errors["base"] = "invalid_totp_secret"
+                totp_secret = None
 
-                # Test API connection by logging in
-                await self._api.async_login()
+            if not errors:
+                # Validate API credentials
+                try:
+                    self._api = _build_api(
+                        email=user_input[CONF_EMAIL],
+                        password=user_input[CONF_PASSWORD],
+                        auth_mode=AUTH_MODE_DIRECT,
+                        api_key=user_input[CONF_API_KEY],
+                        totp_secret=totp_secret,
+                    )
 
-                # If login successful, try to get hubs to verify access and discover spaces
-                hubs = await self._api.async_get_hubs()
+                    # Test API connection by logging in
+                    await self._api.async_login()
 
-                # Build list of spaces from hubs
-                self._spaces = await self._async_discover_spaces(hubs)
+                    # If login successful, try to get hubs to verify access and discover spaces
+                    hubs = await self._api.async_get_hubs()
 
-                await self._api.close()
+                    # Build list of spaces from hubs
+                    self._spaces = await self._async_discover_spaces(hubs)
 
-                # Hash password for secure storage (never store plain password!)
-                password_hash = hashlib.sha256(user_input[CONF_PASSWORD].encode()).hexdigest()
-
-                # Prepare entry data
-                self._entry_data = {
-                    CONF_AUTH_MODE: AUTH_MODE_DIRECT,
-                    CONF_API_KEY: user_input[CONF_API_KEY],
-                    CONF_EMAIL: user_input[CONF_EMAIL],
-                    CONF_PASSWORD: password_hash,  # Store ONLY the hash
-                }
-
-                # Add optional AWS SQS credentials if provided
-                if user_input.get(CONF_AWS_ACCESS_KEY_ID):
-                    self._entry_data[CONF_AWS_ACCESS_KEY_ID] = user_input[CONF_AWS_ACCESS_KEY_ID]
-                if user_input.get(CONF_AWS_SECRET_ACCESS_KEY):
-                    self._entry_data[CONF_AWS_SECRET_ACCESS_KEY] = user_input[CONF_AWS_SECRET_ACCESS_KEY]
-                if user_input.get(CONF_QUEUE_NAME):
-                    self._entry_data[CONF_QUEUE_NAME] = user_input[CONF_QUEUE_NAME]
-
-                # If multiple spaces, let user select which to enable
-                if len(self._spaces) > 1:
-                    return await self.async_step_select_spaces()
-
-                # Single space or no spaces - enable all by default.
-                # Leave the key unset (=> None => all enabled) when discovery
-                # returned no spaces; an empty list would disable *every* hub.
-                if self._spaces:
-                    self._entry_data[CONF_ENABLED_SPACES] = [s["id"] for s in self._spaces]
-
-                # Add discovered MAC if from DHCP discovery
-                self._add_discovered_mac_to_entry_data()
-
-                # Create entry
-                return self.async_create_entry(
-                    title=f"Ajax - {user_input[CONF_EMAIL]}",
-                    data=self._entry_data,
-                )
-
-            except AjaxRest2FARequiredError as err:
-                # 2FA is required, store request_id and show 2FA form
-                _LOGGER.info("2FA required for login")
-                self._request_id = err.request_id
-                return await self.async_step_2fa()
-
-            except AjaxRestAuthError as err:
-                _LOGGER.error("Authentication failed: %s (type: %s)", err, err.error_type)
-                if self._api:
                     await self._api.close()
-                # Map error type to translation key
-                errors["base"] = _AUTH_ERROR_MAP.get(err.error_type, "invalid_auth")
-            except AjaxRestApiError as err:
-                _LOGGER.error("Cannot connect to Ajax API: %s", err)
-                if self._api:
-                    await self._api.close()
-                errors["base"] = "cannot_connect"
-            except Exception as err:  # pylint: disable=broad-except
-                _LOGGER.exception("Unexpected exception: %s", err)
-                if self._api:
-                    await self._api.close()
-                errors["base"] = "unknown"
+
+                    # Hash password for secure storage (never store plain password!)
+                    password_hash = hashlib.sha256(user_input[CONF_PASSWORD].encode()).hexdigest()
+
+                    # Prepare entry data
+                    self._entry_data = {
+                        CONF_AUTH_MODE: AUTH_MODE_DIRECT,
+                        CONF_API_KEY: user_input[CONF_API_KEY],
+                        CONF_EMAIL: user_input[CONF_EMAIL],
+                        CONF_PASSWORD: password_hash,  # Store ONLY the hash
+                    }
+                    if totp_secret:
+                        self._entry_data[CONF_TOTP_SECRET] = totp_secret
+
+                    # Add optional AWS SQS credentials if provided
+                    if user_input.get(CONF_AWS_ACCESS_KEY_ID):
+                        self._entry_data[CONF_AWS_ACCESS_KEY_ID] = user_input[CONF_AWS_ACCESS_KEY_ID]
+                    if user_input.get(CONF_AWS_SECRET_ACCESS_KEY):
+                        self._entry_data[CONF_AWS_SECRET_ACCESS_KEY] = user_input[CONF_AWS_SECRET_ACCESS_KEY]
+                    if user_input.get(CONF_QUEUE_NAME):
+                        self._entry_data[CONF_QUEUE_NAME] = user_input[CONF_QUEUE_NAME]
+
+                    # If multiple spaces, let user select which to enable
+                    if len(self._spaces) > 1:
+                        return await self.async_step_select_spaces()
+
+                    # Single space or no spaces - enable all by default.
+                    # Leave the key unset (=> None => all enabled) when discovery
+                    # returned no spaces; an empty list would disable *every* hub.
+                    if self._spaces:
+                        self._entry_data[CONF_ENABLED_SPACES] = [s["id"] for s in self._spaces]
+
+                    # Add discovered MAC if from DHCP discovery
+                    self._add_discovered_mac_to_entry_data()
+
+                    # Create entry
+                    return self.async_create_entry(
+                        title=f"Ajax - {user_input[CONF_EMAIL]}",
+                        data=self._entry_data,
+                    )
+
+                except AjaxRestAuthError as err:
+                    _LOGGER.error("Authentication failed: %s (type: %s)", err, err.error_type)
+                    if self._api:
+                        await self._api.close()
+                    # Map error type to translation key
+                    errors["base"] = _AUTH_ERROR_MAP.get(err.error_type, "invalid_auth")
+                except AjaxRestApiError as err:
+                    _LOGGER.error("Cannot connect to Ajax API: %s", err)
+                    if self._api:
+                        await self._api.close()
+                    errors["base"] = "cannot_connect"
+                except Exception as err:  # pylint: disable=broad-except
+                    _LOGGER.exception("Unexpected exception: %s", err)
+                    if self._api:
+                        await self._api.close()
+                    errors["base"] = "unknown"
 
         # Show configuration form for direct mode
         data_schema = vol.Schema(
@@ -267,6 +290,8 @@ class AjaxConfigFlow(ConfigFlow, domain=DOMAIN):
                 vol.Required(CONF_API_KEY): str,
                 vol.Required(CONF_EMAIL): str,
                 vol.Required(CONF_PASSWORD): str,
+                # Two-factor secret (optional) - Base32 key, mandatory on Ajax's side from 2025-09-01
+                vol.Optional(CONF_TOTP_SECRET): str,
                 # AWS SQS credentials (optional - for real-time events)
                 vol.Optional(CONF_AWS_ACCESS_KEY_ID): str,
                 vol.Optional(CONF_AWS_SECRET_ACCESS_KEY): str,
@@ -285,7 +310,7 @@ class AjaxConfigFlow(ConfigFlow, domain=DOMAIN):
         errors: dict[str, str] = {}
 
         if user_input is not None:
-            # Store user input for potential 2FA step
+            # Store user input for the config flow lifetime
             self._user_input = user_input
             self._user_input[CONF_AUTH_MODE] = self._auth_mode
 
@@ -302,81 +327,90 @@ class AjaxConfigFlow(ConfigFlow, domain=DOMAIN):
 
                 await self.async_set_unique_id(user_input[CONF_EMAIL].lower())
                 self._abort_if_unique_id_configured()
+
+                # Validated on its own, outside the network try/except below —
+                # otherwise an unrelated ValueError from the login/hubs calls
+                # would be misreported as an invalid TOTP secret.
                 try:
-                    # For proxy mode, we authenticate via the proxy
-                    # The proxy will provide API key (hybrid) or handle all requests (secure)
-                    self._api = _build_api(
-                        email=user_input[CONF_EMAIL],
-                        password=user_input[CONF_PASSWORD],
-                        auth_mode=self._auth_mode,
-                        proxy_url=proxy_url,
-                        verify_ssl=verify_ssl,
-                    )
+                    totp_secret = self._clean_totp_secret(user_input.get(CONF_TOTP_SECRET))
+                except ValueError:
+                    errors["base"] = "invalid_totp_secret"
+                    totp_secret = None
 
-                    # Test connection by logging in via proxy
-                    await self._api.async_login()
-
-                    # Get hubs to discover spaces
+                if not errors:
                     try:
-                        hubs = await self._api.async_get_hubs()
-                        self._spaces = await self._async_discover_spaces(hubs)
+                        # For proxy mode, we authenticate via the proxy
+                        # The proxy will provide API key (hybrid) or handle all requests (secure)
+                        self._api = _build_api(
+                            email=user_input[CONF_EMAIL],
+                            password=user_input[CONF_PASSWORD],
+                            auth_mode=self._auth_mode,
+                            totp_secret=totp_secret,
+                            proxy_url=proxy_url,
+                            verify_ssl=verify_ssl,
+                        )
+
+                        # Test connection by logging in via proxy
+                        await self._api.async_login()
+
+                        # Get hubs to discover spaces
+                        try:
+                            hubs = await self._api.async_get_hubs()
+                            self._spaces = await self._async_discover_spaces(hubs)
+                        except AjaxRestApiError as err:
+                            # Proxy may not have all endpoints - continue without space selection
+                            _LOGGER.debug("Proxy hubs discovery failed: %s", err)
+                            self._spaces = []
+
+                        await self._api.close()
+
+                        # Hash password for secure storage
+                        password_hash = hashlib.sha256(user_input[CONF_PASSWORD].encode()).hexdigest()
+
+                        # Prepare entry data
+                        self._entry_data = {
+                            CONF_AUTH_MODE: self._auth_mode,
+                            CONF_PROXY_URL: proxy_url,
+                            CONF_EMAIL: user_input[CONF_EMAIL],
+                            CONF_PASSWORD: password_hash,
+                            CONF_VERIFY_SSL: user_input.get(CONF_VERIFY_SSL, True),
+                        }
+                        if totp_secret:
+                            self._entry_data[CONF_TOTP_SECRET] = totp_secret
+
+                        # If multiple spaces, let user select which to enable
+                        if len(self._spaces) > 1:
+                            return await self.async_step_select_spaces()
+
+                        # Single space or no spaces - enable all by default
+                        if self._spaces:
+                            self._entry_data[CONF_ENABLED_SPACES] = [s["id"] for s in self._spaces]
+
+                        # Add discovered MAC if from DHCP discovery
+                        self._add_discovered_mac_to_entry_data()
+
+                        # Create entry
+                        return self.async_create_entry(
+                            title=f"Ajax - {user_input[CONF_EMAIL]}",
+                            data=self._entry_data,
+                        )
+
+                    except AjaxRestAuthError as err:
+                        _LOGGER.error("Authentication failed: %s (type: %s)", err, err.error_type)
+                        if self._api:
+                            await self._api.close()
+                        # Map error type to translation key
+                        errors["base"] = _AUTH_ERROR_MAP.get(err.error_type, "invalid_auth")
                     except AjaxRestApiError as err:
-                        # Proxy may not have all endpoints - continue without space selection
-                        _LOGGER.debug("Proxy hubs discovery failed: %s", err)
-                        self._spaces = []
-
-                    await self._api.close()
-
-                    # Hash password for secure storage
-                    password_hash = hashlib.sha256(user_input[CONF_PASSWORD].encode()).hexdigest()
-
-                    # Prepare entry data
-                    self._entry_data = {
-                        CONF_AUTH_MODE: self._auth_mode,
-                        CONF_PROXY_URL: proxy_url,
-                        CONF_EMAIL: user_input[CONF_EMAIL],
-                        CONF_PASSWORD: password_hash,
-                        CONF_VERIFY_SSL: user_input.get(CONF_VERIFY_SSL, True),
-                    }
-
-                    # If multiple spaces, let user select which to enable
-                    if len(self._spaces) > 1:
-                        return await self.async_step_select_spaces()
-
-                    # Single space or no spaces - enable all by default
-                    if self._spaces:
-                        self._entry_data[CONF_ENABLED_SPACES] = [s["id"] for s in self._spaces]
-
-                    # Add discovered MAC if from DHCP discovery
-                    self._add_discovered_mac_to_entry_data()
-
-                    # Create entry
-                    return self.async_create_entry(
-                        title=f"Ajax - {user_input[CONF_EMAIL]}",
-                        data=self._entry_data,
-                    )
-
-                except AjaxRest2FARequiredError as err:
-                    _LOGGER.info("2FA required for proxy login")
-                    self._request_id = err.request_id
-                    return await self.async_step_2fa()
-
-                except AjaxRestAuthError as err:
-                    _LOGGER.error("Authentication failed: %s (type: %s)", err, err.error_type)
-                    if self._api:
-                        await self._api.close()
-                    # Map error type to translation key
-                    errors["base"] = _AUTH_ERROR_MAP.get(err.error_type, "invalid_auth")
-                except AjaxRestApiError as err:
-                    _LOGGER.error("Cannot connect to proxy: %s", err)
-                    if self._api:
-                        await self._api.close()
-                    errors["base"] = "cannot_connect"
-                except Exception as err:
-                    _LOGGER.exception("Unexpected exception: %s", err)
-                    if self._api:
-                        await self._api.close()
-                    errors["base"] = "unknown"
+                        _LOGGER.error("Cannot connect to proxy: %s", err)
+                        if self._api:
+                            await self._api.close()
+                        errors["base"] = "cannot_connect"
+                    except Exception as err:
+                        _LOGGER.exception("Unexpected exception: %s", err)
+                        if self._api:
+                            await self._api.close()
+                        errors["base"] = "unknown"
 
         # Show configuration form for proxy mode
         data_schema = vol.Schema(
@@ -385,6 +419,8 @@ class AjaxConfigFlow(ConfigFlow, domain=DOMAIN):
                 vol.Required(CONF_EMAIL): str,
                 vol.Required(CONF_PASSWORD): str,
                 vol.Optional(CONF_VERIFY_SSL, default=True): bool,
+                # Two-factor secret (optional) - Base32 key, mandatory on Ajax's side from 2025-09-01
+                vol.Optional(CONF_TOTP_SECRET): str,
             }
         )
 
@@ -392,134 +428,6 @@ class AjaxConfigFlow(ConfigFlow, domain=DOMAIN):
             step_id="proxy",
             data_schema=data_schema,
             errors=errors,
-        )
-
-    async def async_step_2fa(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
-        """Handle 2FA verification step."""
-        errors: dict[str, str] = {}
-
-        if user_input is not None:
-            code = user_input.get("code", "").strip()
-
-            if self._api is None or self._request_id is None:
-                return self.async_abort(reason="api_not_initialized")
-
-            try:
-                # Verify 2FA code
-                await self._api.async_verify_2fa(self._request_id, code)
-
-                # Get auth mode from stored input
-                auth_mode = self._user_input.get(CONF_AUTH_MODE, AUTH_MODE_DIRECT)
-
-                # 2FA successful, discover spaces
-                try:
-                    hubs = await self._api.async_get_hubs()
-                except AjaxRestApiError as err:
-                    if auth_mode == AUTH_MODE_DIRECT:
-                        raise
-                    # Proxy may not expose all discovery endpoints.
-                    _LOGGER.debug("Proxy hubs discovery failed after 2FA: %s", err)
-                    hubs = []
-                self._spaces = await self._async_discover_spaces(hubs)
-
-                await self._api.close()
-
-                # Hash password for secure storage (never store plain password!)
-                password_hash = hashlib.sha256(self._user_input[CONF_PASSWORD].encode()).hexdigest()
-
-                # Prepare entry data based on auth mode
-                self._entry_data = {
-                    CONF_AUTH_MODE: auth_mode,
-                    CONF_EMAIL: self._user_input[CONF_EMAIL],
-                    CONF_PASSWORD: password_hash,
-                }
-
-                if auth_mode == AUTH_MODE_DIRECT:
-                    # Direct mode: include API key and optional AWS credentials
-                    self._entry_data[CONF_API_KEY] = self._user_input[CONF_API_KEY]
-
-                    if self._user_input.get(CONF_AWS_ACCESS_KEY_ID):
-                        self._entry_data[CONF_AWS_ACCESS_KEY_ID] = self._user_input[CONF_AWS_ACCESS_KEY_ID]
-                    if self._user_input.get(CONF_AWS_SECRET_ACCESS_KEY):
-                        self._entry_data[CONF_AWS_SECRET_ACCESS_KEY] = self._user_input[CONF_AWS_SECRET_ACCESS_KEY]
-                    if self._user_input.get(CONF_QUEUE_NAME):
-                        self._entry_data[CONF_QUEUE_NAME] = self._user_input[CONF_QUEUE_NAME]
-                else:
-                    # Proxy mode: include proxy URL and TLS preference
-                    self._entry_data[CONF_PROXY_URL] = self._user_input[CONF_PROXY_URL]
-                    self._entry_data[CONF_VERIFY_SSL] = self._user_input.get(CONF_VERIFY_SSL, True)
-
-                # Check if this is a reauth flow
-                if self.context.get("source") == "reauth":
-                    reauth_entry = self.hass.config_entries.async_get_entry(self.context.get("entry_id", ""))
-                    if reauth_entry:
-                        # Update + abort("reauth_successful"); the update
-                        # listener schedules the reload (HA deprecates the
-                        # flow-side reload helper on entries with a listener).
-                        # Same password (expired-token case) → the listener
-                        # will not fire, so retry the setup explicitly. Same
-                        # if the entry isn't loaded (setup failed before the
-                        # listener could be registered, e.g. a previous
-                        # ConfigEntryAuthFailed) — there is no listener to
-                        # rely on, so the flow must reschedule the setup.
-                        if (
-                            reauth_entry.data.get(CONF_PASSWORD) == password_hash
-                            or reauth_entry.state is not ConfigEntryState.LOADED
-                        ):
-                            self.hass.config_entries.async_schedule_reload(reauth_entry.entry_id)
-                        return self.async_update_and_abort(
-                            reauth_entry,
-                            data_updates={CONF_PASSWORD: password_hash},
-                        )
-
-                # If multiple spaces, let user select which to enable
-                if len(self._spaces) > 1:
-                    return await self.async_step_select_spaces()
-
-                # Single space or no spaces - enable all by default.
-                # Leave the key unset (=> None => all enabled) when discovery
-                # returned no spaces (e.g. proxy without the hubs endpoint);
-                # an empty list would disable *every* hub and create no entities.
-                if self._spaces:
-                    self._entry_data[CONF_ENABLED_SPACES] = [s["id"] for s in self._spaces]
-
-                # Add discovered MAC if from DHCP discovery
-                self._add_discovered_mac_to_entry_data()
-
-                # Create entry
-                return self.async_create_entry(
-                    title=f"Ajax - {self._user_input[CONF_EMAIL]}",
-                    data=self._entry_data,
-                )
-
-            except AjaxRestAuthError:
-                _LOGGER.error("Invalid 2FA code")
-                errors["base"] = "invalid_2fa"
-            except AjaxRestApiError as err:
-                _LOGGER.error("2FA verification failed: %s", err)
-                if self._api:
-                    await self._api.close()
-                errors["base"] = "cannot_connect"
-            except Exception as err:  # pylint: disable=broad-except
-                _LOGGER.exception("Unexpected exception during 2FA: %s", err)
-                if self._api:
-                    await self._api.close()
-                errors["base"] = "unknown"
-
-        # Show 2FA form
-        data_schema = vol.Schema(
-            {
-                vol.Required("code"): str,
-            }
-        )
-
-        return self.async_show_form(
-            step_id="2fa",
-            data_schema=data_schema,
-            errors=errors,
-            description_placeholders={
-                "email": self._user_input.get(CONF_EMAIL, ""),
-            },
         )
 
     async def async_step_select_spaces(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
@@ -663,71 +571,89 @@ class AjaxConfigFlow(ConfigFlow, domain=DOMAIN):
             auth_mode = reauth_entry.data.get(CONF_AUTH_MODE, AUTH_MODE_DIRECT)
             proxy_url = reauth_entry.data.get(CONF_PROXY_URL)
 
+            # Validated on its own, outside the network try/except below —
+            # otherwise an unrelated ValueError from the login call would be
+            # misreported as an invalid TOTP secret.
             try:
-                # Create API client based on auth mode
-                self._api = _build_api(
-                    email=reauth_entry.data.get(CONF_EMAIL, ""),
-                    password=user_input[CONF_PASSWORD],
-                    auth_mode=auth_mode,
-                    api_key=reauth_entry.data.get(CONF_API_KEY, ""),
-                    proxy_url=proxy_url,
-                    verify_ssl=reauth_entry.data.get(CONF_VERIFY_SSL, True),
-                )
+                new_totp_secret = self._clean_totp_secret(user_input.get(CONF_TOTP_SECRET))
+            except ValueError:
+                errors["base"] = "invalid_totp_secret"
+                new_totp_secret = None
 
-                # Test login
-                await self._api.async_login()
-                await self._api.close()
+            if not errors:
+                # A newly entered secret wins; otherwise keep using the one
+                # already stored on the entry (the account may still require
+                # 2FA even though the user left the field blank this time).
+                totp_secret = new_totp_secret or reauth_entry.data.get(CONF_TOTP_SECRET)
 
-                # Hash new password
-                password_hash = hashlib.sha256(user_input[CONF_PASSWORD].encode()).hexdigest()
+                try:
+                    # Create API client based on auth mode
+                    self._api = _build_api(
+                        email=reauth_entry.data.get(CONF_EMAIL, ""),
+                        password=user_input[CONF_PASSWORD],
+                        auth_mode=auth_mode,
+                        api_key=reauth_entry.data.get(CONF_API_KEY, ""),
+                        totp_secret=totp_secret,
+                        proxy_url=proxy_url,
+                        verify_ssl=reauth_entry.data.get(CONF_VERIFY_SSL, True),
+                    )
 
-                # Update + abort("reauth_successful"); the update listener
-                # schedules the reload (HA deprecates the flow-side reload
-                # helper on entries with a listener). Same password
-                # (expired-token case) → the listener will not fire, so
-                # retry the setup explicitly. Same if the entry isn't loaded
-                # (setup failed before the listener could be registered,
-                # e.g. a previous ConfigEntryAuthFailed) — there is no
-                # listener to rely on, so the flow must reschedule the setup.
-                if (
-                    reauth_entry.data.get(CONF_PASSWORD) == password_hash
-                    or reauth_entry.state is not ConfigEntryState.LOADED
-                ):
-                    self.hass.config_entries.async_schedule_reload(reauth_entry.entry_id)
-                return self.async_update_and_abort(
-                    reauth_entry,
-                    data_updates={CONF_PASSWORD: password_hash},
-                )
-
-            except AjaxRest2FARequiredError as err:
-                # Store info for 2FA
-                self._user_input = {
-                    **reauth_entry.data,
-                    CONF_PASSWORD: user_input[CONF_PASSWORD],
-                }
-                self._request_id = err.request_id
-                return await self.async_step_2fa()
-
-            except AjaxRestAuthError as err:
-                _LOGGER.error("Reauth failed: %s (type: %s)", err, err.error_type)
-                if self._api:
+                    # Test login
+                    await self._api.async_login()
                     await self._api.close()
-                errors["base"] = _AUTH_ERROR_MAP.get(err.error_type, "invalid_auth")
-            except AjaxRestApiError as err:
-                _LOGGER.error("Reauth failed: %s", err)
-                if self._api:
-                    await self._api.close()
-                errors["base"] = "cannot_connect"
-            except Exception as err:
-                _LOGGER.exception("Unexpected error during reauth: %s", err)
-                if self._api:
-                    await self._api.close()
-                errors["base"] = "unknown"
+
+                    # Hash new password
+                    password_hash = hashlib.sha256(user_input[CONF_PASSWORD].encode()).hexdigest()
+
+                    data_updates: dict[str, Any] = {CONF_PASSWORD: password_hash}
+                    if new_totp_secret:
+                        data_updates[CONF_TOTP_SECRET] = new_totp_secret
+
+                    # Update + abort("reauth_successful"); the update listener
+                    # schedules the reload (HA deprecates the flow-side reload
+                    # helper on entries with a listener). Same password
+                    # (expired-token case) → the listener will not fire, so
+                    # retry the setup explicitly. Same if the entry isn't loaded
+                    # (setup failed before the listener could be registered,
+                    # e.g. a previous ConfigEntryAuthFailed) — there is no
+                    # listener to rely on, so the flow must reschedule the setup.
+                    if (
+                        reauth_entry.data.get(CONF_PASSWORD) == password_hash
+                        or reauth_entry.state is not ConfigEntryState.LOADED
+                    ):
+                        self.hass.config_entries.async_schedule_reload(reauth_entry.entry_id)
+                    return self.async_update_and_abort(
+                        reauth_entry,
+                        data_updates=data_updates,
+                    )
+
+                except AjaxRestAuthError as err:
+                    _LOGGER.error("Reauth failed: %s (type: %s)", err, err.error_type)
+                    if self._api:
+                        await self._api.close()
+                    errors["base"] = _AUTH_ERROR_MAP.get(err.error_type, "invalid_auth")
+                except AjaxRestApiError as err:
+                    _LOGGER.error("Reauth failed: %s", err)
+                    if self._api:
+                        await self._api.close()
+                    errors["base"] = "cannot_connect"
+                except Exception as err:
+                    _LOGGER.exception("Unexpected error during reauth: %s", err)
+                    if self._api:
+                        await self._api.close()
+                    errors["base"] = "unknown"
 
         # Show password re-entry form
         return self.async_show_form(
             step_id="reauth_confirm",
-            data_schema=vol.Schema({vol.Required(CONF_PASSWORD): str}),
+            data_schema=vol.Schema(
+                {
+                    vol.Required(CONF_PASSWORD): str,
+                    # Two-factor secret (optional) - leave blank to keep the
+                    # one already stored on this entry.
+                    vol.Optional(CONF_TOTP_SECRET): str,
+                }
+            ),
             errors=errors,
             description_placeholders={
                 "email": reauth_entry.data.get(CONF_EMAIL, ""),
@@ -742,70 +668,94 @@ class AjaxConfigFlow(ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             auth_mode = reconfigure_entry.data.get(CONF_AUTH_MODE, AUTH_MODE_DIRECT)
 
+            # Validated on its own, outside the network try/except below —
+            # otherwise an unrelated ValueError from the login call would be
+            # misreported as an invalid TOTP secret.
             try:
-                # Validate new credentials
-                proxy_url = user_input.get(CONF_PROXY_URL, reconfigure_entry.data.get(CONF_PROXY_URL))
-                proxy_url = proxy_url.rstrip("/") if proxy_url else proxy_url
-                self._api = _build_api(
-                    email=user_input[CONF_EMAIL],
-                    password=user_input[CONF_PASSWORD],
-                    auth_mode=auth_mode,
-                    api_key=user_input.get(CONF_API_KEY, reconfigure_entry.data.get(CONF_API_KEY, "")),
-                    proxy_url=proxy_url,
-                    verify_ssl=user_input.get(CONF_VERIFY_SSL, reconfigure_entry.data.get(CONF_VERIFY_SSL, True)),
-                )
+                new_totp_secret = self._clean_totp_secret(user_input.get(CONF_TOTP_SECRET))
+            except ValueError:
+                errors["base"] = "invalid_totp_secret"
+                new_totp_secret = None
 
-                # Test login
-                await self._api.async_login()
-                await self._api.close()
+            if not errors:
+                # A newly entered secret wins; otherwise keep using the one
+                # already stored on the entry.
+                totp_secret = new_totp_secret or reconfigure_entry.data.get(CONF_TOTP_SECRET)
 
-                # Hash new password
-                password_hash = hashlib.sha256(user_input[CONF_PASSWORD].encode()).hexdigest()
+                try:
+                    # Validate new credentials
+                    proxy_url = user_input.get(CONF_PROXY_URL, reconfigure_entry.data.get(CONF_PROXY_URL))
+                    proxy_url = proxy_url.rstrip("/") if proxy_url else proxy_url
+                    self._api = _build_api(
+                        email=user_input[CONF_EMAIL],
+                        password=user_input[CONF_PASSWORD],
+                        auth_mode=auth_mode,
+                        api_key=user_input.get(CONF_API_KEY, reconfigure_entry.data.get(CONF_API_KEY, "")),
+                        totp_secret=totp_secret,
+                        proxy_url=proxy_url,
+                        verify_ssl=user_input.get(CONF_VERIFY_SSL, reconfigure_entry.data.get(CONF_VERIFY_SSL, True)),
+                    )
 
-                # Prepare new data
-                new_data = {
-                    **reconfigure_entry.data,
-                    CONF_EMAIL: user_input[CONF_EMAIL],
-                    CONF_PASSWORD: password_hash,
-                }
-
-                # Update API key if in direct mode
-                if auth_mode == AUTH_MODE_DIRECT and CONF_API_KEY in user_input:
-                    new_data[CONF_API_KEY] = user_input[CONF_API_KEY]
-
-                # Update proxy URL if in proxy mode
-                if auth_mode != AUTH_MODE_DIRECT and CONF_PROXY_URL in user_input:
-                    new_data[CONF_PROXY_URL] = user_input[CONF_PROXY_URL].rstrip("/")
-                if auth_mode != AUTH_MODE_DIRECT and CONF_VERIFY_SSL in user_input:
-                    new_data[CONF_VERIFY_SSL] = user_input[CONF_VERIFY_SSL]
-
-                # The update listener schedules the reload on data change;
-                # identical resubmission still retries the setup explicitly.
-                # Same if the entry isn't loaded (setup failed before the
-                # listener could be registered) — there is no listener to
-                # rely on, so the flow must reschedule the setup itself.
-                if new_data == dict(reconfigure_entry.data) or reconfigure_entry.state is not ConfigEntryState.LOADED:
-                    self.hass.config_entries.async_schedule_reload(reconfigure_entry.entry_id)
-                return self.async_update_and_abort(
-                    reconfigure_entry,
-                    data_updates=new_data,
-                )
-
-            except AjaxRestAuthError as err:
-                _LOGGER.error("Reconfigure failed: %s", err)
-                if self._api:
+                    # Test login
+                    await self._api.async_login()
                     await self._api.close()
-                errors["base"] = "invalid_auth"
-            except AjaxRestApiError as err:
-                _LOGGER.error("Reconfigure failed: %s", err)
-                if self._api:
-                    await self._api.close()
-                errors["base"] = "cannot_connect"
-            except Exception as err:
-                _LOGGER.exception("Unexpected error during reconfigure: %s", err)
-                if self._api:
-                    await self._api.close()
-                errors["base"] = "unknown"
+
+                    # Hash new password
+                    password_hash = hashlib.sha256(user_input[CONF_PASSWORD].encode()).hexdigest()
+
+                    # Prepare new data
+                    new_data = {
+                        **reconfigure_entry.data,
+                        CONF_EMAIL: user_input[CONF_EMAIL],
+                        CONF_PASSWORD: password_hash,
+                    }
+
+                    # Update API key if in direct mode
+                    if auth_mode == AUTH_MODE_DIRECT and CONF_API_KEY in user_input:
+                        new_data[CONF_API_KEY] = user_input[CONF_API_KEY]
+
+                    # Update proxy URL if in proxy mode
+                    if auth_mode != AUTH_MODE_DIRECT and CONF_PROXY_URL in user_input:
+                        new_data[CONF_PROXY_URL] = user_input[CONF_PROXY_URL].rstrip("/")
+                    if auth_mode != AUTH_MODE_DIRECT and CONF_VERIFY_SSL in user_input:
+                        new_data[CONF_VERIFY_SSL] = user_input[CONF_VERIFY_SSL]
+
+                    # Only overwrite the stored secret when a new one was
+                    # entered; otherwise new_data already carries the existing
+                    # value forward via the reconfigure_entry.data spread above.
+                    if new_totp_secret:
+                        new_data[CONF_TOTP_SECRET] = new_totp_secret
+
+                    # The update listener schedules the reload on data change;
+                    # identical resubmission still retries the setup explicitly.
+                    # Same if the entry isn't loaded (setup failed before the
+                    # listener could be registered) — there is no listener to
+                    # rely on, so the flow must reschedule the setup itself.
+                    if (
+                        new_data == dict(reconfigure_entry.data)
+                        or reconfigure_entry.state is not ConfigEntryState.LOADED
+                    ):
+                        self.hass.config_entries.async_schedule_reload(reconfigure_entry.entry_id)
+                    return self.async_update_and_abort(
+                        reconfigure_entry,
+                        data_updates=new_data,
+                    )
+
+                except AjaxRestAuthError as err:
+                    _LOGGER.error("Reconfigure failed: %s", err)
+                    if self._api:
+                        await self._api.close()
+                    errors["base"] = "invalid_auth"
+                except AjaxRestApiError as err:
+                    _LOGGER.error("Reconfigure failed: %s", err)
+                    if self._api:
+                        await self._api.close()
+                    errors["base"] = "cannot_connect"
+                except Exception as err:
+                    _LOGGER.exception("Unexpected error during reconfigure: %s", err)
+                    if self._api:
+                        await self._api.close()
+                    errors["base"] = "unknown"
 
         # Build schema based on auth mode
         auth_mode = reconfigure_entry.data.get(CONF_AUTH_MODE, AUTH_MODE_DIRECT)
@@ -816,6 +766,9 @@ class AjaxConfigFlow(ConfigFlow, domain=DOMAIN):
                     vol.Required(CONF_API_KEY, default=reconfigure_entry.data.get(CONF_API_KEY, "")): str,
                     vol.Required(CONF_EMAIL, default=reconfigure_entry.data.get(CONF_EMAIL, "")): str,
                     vol.Required(CONF_PASSWORD): str,
+                    # Two-factor secret (optional) - leave blank to keep the
+                    # one already stored on this entry.
+                    vol.Optional(CONF_TOTP_SECRET): str,
                 }
             )
         else:
@@ -825,6 +778,9 @@ class AjaxConfigFlow(ConfigFlow, domain=DOMAIN):
                     vol.Required(CONF_EMAIL, default=reconfigure_entry.data.get(CONF_EMAIL, "")): str,
                     vol.Required(CONF_PASSWORD): str,
                     vol.Optional(CONF_VERIFY_SSL, default=reconfigure_entry.data.get(CONF_VERIFY_SSL, True)): bool,
+                    # Two-factor secret (optional) - leave blank to keep the
+                    # one already stored on this entry.
+                    vol.Optional(CONF_TOTP_SECRET): str,
                 }
             )
 

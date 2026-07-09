@@ -11,26 +11,16 @@
     "error": {
       "cannot_connect": "Échec de la connexion à l'API Ajax. Vérifiez votre connexion Internet.",
       "entry_not_found": "Configuration introuvable. Veuillez réessayer.",
-      "invalid_2fa": "Code de vérification invalide. Veuillez réessayer.",
       "invalid_account_type": "Type de compte non pris en charge. Utilisez un compte utilisateur (pas un compte PRO/Entreprise).",
       "invalid_api_key": "Clé API invalide ou manquante. Vérifiez votre clé API entreprise.",
       "invalid_auth": "Identifiants API invalides. Vérifiez votre clé API, e-mail et mot de passe.",
       "invalid_password": "E-mail ou mot de passe incorrect. Vérifiez vos identifiants de compte Ajax.",
       "invalid_proxy_url": "URL du proxy invalide. L'URL doit commencer par http:// ou https://",
+      "invalid_totp_secret": "Secret TOTP invalide. Saisissez la clé Base32 affichée lors de l'activation de l'authentification à deux facteurs.",
       "no_spaces_selected": "Veuillez sélectionner au moins un espace à activer.",
       "unknown": "Erreur inattendue. Consultez les journaux pour plus de détails."
     },
     "step": {
-      "2fa": {
-        "data": {
-          "code": "Code de vérification"
-        },
-        "data_description": {
-          "code": "Code à 6 chiffres de votre application d'authentification ou SMS"
-        },
-        "description": "Entrez le code de vérification à 6 chiffres envoyé sur votre appareil pour {email}",
-        "title": "Authentification à deux facteurs"
-      },
       "dhcp_confirm": {
         "data": {
           "action": "Action"
@@ -45,7 +35,8 @@
           "aws_secret_access_key": "Clé secrète AWS (Optionnel)",
           "email": "Adresse e-mail",
           "password": "Mot de passe",
-          "queue_name": "Nom de file SQS (Optionnel)"
+          "queue_name": "Nom de file SQS (Optionnel)",
+          "totp_secret": "Secret à deux facteurs (facultatif)"
         },
         "data_description": {
           "api_key": "Votre clé API fournie par Ajax Systems",
@@ -53,7 +44,8 @@
           "aws_secret_access_key": "Clé secrète AWS pour les événements SQS en temps réel",
           "email": "Votre adresse e-mail de compte Ajax",
           "password": "Votre mot de passe de compte Ajax",
-          "queue_name": "Nom de la file SQS (ex. : ajax-events-xxxxx-prod.fifo)"
+          "queue_name": "Nom de la file SQS (ex. : ajax-events-xxxxx-prod.fifo)",
+          "totp_secret": "Clé Base32 issue de la configuration de votre application d'authentification. Laissez vide si la 2FA n'est pas activée sur votre compte Ajax."
         },
         "description": "Entrez vos identifiants API Ajax.\n\n⚠️ **Compte utilisateur uniquement** (pas de compte PRO/Entreprise).\n\nOptionnel : Ajoutez les identifiants AWS pour recevoir les événements en temps réel.",
         "title": "Connexion directe"
@@ -63,12 +55,14 @@
           "email": "Adresse e-mail",
           "password": "Mot de passe",
           "proxy_url": "URL du proxy",
+          "totp_secret": "Secret à deux facteurs (facultatif)",
           "verify_ssl": "Vérifier le certificat SSL"
         },
         "data_description": {
           "email": "Votre adresse e-mail de compte Ajax",
           "password": "Votre mot de passe de compte Ajax",
           "proxy_url": "URL du serveur proxy Ajax",
+          "totp_secret": "Clé Base32 issue de la configuration de votre application d'authentification. Laissez vide si la 2FA n'est pas activée sur votre compte Ajax.",
           "verify_ssl": "Désactiver si vous utilisez un certificat auto-signé (HTTPS)"
         },
         "description": "Connectez-vous via un serveur proxy Ajax.\n\n⚠️ **Compte utilisateur uniquement** (pas de compte PRO/Entreprise).\n\nLes événements seront reçus en temps réel via SSE.",
@@ -76,7 +70,11 @@
       },
       "reauth_confirm": {
         "data": {
-          "password": "Mot de passe"
+          "password": "Mot de passe",
+          "totp_secret": "Secret à deux facteurs (facultatif)"
+        },
+        "data_description": {
+          "totp_secret": "Clé Base32 issue de la configuration de votre application d'authentification. Laissez vide si la 2FA n'est pas activée sur votre compte Ajax."
         },
         "description": "Votre session a expiré. Veuillez entrer à nouveau votre mot de passe pour {email}.",
         "title": "Ré-authentification"
@@ -87,9 +85,11 @@
           "email": "E-mail",
           "password": "Mot de passe",
           "proxy_url": "URL du proxy",
+          "totp_secret": "Secret à deux facteurs (facultatif)",
           "verify_ssl": "Vérifier le certificat SSL"
         },
         "data_description": {
+          "totp_secret": "Clé Base32 issue de la configuration de votre application d'authentification. Laissez vide si la 2FA n'est pas activée sur votre compte Ajax.",
           "verify_ssl": "Désactiver si le proxy utilise un certificat auto-signé."
         },
         "description": "Mettez à jour vos identifiants Ajax.",

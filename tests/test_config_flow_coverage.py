@@ -6,7 +6,7 @@ The HA helper methods that need a running flow manager
 ``async_create_entry``, ``async_show_form``, ``async_abort`` ...) are patched
 on each instance so the step logic can be exercised directly. ``AjaxRestApi``
 is patched at the module level to simulate login OK / invalid_auth /
-cannot_connect / 2FA-required without any network IO.
+cannot_connect without any network IO.
 """
 
 from __future__ import annotations
@@ -18,7 +18,6 @@ import pytest
 from homeassistant.config_entries import ConfigEntryState
 
 from custom_components.ajax.api import (
-    AjaxRest2FARequiredError,
     AjaxRestApiError,
     AjaxRestAuthError,
 )
@@ -42,11 +41,15 @@ from custom_components.ajax.const import (
     CONF_QUEUE_NAME,
     CONF_RTSP_PASSWORD,
     CONF_RTSP_USERNAME,
+    CONF_TOTP_SECRET,
     CONF_VERIFY_SSL,
     NOTIFICATION_FILTER_ALL,
 )
 
 API_PATH = "custom_components.ajax.config_flow.AjaxRestApi"
+
+# pyotp's well-known public test vector (RFC 6238 example secret).
+_TEST_TOTP_SECRET = "JBSWY3DPEHPK3PXP"
 
 
 # --------------------------------------------------------------------------- #
@@ -97,7 +100,6 @@ def _mock_api(*, login_exc: Exception | None = None, hubs: list[dict[str, Any]] 
         api.async_login = AsyncMock(return_value=None)
     api.async_get_hubs = AsyncMock(return_value=hubs if hubs is not None else [])
     api.async_get_space_by_hub = AsyncMock(return_value=None)
-    api.async_verify_2fa = AsyncMock(return_value=None)
     api.close = AsyncMock(return_value=None)
     return api
 
@@ -245,17 +247,47 @@ async def test_step_direct_multiple_spaces_goes_to_select() -> None:
     assert result["step_id"] == "select_spaces"
 
 
-async def test_step_direct_2fa_required() -> None:
+async def test_step_direct_totp_secret_stored_normalized() -> None:
     flow = _make_flow()
-    api = _mock_api(login_exc=AjaxRest2FARequiredError("req-123"))
-    with (
-        patch(API_PATH, return_value=api),
-        patch.object(flow, "async_step_2fa", new=AsyncMock(return_value={"type": "form", "step_id": "2fa"})) as twofa,
-    ):
+    api = _mock_api(hubs=[{"hubId": "HUB1", "hubName": "Home"}])
+    with patch(API_PATH, return_value=api) as api_cls:
+        result = await flow.async_step_direct(
+            {
+                CONF_API_KEY: "key",
+                CONF_EMAIL: "u@e.com",
+                CONF_PASSWORD: "secret",
+                CONF_TOTP_SECRET: " jbswy3dpehpk3pxp ",
+            }
+        )
+    assert result["type"] == "create_entry"
+    assert result["data"][CONF_TOTP_SECRET] == "JBSWY3DPEHPK3PXP"
+    assert api_cls.call_args.kwargs["totp_secret"] == "JBSWY3DPEHPK3PXP"
+
+
+async def test_step_direct_without_totp_secret_key_absent() -> None:
+    flow = _make_flow()
+    api = _mock_api(hubs=[{"hubId": "HUB1", "hubName": "Home"}])
+    with patch(API_PATH, return_value=api):
         result = await flow.async_step_direct({CONF_API_KEY: "key", CONF_EMAIL: "u@e.com", CONF_PASSWORD: "secret"})
-    twofa.assert_awaited_once()
-    assert flow._request_id == "req-123"
-    assert result["step_id"] == "2fa"
+    assert result["type"] == "create_entry"
+    assert CONF_TOTP_SECRET not in result["data"]
+
+
+async def test_step_direct_invalid_totp_secret_reshows_form() -> None:
+    flow = _make_flow()
+    with patch(API_PATH) as api_cls:
+        result = await flow.async_step_direct(
+            {
+                CONF_API_KEY: "key",
+                CONF_EMAIL: "u@e.com",
+                CONF_PASSWORD: "secret",
+                CONF_TOTP_SECRET: "not-base32!",
+            }
+        )
+    assert result["type"] == "form"
+    assert result["errors"]["base"] == "invalid_totp_secret"
+    # Validation fails before any API client is even constructed.
+    api_cls.assert_not_called()
 
 
 @pytest.mark.parametrize(
@@ -378,17 +410,39 @@ async def test_step_proxy_multiple_spaces() -> None:
     sel.assert_awaited_once()
 
 
-async def test_step_proxy_2fa_required() -> None:
+async def test_step_proxy_totp_secret_stored_normalized() -> None:
     flow = _make_flow()
     flow._auth_mode = AUTH_MODE_PROXY_SECURE
-    api = _mock_api(login_exc=AjaxRest2FARequiredError("rid"))
-    with (
-        patch(API_PATH, return_value=api),
-        patch.object(flow, "async_step_2fa", new=AsyncMock(return_value={"type": "form"})) as twofa,
-    ):
-        await flow.async_step_proxy({CONF_PROXY_URL: "https://proxy", CONF_EMAIL: "u@e.com", CONF_PASSWORD: "secret"})
-    twofa.assert_awaited_once()
-    assert flow._request_id == "rid"
+    api = _mock_api(hubs=[])
+    with patch(API_PATH, return_value=api) as api_cls:
+        result = await flow.async_step_proxy(
+            {
+                CONF_PROXY_URL: "https://proxy",
+                CONF_EMAIL: "u@e.com",
+                CONF_PASSWORD: "secret",
+                CONF_TOTP_SECRET: "jbswy3dpehpk3pxp",
+            }
+        )
+    assert result["type"] == "create_entry"
+    assert result["data"][CONF_TOTP_SECRET] == "JBSWY3DPEHPK3PXP"
+    assert api_cls.call_args.kwargs["totp_secret"] == "JBSWY3DPEHPK3PXP"
+
+
+async def test_step_proxy_invalid_totp_secret_reshows_form() -> None:
+    flow = _make_flow()
+    flow._auth_mode = AUTH_MODE_PROXY_SECURE
+    with patch(API_PATH) as api_cls:
+        result = await flow.async_step_proxy(
+            {
+                CONF_PROXY_URL: "https://proxy",
+                CONF_EMAIL: "u@e.com",
+                CONF_PASSWORD: "secret",
+                CONF_TOTP_SECRET: "not-base32!",
+            }
+        )
+    assert result["type"] == "form"
+    assert result["errors"]["base"] == "invalid_totp_secret"
+    api_cls.assert_not_called()
 
 
 async def test_step_proxy_auth_error() -> None:
@@ -421,244 +475,6 @@ async def test_step_proxy_unknown_exception() -> None:
         result = await flow.async_step_proxy(
             {CONF_PROXY_URL: "https://proxy", CONF_EMAIL: "u@e.com", CONF_PASSWORD: "secret"}
         )
-    assert result["errors"]["base"] == "unknown"
-
-
-# --------------------------------------------------------------------------- #
-# async_step_2fa
-# --------------------------------------------------------------------------- #
-async def test_step_2fa_form_no_input() -> None:
-    flow = _make_flow()
-    flow._user_input = {CONF_EMAIL: "u@e.com"}
-    result = await flow.async_step_2fa()
-    assert result["type"] == "form"
-    assert result["step_id"] == "2fa"
-    assert result["description_placeholders"]["email"] == "u@e.com"
-
-
-async def test_step_2fa_not_initialized_aborts() -> None:
-    flow = _make_flow()
-    flow._api = None
-    flow._request_id = None
-    result = await flow.async_step_2fa({"code": "123456"})
-    assert result["type"] == "abort"
-    assert result["reason"] == "api_not_initialized"
-
-
-async def test_step_2fa_success_direct_single_space() -> None:
-    flow = _make_flow()
-    flow._api = _mock_api(hubs=[{"hubId": "HUB1", "hubName": "Home"}])
-    flow._request_id = "rid"
-    flow._user_input = {
-        CONF_AUTH_MODE: AUTH_MODE_DIRECT,
-        CONF_API_KEY: "key",
-        CONF_EMAIL: "u@e.com",
-        CONF_PASSWORD: "secret",
-        CONF_AWS_ACCESS_KEY_ID: "AKIA",
-        CONF_AWS_SECRET_ACCESS_KEY: "SEC",
-        CONF_QUEUE_NAME: "q",
-    }
-    result = await flow.async_step_2fa({"code": " 123456 "})
-    assert result["type"] == "create_entry"
-    assert result["data"][CONF_API_KEY] == "key"
-    assert result["data"][CONF_AWS_ACCESS_KEY_ID] == "AKIA"
-    assert result["data"][CONF_ENABLED_SPACES] == ["HUB1"]
-    flow._api.async_verify_2fa.assert_awaited_once_with("rid", "123456")
-
-
-async def test_step_2fa_success_proxy_mode() -> None:
-    flow = _make_flow()
-    flow._api = _mock_api(hubs=[])
-    flow._request_id = "rid"
-    flow._user_input = {
-        CONF_AUTH_MODE: AUTH_MODE_PROXY_SECURE,
-        CONF_EMAIL: "u@e.com",
-        CONF_PASSWORD: "secret",
-        CONF_PROXY_URL: "https://proxy",
-        CONF_VERIFY_SSL: False,
-    }
-    result = await flow.async_step_2fa({"code": "123456"})
-    assert result["type"] == "create_entry"
-    assert result["data"][CONF_PROXY_URL] == "https://proxy"
-    assert result["data"][CONF_VERIFY_SSL] is False
-    assert CONF_ENABLED_SPACES not in result["data"]
-
-
-async def test_step_2fa_proxy_hubs_discovery_fails_continues() -> None:
-    flow = _make_flow()
-    api = _mock_api()
-    api.async_get_hubs = AsyncMock(side_effect=AjaxRestApiError("no endpoint"))
-    flow._api = api
-    flow._request_id = "rid"
-    flow._user_input = {
-        CONF_AUTH_MODE: AUTH_MODE_PROXY_SECURE,
-        CONF_EMAIL: "u@e.com",
-        CONF_PASSWORD: "secret",
-        CONF_PROXY_URL: "https://proxy",
-    }
-    result = await flow.async_step_2fa({"code": "123456"})
-    assert result["type"] == "create_entry"
-    assert flow._spaces == []
-
-
-async def test_step_2fa_direct_hubs_discovery_fails_is_error() -> None:
-    flow = _make_flow()
-    api = _mock_api()
-    api.async_get_hubs = AsyncMock(side_effect=AjaxRestApiError("boom"))
-    flow._api = api
-    flow._request_id = "rid"
-    flow._user_input = {
-        CONF_AUTH_MODE: AUTH_MODE_DIRECT,
-        CONF_API_KEY: "key",
-        CONF_EMAIL: "u@e.com",
-        CONF_PASSWORD: "secret",
-    }
-    result = await flow.async_step_2fa({"code": "123456"})
-    # Re-raised AjaxRestApiError -> cannot_connect form.
-    assert result["type"] == "form"
-    assert result["errors"]["base"] == "cannot_connect"
-
-
-async def test_step_2fa_multiple_spaces() -> None:
-    flow = _make_flow()
-    flow._api = _mock_api(hubs=[{"hubId": "H1", "hubName": "A"}, {"hubId": "H2", "hubName": "B"}])
-    flow._request_id = "rid"
-    flow._user_input = {
-        CONF_AUTH_MODE: AUTH_MODE_DIRECT,
-        CONF_API_KEY: "key",
-        CONF_EMAIL: "u@e.com",
-        CONF_PASSWORD: "secret",
-    }
-    with patch.object(
-        flow, "async_step_select_spaces", new=AsyncMock(return_value={"type": "form", "step_id": "select_spaces"})
-    ) as sel:
-        await flow.async_step_2fa({"code": "123456"})
-    sel.assert_awaited_once()
-
-
-async def test_step_2fa_space_name_resolved() -> None:
-    flow = _make_flow()
-    api = _mock_api(hubs=[{"hubId": "HUB1", "hubName": "Fallback"}])
-    api.async_get_space_by_hub = AsyncMock(return_value={"name": "Resolved 2FA"})
-    flow._api = api
-    flow._request_id = "rid"
-    flow._user_input = {
-        CONF_AUTH_MODE: AUTH_MODE_DIRECT,
-        CONF_API_KEY: "key",
-        CONF_EMAIL: "u@e.com",
-        CONF_PASSWORD: "secret",
-    }
-    result = await flow.async_step_2fa({"code": "123456"})
-    assert result["type"] == "create_entry"
-    assert flow._spaces == [{"id": "HUB1", "name": "Resolved 2FA"}]
-
-
-async def test_step_2fa_space_name_resolution_fails() -> None:
-    flow = _make_flow()
-    api = _mock_api(hubs=[{"hubId": "HUB1"}])
-    api.async_get_space_by_hub = AsyncMock(side_effect=AjaxRestApiError("boom"))
-    flow._api = api
-    flow._request_id = "rid"
-    flow._user_input = {
-        CONF_AUTH_MODE: AUTH_MODE_DIRECT,
-        CONF_API_KEY: "key",
-        CONF_EMAIL: "u@e.com",
-        CONF_PASSWORD: "secret",
-    }
-    result = await flow.async_step_2fa({"code": "123456"})
-    assert result["type"] == "create_entry"
-    assert flow._spaces[0]["name"].startswith("Hub ")
-
-
-async def test_step_2fa_reauth_success() -> None:
-    flow = _make_flow(source="reauth")
-    flow.context["entry_id"] = "entry-1"
-    flow._api = _mock_api(hubs=[])
-    flow._request_id = "rid"
-    flow._user_input = {
-        CONF_AUTH_MODE: AUTH_MODE_DIRECT,
-        CONF_API_KEY: "key",
-        CONF_EMAIL: "u@e.com",
-        CONF_PASSWORD: "secret",
-    }
-    reauth_entry = MagicMock()
-    reauth_entry.data = {CONF_EMAIL: "u@e.com"}
-    reauth_entry.entry_id = "entry-1"
-    reauth_entry.state = ConfigEntryState.LOADED
-    flow.hass.config_entries.async_get_entry = MagicMock(return_value=reauth_entry)
-    flow.hass.config_entries.async_update_entry = MagicMock()
-    flow.hass.config_entries.async_schedule_reload = MagicMock()
-
-    result = await flow.async_step_2fa({"code": "123456"})
-    assert result["type"] == "abort"
-    assert result["reason"] == "reauth_successful"
-    # async_update_and_abort → update only; the update listener owns the reload.
-    flow.hass.config_entries.async_update_entry.assert_called_once()
-    flow.hass.config_entries.async_schedule_reload.assert_not_called()
-
-
-async def test_step_2fa_reauth_not_loaded_schedules_reload() -> None:
-    """2FA reauth on an entry that isn't LOADED must reschedule the setup itself.
-
-    Mirrors ``test_step_reauth_confirm_changed_password_not_loaded_schedules_reload``
-    for the 2FA branch of the reauth flow.
-    """
-    flow = _make_flow(source="reauth")
-    flow.context["entry_id"] = "entry-1"
-    flow._api = _mock_api(hubs=[])
-    flow._request_id = "rid"
-    flow._user_input = {
-        CONF_AUTH_MODE: AUTH_MODE_DIRECT,
-        CONF_API_KEY: "key",
-        CONF_EMAIL: "u@e.com",
-        CONF_PASSWORD: "secret",
-    }
-    reauth_entry = MagicMock()
-    reauth_entry.data = {CONF_EMAIL: "u@e.com"}
-    reauth_entry.entry_id = "entry-1"
-    reauth_entry.state = ConfigEntryState.SETUP_ERROR
-    flow.hass.config_entries.async_get_entry = MagicMock(return_value=reauth_entry)
-    flow.hass.config_entries.async_update_entry = MagicMock()
-    flow.hass.config_entries.async_schedule_reload = MagicMock()
-
-    result = await flow.async_step_2fa({"code": "123456"})
-    assert result["type"] == "abort"
-    assert result["reason"] == "reauth_successful"
-    flow.hass.config_entries.async_update_entry.assert_called_once()
-    flow.hass.config_entries.async_schedule_reload.assert_called_once_with("entry-1")
-
-
-async def test_step_2fa_invalid_code() -> None:
-    flow = _make_flow()
-    api = _mock_api()
-    api.async_verify_2fa = AsyncMock(side_effect=AjaxRestAuthError("bad"))
-    flow._api = api
-    flow._request_id = "rid"
-    flow._user_input = {CONF_EMAIL: "u@e.com"}
-    result = await flow.async_step_2fa({"code": "000000"})
-    assert result["type"] == "form"
-    assert result["errors"]["base"] == "invalid_2fa"
-
-
-async def test_step_2fa_api_error_cannot_connect() -> None:
-    flow = _make_flow()
-    api = _mock_api()
-    api.async_verify_2fa = AsyncMock(side_effect=AjaxRestApiError("down"))
-    flow._api = api
-    flow._request_id = "rid"
-    flow._user_input = {CONF_EMAIL: "u@e.com"}
-    result = await flow.async_step_2fa({"code": "000000"})
-    assert result["errors"]["base"] == "cannot_connect"
-
-
-async def test_step_2fa_unknown_exception() -> None:
-    flow = _make_flow()
-    api = _mock_api()
-    api.async_verify_2fa = AsyncMock(side_effect=RuntimeError("weird"))
-    flow._api = api
-    flow._request_id = "rid"
-    flow._user_input = {CONF_EMAIL: "u@e.com"}
-    result = await flow.async_step_2fa({"code": "000000"})
     assert result["errors"]["base"] == "unknown"
 
 
@@ -954,21 +770,61 @@ async def test_step_reauth_confirm_proxy_success() -> None:
     assert api_cls.call_args.kwargs["proxy_mode"] == AUTH_MODE_PROXY_SECURE
 
 
-async def test_step_reauth_confirm_2fa_required() -> None:
+async def test_step_reauth_confirm_new_totp_secret_updates_entry() -> None:
+    flow = _make_flow()
+    flow.context["entry_id"] = "e1"
+    entry = MagicMock()
+    entry.entry_id = "e1"
+    entry.state = ConfigEntryState.LOADED
+    entry.data = {CONF_EMAIL: "u@e.com", CONF_AUTH_MODE: AUTH_MODE_DIRECT, CONF_API_KEY: "key"}
+    flow.hass.config_entries.async_get_entry = MagicMock(return_value=entry)
+    flow.hass.config_entries.async_update_entry = MagicMock()
+    api = _mock_api()
+    with patch(API_PATH, return_value=api) as api_cls:
+        result = await flow.async_step_reauth_confirm({CONF_PASSWORD: "newpass", CONF_TOTP_SECRET: "jbswy3dpehpk3pxp"})
+    assert result["type"] == "abort"
+    assert result["reason"] == "reauth_successful"
+    assert api_cls.call_args.kwargs["totp_secret"] == "JBSWY3DPEHPK3PXP"
+    updated_data = flow.hass.config_entries.async_update_entry.call_args.kwargs["data"]
+    assert updated_data[CONF_TOTP_SECRET] == "JBSWY3DPEHPK3PXP"
+
+
+async def test_step_reauth_confirm_blank_totp_secret_preserves_existing() -> None:
+    flow = _make_flow()
+    flow.context["entry_id"] = "e1"
+    entry = MagicMock()
+    entry.entry_id = "e1"
+    entry.state = ConfigEntryState.LOADED
+    entry.data = {
+        CONF_EMAIL: "u@e.com",
+        CONF_AUTH_MODE: AUTH_MODE_DIRECT,
+        CONF_API_KEY: "key",
+        CONF_TOTP_SECRET: _TEST_TOTP_SECRET,
+    }
+    flow.hass.config_entries.async_get_entry = MagicMock(return_value=entry)
+    flow.hass.config_entries.async_update_entry = MagicMock()
+    api = _mock_api()
+    with patch(API_PATH, return_value=api) as api_cls:
+        result = await flow.async_step_reauth_confirm({CONF_PASSWORD: "newpass"})
+    assert result["type"] == "abort"
+    # The account may still require 2FA even though the field was left blank
+    # this time — login must fall back to the secret already on the entry.
+    assert api_cls.call_args.kwargs["totp_secret"] == _TEST_TOTP_SECRET
+    updated_data = flow.hass.config_entries.async_update_entry.call_args.kwargs["data"]
+    assert updated_data[CONF_TOTP_SECRET] == _TEST_TOTP_SECRET
+
+
+async def test_step_reauth_confirm_invalid_totp_secret_reshows_form() -> None:
     flow = _make_flow()
     flow.context["entry_id"] = "e1"
     entry = MagicMock()
     entry.data = {CONF_EMAIL: "u@e.com", CONF_AUTH_MODE: AUTH_MODE_DIRECT}
     flow.hass.config_entries.async_get_entry = MagicMock(return_value=entry)
-    api = _mock_api(login_exc=AjaxRest2FARequiredError("rid"))
-    with (
-        patch(API_PATH, return_value=api),
-        patch.object(flow, "async_step_2fa", new=AsyncMock(return_value={"type": "form"})) as twofa,
-    ):
-        await flow.async_step_reauth_confirm({CONF_PASSWORD: "newpass"})
-    twofa.assert_awaited_once()
-    assert flow._request_id == "rid"
-    assert flow._user_input[CONF_PASSWORD] == "newpass"
+    with patch(API_PATH) as api_cls:
+        result = await flow.async_step_reauth_confirm({CONF_PASSWORD: "newpass", CONF_TOTP_SECRET: "not-base32!"})
+    assert result["type"] == "form"
+    assert result["errors"]["base"] == "invalid_totp_secret"
+    api_cls.assert_not_called()
 
 
 async def test_step_reauth_confirm_auth_error() -> None:
@@ -1081,6 +937,58 @@ async def test_step_reconfigure_proxy_success_strips_url() -> None:
     assert result["reason"] == "reconfigure_successful"
     assert result["data"][CONF_PROXY_URL] == "https://new"
     assert result["data"][CONF_VERIFY_SSL] is False
+
+
+async def test_step_reconfigure_new_totp_secret_updates_entry() -> None:
+    flow = _reconfigure_flow({CONF_AUTH_MODE: AUTH_MODE_DIRECT, CONF_API_KEY: "k", CONF_EMAIL: "u@e.com"})
+    api = _mock_api()
+    with patch(API_PATH, return_value=api) as api_cls:
+        result = await flow.async_step_reconfigure(
+            {
+                CONF_API_KEY: "k",
+                CONF_EMAIL: "u@e.com",
+                CONF_PASSWORD: "newpass",
+                CONF_TOTP_SECRET: "jbswy3dpehpk3pxp",
+            }
+        )
+    assert result["reason"] == "reconfigure_successful"
+    assert result["data"][CONF_TOTP_SECRET] == "JBSWY3DPEHPK3PXP"
+    assert api_cls.call_args.kwargs["totp_secret"] == "JBSWY3DPEHPK3PXP"
+
+
+async def test_step_reconfigure_blank_totp_secret_preserves_existing() -> None:
+    flow = _reconfigure_flow(
+        {
+            CONF_AUTH_MODE: AUTH_MODE_DIRECT,
+            CONF_API_KEY: "k",
+            CONF_EMAIL: "u@e.com",
+            CONF_TOTP_SECRET: _TEST_TOTP_SECRET,
+        }
+    )
+    api = _mock_api()
+    with patch(API_PATH, return_value=api) as api_cls:
+        result = await flow.async_step_reconfigure({CONF_API_KEY: "k", CONF_EMAIL: "u@e.com", CONF_PASSWORD: "newpass"})
+    assert result["reason"] == "reconfigure_successful"
+    # Existing secret is carried forward via the entry.data spread — the
+    # account may still require 2FA even though the field was left blank.
+    assert result["data"][CONF_TOTP_SECRET] == _TEST_TOTP_SECRET
+    assert api_cls.call_args.kwargs["totp_secret"] == _TEST_TOTP_SECRET
+
+
+async def test_step_reconfigure_invalid_totp_secret_reshows_form() -> None:
+    flow = _reconfigure_flow({CONF_AUTH_MODE: AUTH_MODE_DIRECT, CONF_API_KEY: "k", CONF_EMAIL: "u@e.com"})
+    with patch(API_PATH) as api_cls:
+        result = await flow.async_step_reconfigure(
+            {
+                CONF_API_KEY: "k",
+                CONF_EMAIL: "u@e.com",
+                CONF_PASSWORD: "newpass",
+                CONF_TOTP_SECRET: "not-base32!",
+            }
+        )
+    assert result["type"] == "form"
+    assert result["errors"]["base"] == "invalid_totp_secret"
+    api_cls.assert_not_called()
 
 
 async def test_step_reconfigure_changed_data_not_loaded_schedules_reload() -> None:

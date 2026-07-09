@@ -11,26 +11,16 @@
     "error": {
       "cannot_connect": "Kan geen verbinding maken met Ajax API. Controleer je internetverbinding.",
       "entry_not_found": "Configuratie niet gevonden. Probeer het opnieuw.",
-      "invalid_2fa": "Ongeldige verificatiecode. Probeer opnieuw.",
       "invalid_account_type": "Accounttype niet ondersteund. Gebruik een gebruikersaccount (geen PRO/Enterprise-account).",
       "invalid_api_key": "Ongeldige of ontbrekende API-sleutel. Controleer je enterprise API-sleutel.",
       "invalid_auth": "Ongeldige API-referenties. Controleer je API-sleutel, e-mail en wachtwoord.",
       "invalid_password": "Ongeldig e-mailadres of wachtwoord. Controleer je Ajax-accountgegevens.",
       "invalid_proxy_url": "Ongeldige proxy-URL. URL moet beginnen met http:// of https://",
+      "invalid_totp_secret": "Ongeldige TOTP-sleutel. Voer de Base32-sleutel in die werd getoond toen je tweefactorauthenticatie inschakelde.",
       "no_spaces_selected": "Selecteer ten minste één ruimte om in te schakelen.",
       "unknown": "Onverwachte fout. Controleer de logs voor meer details."
     },
     "step": {
-      "2fa": {
-        "data": {
-          "code": "Verificatiecode"
-        },
-        "data_description": {
-          "code": "6-cijferige code van je authenticator-app of SMS"
-        },
-        "description": "Voer de 6-cijferige verificatiecode in die naar je apparaat is verzonden voor {email}",
-        "title": "Tweefactorauthenticatie"
-      },
       "dhcp_confirm": {
         "data": {
           "action": "Actie"
@@ -45,7 +35,8 @@
           "aws_secret_access_key": "AWS Secret Access Key (Optioneel)",
           "email": "E-mailadres",
           "password": "Wachtwoord",
-          "queue_name": "SQS-wachtrijnaam (Optioneel)"
+          "queue_name": "SQS-wachtrijnaam (Optioneel)",
+          "totp_secret": "Twee-factor geheime sleutel (optioneel)"
         },
         "data_description": {
           "api_key": "Je API-sleutel verstrekt door Ajax Systems",
@@ -53,7 +44,8 @@
           "aws_secret_access_key": "AWS Secret Access Key voor real-time SQS-gebeurtenissen",
           "email": "Je Ajax-account e-mailadres",
           "password": "Je Ajax-accountwachtwoord",
-          "queue_name": "SQS-wachtrijnaam (bijv. ajax-events-xxxxx-prod.fifo)"
+          "queue_name": "SQS-wachtrijnaam (bijv. ajax-events-xxxxx-prod.fifo)",
+          "totp_secret": "Base32-sleutel van je authenticator-app instellingen. Laat leeg als 2FA niet is ingeschakeld voor je Ajax-account."
         },
         "description": "Voer je Ajax API-referenties in.\n\n⚠️ **Alleen gebruikersaccount** (geen PRO/Enterprise-accounts).\n\nOptioneel: Voeg AWS-referenties toe voor real-time gebeurtenismeldingen.",
         "title": "Directe verbinding"
@@ -63,12 +55,14 @@
           "email": "E-mailadres",
           "password": "Wachtwoord",
           "proxy_url": "Proxy-URL",
+          "totp_secret": "Twee-factor geheime sleutel (optioneel)",
           "verify_ssl": "SSL-certificaat verifiëren"
         },
         "data_description": {
           "email": "Je Ajax-account e-mailadres",
           "password": "Je Ajax-accountwachtwoord",
           "proxy_url": "Ajax-proxyserver URL",
+          "totp_secret": "Base32-sleutel van je authenticator-app instellingen. Laat leeg als 2FA niet is ingeschakeld voor je Ajax-account.",
           "verify_ssl": "Schakel uit bij gebruik van zelfondertekend certificaat (HTTPS)"
         },
         "description": "Verbind via een Ajax-proxyserver.\n\n⚠️ **Alleen gebruikersaccount** (geen PRO/Enterprise-accounts).\n\nGebeurtenissen worden in real-time ontvangen via SSE.",
@@ -76,7 +70,11 @@
       },
       "reauth_confirm": {
         "data": {
-          "password": "Wachtwoord"
+          "password": "Wachtwoord",
+          "totp_secret": "Twee-factor geheime sleutel (optioneel)"
+        },
+        "data_description": {
+          "totp_secret": "Base32-sleutel van je authenticator-app instellingen. Laat leeg als 2FA niet is ingeschakeld voor je Ajax-account."
         },
         "description": "Je sessie is verlopen. Voer je wachtwoord opnieuw in voor {email}.",
         "title": "Opnieuw authenticeren"
@@ -87,9 +85,11 @@
           "email": "E-mailadres",
           "password": "Wachtwoord",
           "proxy_url": "Proxy-URL",
+          "totp_secret": "Twee-factor geheime sleutel (optioneel)",
           "verify_ssl": "SSL-certificaat verifiëren"
         },
         "data_description": {
+          "totp_secret": "Base32-sleutel van je authenticator-app instellingen. Laat leeg als 2FA niet is ingeschakeld voor je Ajax-account.",
           "verify_ssl": "Schakel uit als de proxy een zelfondertekend certificaat gebruikt."
         },
         "description": "Werk je Ajax-referenties bij.",

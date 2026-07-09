@@ -30,6 +30,7 @@ from custom_components.ajax.const import (
     CONF_PASSWORD,
     CONF_PROXY_URL,
     CONF_QUEUE_NAME,
+    CONF_TOTP_SECRET,
     CONF_VERIFY_SSL,
     DOMAIN,
 )
@@ -107,6 +108,36 @@ async def test_setup_entry_direct_mode_happy_path(hass: HomeAssistant) -> None:
         assert isinstance(entry.runtime_data, AjaxDataCoordinator)
         assert entry.runtime_data._aws_access_key_id == "ak"
         fwd.assert_awaited_once()
+    await hass.async_block_till_done()
+
+
+async def test_setup_entry_passes_totp_secret_to_api(hass: HomeAssistant) -> None:
+    entry = _entry(hass, **{CONF_TOTP_SECRET: "JBSWY3DPEHPK3PXP"})
+    with (
+        patch("custom_components.ajax.AjaxRestApi") as api_cls,
+        patch("custom_components.ajax.async_get_clientsession"),
+        patch.object(AjaxDataCoordinator, "async_config_entry_first_refresh", new=AsyncMock()),
+        patch("custom_components.ajax._async_setup_areas", new=AsyncMock()),
+        patch.object(hass.config_entries, "async_forward_entry_setups", new=AsyncMock()),
+    ):
+        _mock_api(api_cls)
+        assert await async_setup_entry(hass, entry) is True
+        assert api_cls.call_args.kwargs["totp_secret"] == "JBSWY3DPEHPK3PXP"
+    await hass.async_block_till_done()
+
+
+async def test_setup_entry_without_totp_secret_passes_none(hass: HomeAssistant) -> None:
+    entry = _entry(hass)
+    with (
+        patch("custom_components.ajax.AjaxRestApi") as api_cls,
+        patch("custom_components.ajax.async_get_clientsession"),
+        patch.object(AjaxDataCoordinator, "async_config_entry_first_refresh", new=AsyncMock()),
+        patch("custom_components.ajax._async_setup_areas", new=AsyncMock()),
+        patch.object(hass.config_entries, "async_forward_entry_setups", new=AsyncMock()),
+    ):
+        _mock_api(api_cls)
+        assert await async_setup_entry(hass, entry) is True
+        assert api_cls.call_args.kwargs["totp_secret"] is None
     await hass.async_block_till_done()
 
 

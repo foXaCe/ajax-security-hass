@@ -11,26 +11,16 @@
     "error": {
       "cannot_connect": "Verbindung zur Ajax-API fehlgeschlagen. Überprüfen Sie Ihre Internetverbindung.",
       "entry_not_found": "Konfiguration nicht gefunden. Bitte versuchen Sie es erneut.",
-      "invalid_2fa": "Ungültiger Bestätigungscode. Bitte versuchen Sie es erneut.",
       "invalid_account_type": "Kontotyp nicht unterstützt. Verwenden Sie ein Benutzerkonto (kein PRO/Enterprise-Konto).",
       "invalid_api_key": "Ungültiger oder fehlender API-Schlüssel. Überprüfen Sie Ihren Enterprise-API-Schlüssel.",
       "invalid_auth": "Ungültige API-Anmeldedaten. Überprüfen Sie Ihren API-Schlüssel, E-Mail und Passwort.",
       "invalid_password": "Ungültige E-Mail oder Passwort. Überprüfen Sie Ihre Ajax-Kontodaten.",
       "invalid_proxy_url": "Ungültige Proxy-URL. URL muss mit http:// oder https:// beginnen",
+      "invalid_totp_secret": "Ungültiger TOTP-Schlüssel. Geben Sie den Base32-Schlüssel ein, der beim Aktivieren der Zwei-Faktor-Authentifizierung angezeigt wurde.",
       "no_spaces_selected": "Bitte wählen Sie mindestens einen Bereich aus.",
       "unknown": "Unerwarteter Fehler. Überprüfen Sie die Protokolle für weitere Details."
     },
     "step": {
-      "2fa": {
-        "data": {
-          "code": "Bestätigungscode"
-        },
-        "data_description": {
-          "code": "6-stelliger Code aus Ihrer Authenticator-App oder SMS"
-        },
-        "description": "Geben Sie den 6-stelligen Bestätigungscode ein, der an Ihr Gerät für {email} gesendet wurde",
-        "title": "Zwei-Faktor-Authentifizierung"
-      },
       "dhcp_confirm": {
         "data": {
           "action": "Aktion"
@@ -45,7 +35,8 @@
           "aws_secret_access_key": "AWS-Geheimschlüssel (Optional)",
           "email": "E-Mail-Adresse",
           "password": "Passwort",
-          "queue_name": "SQS-Warteschlangenname (Optional)"
+          "queue_name": "SQS-Warteschlangenname (Optional)",
+          "totp_secret": "Zwei-Faktor-Geheimschlüssel (optional)"
         },
         "data_description": {
           "api_key": "Ihr von Ajax Systems bereitgestellter API-Schlüssel",
@@ -53,7 +44,8 @@
           "aws_secret_access_key": "AWS Secret Access Key für Echtzeit-SQS-Ereignisse",
           "email": "Ihre Ajax-Konto-E-Mail-Adresse",
           "password": "Ihr Ajax-Konto-Passwort",
-          "queue_name": "SQS-Warteschlangenname (z.B. ajax-events-xxxxx-prod.fifo)"
+          "queue_name": "SQS-Warteschlangenname (z.B. ajax-events-xxxxx-prod.fifo)",
+          "totp_secret": "Base32-Schlüssel aus der Einrichtung Ihrer Authenticator-App. Leer lassen, wenn 2FA für Ihr Ajax-Konto nicht aktiviert ist."
         },
         "description": "Geben Sie Ihre Ajax-API-Anmeldedaten ein.\n\n⚠️ **Nur Benutzerkonto** (keine PRO/Enterprise-Konten).\n\nOptional: AWS-Anmeldedaten für Echtzeit-Ereignisbenachrichtigungen hinzufügen.",
         "title": "Direkte Verbindung"
@@ -63,12 +55,14 @@
           "email": "E-Mail-Adresse",
           "password": "Passwort",
           "proxy_url": "Proxy-URL",
+          "totp_secret": "Zwei-Faktor-Geheimschlüssel (optional)",
           "verify_ssl": "SSL-Zertifikat überprüfen"
         },
         "data_description": {
           "email": "Ihre Ajax-Konto-E-Mail-Adresse",
           "password": "Ihr Ajax-Konto-Passwort",
           "proxy_url": "Ajax-Proxy-Server-URL",
+          "totp_secret": "Base32-Schlüssel aus der Einrichtung Ihrer Authenticator-App. Leer lassen, wenn 2FA für Ihr Ajax-Konto nicht aktiviert ist.",
           "verify_ssl": "Deaktivieren bei Verwendung eines selbstsignierten Zertifikats (HTTPS)"
         },
         "description": "Verbindung über einen Ajax-Proxy-Server.\n\n⚠️ **Nur Benutzerkonto** (keine PRO/Enterprise-Konten).\n\nEreignisse werden in Echtzeit über SSE empfangen.",
@@ -76,7 +70,11 @@
       },
       "reauth_confirm": {
         "data": {
-          "password": "Passwort"
+          "password": "Passwort",
+          "totp_secret": "Zwei-Faktor-Geheimschlüssel (optional)"
+        },
+        "data_description": {
+          "totp_secret": "Base32-Schlüssel aus der Einrichtung Ihrer Authenticator-App. Leer lassen, wenn 2FA für Ihr Ajax-Konto nicht aktiviert ist."
         },
         "description": "Ihre Sitzung ist abgelaufen. Bitte geben Sie Ihr Passwort für {email} erneut ein.",
         "title": "Erneut authentifizieren"
@@ -87,9 +85,11 @@
           "email": "E-Mail",
           "password": "Passwort",
           "proxy_url": "Proxy-URL",
+          "totp_secret": "Zwei-Faktor-Geheimschlüssel (optional)",
           "verify_ssl": "SSL-Zertifikat überprüfen"
         },
         "data_description": {
+          "totp_secret": "Base32-Schlüssel aus der Einrichtung Ihrer Authenticator-App. Leer lassen, wenn 2FA für Ihr Ajax-Konto nicht aktiviert ist.",
           "verify_ssl": "Deaktivieren, wenn der Proxy ein selbstsigniertes Zertifikat verwendet."
         },
         "description": "Aktualisieren Sie Ihre Ajax-Anmeldedaten.",

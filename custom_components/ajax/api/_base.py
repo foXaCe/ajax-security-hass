@@ -74,15 +74,6 @@ class AjaxRestRateLimitError(AjaxRestApiError):
     """Rate limit exceeded."""
 
 
-class AjaxRest2FARequiredError(AjaxRestApiError):
-    """2FA is required."""
-
-    def __init__(self, request_id: str):
-        """Initialize 2FA error with request ID."""
-        super().__init__("Two-factor authentication required")
-        self.request_id = request_id
-
-
 class AjaxRestClientBase:
     """Transport, authentication and request-retry core shared by the API mixins."""
 
@@ -92,6 +83,7 @@ class AjaxRestClientBase:
         email: str,
         password: str,
         password_is_hashed: bool = False,
+        totp_secret: str | None = None,
         proxy_url: str | None = None,
         proxy_mode: str | None = None,
         session: aiohttp.ClientSession | None = None,
@@ -104,6 +96,8 @@ class AjaxRestClientBase:
             email: User email address
             password: User password (plain or SHA256 hashed)
             password_is_hashed: True if password is already SHA256 hashed
+            totp_secret: Optional Base32 TOTP secret (2FA); when set, a fresh
+                code is generated for every /login call
             proxy_url: URL of proxy server (for proxy modes)
             proxy_mode: Authentication mode (direct, proxy_secure)
             session: Optional aiohttp session (use async_get_clientsession(hass) for HA)
@@ -111,6 +105,7 @@ class AjaxRestClientBase:
         """
         self.api_key = api_key
         self.email = email
+        self.totp_secret = totp_secret or None
         self.proxy_url = proxy_url.rstrip("/") if proxy_url else None
         self.proxy_mode = proxy_mode or AUTH_MODE_DIRECT
         self.verify_ssl = verify_ssl  # Verify SSL certificates
@@ -322,10 +317,15 @@ class AjaxRestClientBase:
     async def async_login(self) -> str:
         """Login with email and SHA256(password) to get session token.
 
-        According to Swagger API 1.130.0:
-        - Authenticates with email + SHA256(password)
-        - Returns sessionToken (15 min TTL), refreshToken (7 days TTL), and userId
-        - POST body: {"login": email, "passwordHash": hash}
+        According to Swagger API 1.147.0:
+        - Authenticates with email + SHA256(password) (+ TOTP code if 2FA is
+          enabled on the account — mandatory for all Enterprise API logins
+          from 2025-09-01)
+        - Returns sessionToken (15 min TTL), refreshToken (7 days TTL, or
+          1 year when a valid TOTP was supplied), and userId
+        - POST body: {"login": email, "passwordHash": hash, "totp": code?}
+        - This is a single-step login; the API no longer exposes a separate
+          two-step verification endpoint
 
         For proxy modes, the proxy may also return:
         - apiKey: API key to use for direct requests (hybrid mode)
@@ -335,8 +335,8 @@ class AjaxRestClientBase:
             Session token string
 
         Raises:
-            AjaxRest2FARequiredError: If 2FA is required
-            AjaxRestAuthError: If authentication fails
+            AjaxRestAuthError: If authentication fails (including an invalid
+                TOTP secret)
             AjaxRestApiError: For other API errors
         """
         _LOGGER.debug("Logging in with email: %s (mode: %s)", self.email, self.proxy_mode)
@@ -346,10 +346,17 @@ class AjaxRestClientBase:
         url = f"{base_url}/login"
 
         # Login request body according to Swagger
-        payload = {
+        payload: dict[str, str] = {
             "login": self.email,
             "passwordHash": self.password_hash,
         }
+        if self.totp_secret:
+            import pyotp  # local import: keeps setup import light
+
+            try:
+                payload["totp"] = pyotp.TOTP(self.totp_secret).now()
+            except Exception as err:  # invalid base32 secret, etc.
+                raise AjaxRestAuthError("Invalid TOTP secret", error_type="invalid_totp_secret") from err
 
         try:
             async with session.post(
@@ -396,11 +403,11 @@ class AjaxRestClientBase:
                     _LOGGER.debug("Login 500 error - likely invalid API key")
                     raise AjaxRestAuthError("Invalid API key or server error", error_type="invalid_api_key")
                 elif response.status == 403:
-                    # 2FA required
-                    result = await response.json()
-                    request_id = result.get("requestId", "")
-                    _LOGGER.info("2FA required, request_id: %s", request_id)
-                    raise AjaxRest2FARequiredError(request_id)
+                    # API 1.147.0 has no distinct signal for "2FA required" vs
+                    # a bad password/TOTP — surface it as an auth failure so
+                    # the config flow re-prompts instead of a generic error.
+                    _LOGGER.debug("Login 403 - authentication rejected")
+                    raise AjaxRestAuthError("Authentication failed", error_type="invalid_password")
 
                 response.raise_for_status()
                 result = await response.json()
@@ -455,86 +462,6 @@ class AjaxRestClientBase:
         except TimeoutError as err:
             _LOGGER.error("Login request timeout")
             raise AjaxRestApiError("Login timeout") from err
-
-    async def async_verify_2fa(self, request_id: str, code: str) -> str:
-        """Verify 2FA code and get temporary token.
-
-        Args:
-            request_id: Request ID from login response
-            code: 6-digit 2FA code
-
-        Returns:
-            Temporary token string
-
-        Raises:
-            AjaxRestAuthError: If 2FA verification fails
-            AjaxRestApiError: For other API errors
-        """
-        _LOGGER.debug("Verifying 2FA code")
-
-        session = await self._get_session()
-        base_url = self._get_base_url(for_login=True)
-        url = f"{base_url}/login/2fa"
-
-        headers = {
-            **self._base_headers,
-            "X-Request-Id": request_id,
-            "X-2FA-Code": code,
-        }
-
-        try:
-            async with session.post(
-                url,
-                headers=headers,
-                timeout=aiohttp.ClientTimeout(total=AJAX_REST_API_TIMEOUT),
-            ) as response:
-                if response.status == 401:
-                    raise AjaxRestAuthError("Invalid 2FA code")
-
-                response.raise_for_status()
-                result = await response.json()
-
-                # 2FA returns the same auth payload as a normal login.
-                self.session_token = result.get("sessionToken")
-                self.refresh_token = result.get("refreshToken")
-                self.user_id = result.get("userId") or result.get("user_id")
-
-                if self.proxy_url:
-                    if not self.session_token and self.user_id:
-                        self.session_token = self.user_id
-                        _LOGGER.debug("Using user_id as session token for proxy mode after 2FA")
-
-                    proxy_api_key = result.get("apiKey")
-                    if proxy_api_key:
-                        self.api_key = proxy_api_key
-                        self._base_headers["X-Api-Key"] = proxy_api_key
-                        _LOGGER.info("Received API key from proxy after 2FA")
-
-                    self.sse_url = result.get("sseUrl")
-                    if not self.sse_url and self.user_id:
-                        self.sse_url = f"{self.proxy_url}/events?userId={self.user_id}"
-                    if self.sse_url:
-                        _LOGGER.info("SSE endpoint configured after 2FA")
-                        _LOGGER.debug("SSE endpoint host: %s", urlsplit(self.sse_url).netloc)
-
-                if not self.session_token:
-                    raise AjaxRestApiError("No sessionToken in 2FA response")
-                if not self.user_id:
-                    raise AjaxRestApiError("No userId in 2FA response")
-
-                self._token_version += 1
-                self._last_login_time = time.monotonic()
-                self._token_obtained_at = time.monotonic()
-                self._refresh_failures = 0
-                _LOGGER.info("2FA verification successful (user: %s)", self.user_id[:8])
-                return self.session_token
-
-        except aiohttp.ClientError as err:
-            _LOGGER.error("2FA verification failed: %s", err)
-            raise AjaxRestApiError(f"2FA verification failed: {err}") from err
-        except TimeoutError as err:
-            _LOGGER.error("2FA verification timeout")
-            raise AjaxRestApiError("2FA verification timeout") from err
 
     async def async_refresh_token(self) -> str:
         """Refresh session token using refresh token.

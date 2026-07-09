@@ -1535,9 +1535,6 @@
     "invalid_target": {
       "message": "Ongeldig doel voor service."
     },
-    "lock_not_supported": {
-      "message": "Op afstand vergrendelen wordt niet ondersteund door Ajax smart locks."
-    },
     "no_api_key": {
       "message": "Geen API-sleutel geconfigureerd voor deze entiteit."
     },

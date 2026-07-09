@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.36.0] - 2026-07-09
+
+### Added
+- **Two-factor authentication (TOTP) support — required by Ajax from September 1st, 2025.** Ajax is making 2FA mandatory for all Enterprise API logins. You can now enter your TOTP secret (the Base32 key shown when you enable two-factor authentication) as an optional field when setting up or re-authenticating the integration; a fresh code is generated automatically on every login, so the integration keeps running unattended. Accounts without 2FA are unaffected — the field is optional. Logging in with a valid code also extends Ajax's refresh-token lifetime from 7 days to 1 year. *The login request shape is verified by tests but has not yet been validated against a live 2FA-enabled account — please report any issue before the September 1st deadline.*
+- **Remote locking of smart locks.** `lock` was previously unsupported because Ajax exposed no lock command; the API now provides one, so smart locks can be both locked and unlocked from Home Assistant.
+
+### Fixed
+- **Smart-lock unlock now uses the dedicated `UNLOCK_SMART_LOCK` command (#88).** The integration sent the generic `UNLOCK_DEVICE`, which Ajax rejects with a 403 on LockBridge/Yale locks; Ajax 1.147.0 added dedicated `LOCK_SMART_LOCK` / `UNLOCK_SMART_LOCK` commands. *Best-effort — feedback from users with real LockBridge/Yale hardware is welcome; if the 403 persists, the cause is Ajax-side API-key authorization rather than the command type.*
+
+### Changed
+- Internal: the login flow moved from the removed two-step verification endpoint (`/login/2fa`) to the single-step `totp` field in the `/login` body, matching Ajax API 1.147.0.
+
+### Dependencies
+- Added `pyotp>=2.9.0` (TOTP code generation).
+
 ## [0.35.0] - 2026-07-07
 
 ### Fixed

@@ -6,7 +6,7 @@
 # version floors for any of those here: they fight HA's exact pins and make the
 # install unresolvable (that is what kept the CI tests job disabled). Only
 # declare what phcc does not already pull in.
-pytest-homeassistant-custom-component>=0.13.345
+pytest-homeassistant-custom-component>=0.13.346
 
 # Not provided by phcc:
 pytest-mock

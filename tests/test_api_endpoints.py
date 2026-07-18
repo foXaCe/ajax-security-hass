@@ -110,6 +110,22 @@ async def test_async_get_devices_cache_bypassed_when_bypass_flag_set() -> None:
 
 
 @pytest.mark.asyncio
+async def test_async_get_devices_bypass_window_reuses_fetch_for_second_caller() -> None:
+    """Plan 010: a fetch done INSIDE the bypass window is reused by the next
+    same-tick caller for the same key — the window guarantees at most one
+    fresh fetch per key, not one fetch per caller (periodic loop and
+    door-sensor fast-poll crossing paths within the same window)."""
+    api = _api()
+    api._request.return_value = [{"id": "d1"}]
+
+    api.bypass_cache_next()
+    await api.async_get_devices("h1")  # fresh fetch inside the window
+    await api.async_get_devices("h1")  # same window, same key -> cache hit
+
+    assert api._request.await_count == 1
+
+
+@pytest.mark.asyncio
 async def test_async_get_devices_cache_expires_after_ttl() -> None:
     """Past the TTL window, a fresh request must fire."""
     api = _api()

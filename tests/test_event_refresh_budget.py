@@ -25,9 +25,14 @@ Plan 009 has landed: ``async_force_state_refresh()`` now sets
 ``_async_update_data()`` consumes that flag to skip both the
 ``_cycle_counter`` increment and the video/smart-lock fan-out
 unconditionally. The tests that used to carry a plan-009 baseline marker
-now assert the fixed (no fan-out / no counter drift) behaviour instead;
-only the plan 010 (bypass single-miss) and plan 011 (burst coalescing)
-BASELINE assertions remain open.
+now assert the fixed (no fan-out / no counter drift) behaviour instead.
+
+Plan 010 has also landed: ``api/_base.py``'s ``bypass_cache_next()`` now
+records when the window opened (``_bypass_cache_opened_at``), and
+``_cache_entry_usable()`` only rejects entries written before that instant
+— a fetch done inside the window is still reused by the next same-tick
+caller. Only the plan 011 (burst coalescing) BASELINE assertion remains
+open.
 
 The only mocked "bridge" in the coordinator builder is ``async_refresh``
 itself, which stands in for ``DataUpdateCoordinator``'s real
@@ -436,7 +441,7 @@ async def test_light_refresh_with_forced_metadata_still_fans_out() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Step 4 — BASELINE: the proxy-cache bypass window at the API layer
+# Step 4 — the proxy-cache bypass window at the API layer
 # ---------------------------------------------------------------------------
 
 
@@ -449,8 +454,8 @@ def _space_payload() -> dict[str, Any]:
     }
 
 
-async def test_bypass_window_double_space_fetch() -> None:
-    """Inside a bypass_cache_next() window, the space payload is fetched twice."""
+async def test_bypass_window_single_space_fetch() -> None:
+    """Inside a bypass_cache_next() window, the space payload is fetched once (plan 010)."""
     api = AjaxRestApi(api_key="k", email="u@example.com", password="p")
     api.user_id = "u1"
     api._request = AsyncMock(return_value=_space_payload())  # type: ignore[method-assign]
@@ -460,18 +465,19 @@ async def test_bypass_window_double_space_fetch() -> None:
     await api.async_get_smart_locks("s1", known_ids={"l1"})
 
     space_fetches = [call for call in api._request.await_args_list if call.args[:2] == ("GET", "user/u1/spaces/s1")]
-    # BASELINE (plan 010): bypass_cache_next() opens a blanket 2s window
-    # during which _cache_bypass_active() is True for every caller — both
-    # async_get_video_edges and async_get_smart_locks re-fetch the same
-    # space payload instead of the second one reusing the first's result.
-    assert len(space_fetches) == 2
+    # async_get_video_edges' fetch lands INSIDE the bypass window it opened,
+    # so it is fresh: async_get_smart_locks' own async_get_space() call
+    # reuses it (_cache_entry_usable()) instead of re-fetching the same
+    # space payload a few milliseconds later.
+    assert len(space_fetches) == 1
 
 
 async def test_no_bypass_window_single_space_fetch() -> None:
     """Twin of the bypass test: outside a bypass window, the cache coalesces.
 
-    This is nominal, already-correct behaviour — it must keep holding once
-    plan 010 tightens the bypass-window test above.
+    Same outcome (1 fetch) as the bypass-window test above, for a different
+    reason: no window is open at all, so the plain TTL cache coalesces the
+    two callers — nominal behaviour that must keep holding.
     """
     api = AjaxRestApi(api_key="k", email="u@example.com", password="p")
     api.user_id = "u1"

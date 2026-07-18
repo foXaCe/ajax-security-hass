@@ -188,6 +188,58 @@ def test_bypass_cache_window_expires() -> None:
 
 
 # ---------------------------------------------------------------------------
+# _cache_entry_usable — while a bypass window is open, an entry fetched fresh
+# INSIDE it is still served to the next same-tick caller; only entries older
+# than the window's opening are treated as stale (plan 010). This is what
+# lets async_get_video_edges and async_get_smart_locks share a single
+# GET /spaces/{id} fetch per bypass window instead of one each.
+# ---------------------------------------------------------------------------
+
+
+def test_cache_entry_written_before_window_is_not_usable() -> None:
+    """An entry cached before the bypass window opened must be refetched."""
+    api = AjaxRestApi(api_key="k", email="u@example.com", password="p")
+    now = time.time()
+    written_at = now - 1.0  # cached well before the window opened
+    api._bypass_cache_opened_at = now
+    api._bypass_cache_until = now + 2.0
+    assert api._cache_entry_usable(written_at, ttl=5.0) is False
+
+
+def test_cache_entry_written_during_window_is_usable() -> None:
+    """A fetch done inside the window is fresh — a second same-tick caller reuses it."""
+    api = AjaxRestApi(api_key="k", email="u@example.com", password="p")
+    now = time.time()
+    api._bypass_cache_opened_at = now
+    api._bypass_cache_until = now + 2.0
+    written_at = now + 0.1  # fetched just after the window opened
+    assert api._cache_entry_usable(written_at, ttl=5.0) is True
+
+
+def test_cache_entry_respects_ttl_regardless_of_bypass_window() -> None:
+    """An entry past its TTL is never usable, bypass window or not."""
+    api = AjaxRestApi(api_key="k", email="u@example.com", password="p")
+    stale_written_at = time.time() - 10.0
+    assert api._cache_entry_usable(stale_written_at, ttl=5.0) is False
+
+
+def test_cache_entry_usable_falls_back_to_ttl_once_window_expired() -> None:
+    """Once the bypass window has closed, only the TTL decides again.
+
+    An entry that would have been rejected while the window was open (it
+    predates ``_bypass_cache_opened_at``) is usable once the window itself
+    has expired — the special "must postdate the window" rule only applies
+    while a bypass is actually in progress.
+    """
+    api = AjaxRestApi(api_key="k", email="u@example.com", password="p")
+    now = time.time()
+    written_at = now - 1.0
+    api._bypass_cache_opened_at = now
+    api._bypass_cache_until = now - 0.5  # window already closed
+    assert api._cache_entry_usable(written_at, ttl=5.0) is True
+
+
+# ---------------------------------------------------------------------------
 # _check_rate_limit
 # ---------------------------------------------------------------------------
 

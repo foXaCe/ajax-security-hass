@@ -23,12 +23,14 @@ class _VideoMixin(AjaxRestClientBase):
         Returns:
             Space dictionary with devices array
         """
-        # Skip the in-memory cache while a bypass window is open so the fresh
-        # space payload (which feeds video-edges and smart-locks) is fetched.
-        if not self._cache_bypass_active():
-            cached = self._space_cache.get(space_id)
-            if cached and (time.time() - cached[0]) < self._space_cache_ttl:
-                return cached[1]
+        # Serve a cache entry unless it predates an open bypass window (see
+        # _cache_entry_usable()): a fresh fetch inside the window is reused
+        # by the next same-tick caller (async_get_video_edges then
+        # async_get_smart_locks), so the space payload is fetched at most
+        # once per window instead of once per caller.
+        cached = self._space_cache.get(space_id)
+        if cached and self._cache_entry_usable(cached[0], self._space_cache_ttl):
+            return cached[1]
         data = await self._request("GET", f"user/{self.user_id}/spaces/{space_id}")
         self._space_cache[space_id] = (time.time(), data)
         return data  # type: ignore[no-any-return]

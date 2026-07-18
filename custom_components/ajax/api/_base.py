@@ -136,6 +136,12 @@ class AjaxRestClientBase:
         # bypass actually targets. A short window safely covers one full refresh
         # cycle (which completes well under 1s) and auto-expires.
         self._bypass_cache_until: float = 0.0
+        # When the currently-open bypass window was opened (set alongside
+        # _bypass_cache_until in bypass_cache_next()). Used by
+        # _cache_entry_usable() to tell an entry fetched fresh INSIDE the
+        # window (safe to reuse for the rest of it) from one written before
+        # the window opened (must be skipped).
+        self._bypass_cache_opened_at: float = 0.0
 
         # Rate limiting state
         # (bypass_cache_next() is a public helper; see below.)
@@ -219,19 +225,39 @@ class AjaxRestClientBase:
         return self.session
 
     def bypass_cache_next(self) -> None:
-        """Force the upcoming refresh cycle to skip every cache layer.
+        """Force the upcoming refresh cycle to fetch each cache key fresh at most once.
 
         Public API used by the coordinator after SSE/SQS events or user actions.
         Opens a short 2s window during which both the proxy cache (via the
-        X-Cache-Control: no-cache header) and the in-memory caches are bypassed,
-        so the device/space getters that run later in the same refresh reach the
-        real endpoint instead of serving stale state.
+        X-Cache-Control: no-cache header) and the in-memory caches ignore any
+        entry written before the window opened, so the device/space getters
+        that run later in the same refresh reach the real endpoint instead of
+        serving stale state. Within the window itself, a key already fetched
+        fresh is still served from the in-memory cache to same-tick callers
+        (e.g. ``async_get_video_edges`` and ``async_get_smart_locks`` both
+        reading the same space) — the window guarantees freshness, not a
+        forced re-fetch per call. See ``_cache_entry_usable()``.
         """
-        self._bypass_cache_until = time.time() + 2.0
+        self._bypass_cache_opened_at = time.time()
+        self._bypass_cache_until = self._bypass_cache_opened_at + 2.0
 
     def _cache_bypass_active(self) -> bool:
         """Return True while the cache-bypass window is open."""
         return time.time() < self._bypass_cache_until
+
+    def _cache_entry_usable(self, written_at: float, ttl: float) -> bool:
+        """True if a cache entry may be served instead of re-fetching.
+
+        Within TTL always; additionally, while a bypass window is open, only
+        if the entry was written AFTER the window opened — a fetch done
+        inside the window is already fresh, so serving it to a second
+        same-tick caller preserves the coalescing the caches exist for,
+        while an entry written before the window opened is exactly the
+        stale state the bypass is meant to skip.
+        """
+        if (time.time() - written_at) >= ttl:
+            return False
+        return not (self._cache_bypass_active() and written_at < self._bypass_cache_opened_at)
 
     async def close(self) -> None:
         """Close the session if we own it."""

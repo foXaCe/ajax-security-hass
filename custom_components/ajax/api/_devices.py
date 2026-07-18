@@ -79,13 +79,15 @@ class _DevicesMixin(AjaxRestClientBase):
         Returns:
             List of device dictionaries (with full details if enrich=True)
         """
-        # Serve from the short-lived cache unless a cache bypass is pending
-        # (bypass must reach the real endpoint to get fresh state).
+        # Serve from the short-lived cache unless the entry predates an open
+        # bypass window (see _cache_entry_usable()): a fresh fetch inside the
+        # window is reused by the next same-tick caller (periodic loop and
+        # door-sensor fast-poll crossing paths), so the endpoint is hit at
+        # most once per window instead of once per caller.
         cache_key = (hub_id, enrich)
-        if not self._cache_bypass_active():
-            cached = self._devices_cache.get(cache_key)
-            if cached and (time.time() - cached[0]) < self._devices_cache_ttl:
-                return cached[1]
+        cached = self._devices_cache.get(cache_key)
+        if cached and self._cache_entry_usable(cached[0], self._devices_cache_ttl):
+            return cached[1]
 
         if not self.user_id:
             raise AjaxRestApiError("No user_id available. Call async_login() first.")

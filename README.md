@@ -184,6 +184,7 @@ Connect via a community proxy server. Real-time events via SSE (Server-Sent Even
 - **Proxy URL**: URL of the community proxy server
 - **Email**: Your Ajax account email
 - **Password**: Your Ajax account password
+- **TOTP Secret** (optional): Base32 two-factor secret from your Ajax account. Required if two-factor authentication is enabled on the account (Ajax made 2FA mandatory on 2025-09-01)
 
 > **Note**: No API key required for end users, but requires access to a community proxy server. **No public proxy is currently available** - check the [HACF Forum](https://forum.hacf.fr/t/alarme-ajax-sur-home-assistant/29511/160) for updates.
 
@@ -195,6 +196,7 @@ Direct connection to the Ajax API. Requires an enterprise API key from Ajax Syst
 - **API Key**: Your enterprise API key from Ajax Systems
 - **Email**: Your Ajax account email
 - **Password**: Your Ajax account password
+- **TOTP Secret** (optional): Base32 two-factor secret from your Ajax account. Required if two-factor authentication is enabled on the account (Ajax made 2FA mandatory on 2025-09-01)
 - **AWS Credentials** (optional): For real-time event notifications via SQS
 
 > **Note**: Enterprise API keys are only available through Ajax Systems partnership program.
@@ -238,8 +240,9 @@ Go to the integration options to configure:
 
 ### Authentication Process
 1. **Password hashing**: Your password is hashed using SHA-256 before transmission
-2. **Secure communication**: All API communication uses HTTPS (TLS/SSL)
-3. **Session tokens**: Tokens are stored locally and refreshed automatically
+2. **Two-factor authentication**: If your Ajax account has 2FA enabled, the integration generates the TOTP code locally from the secret you provide — the secret itself never leaves your Home Assistant instance and is redacted from diagnostics
+3. **Secure communication**: All API communication uses HTTPS (TLS/SSL)
+4. **Session tokens**: Tokens are stored locally and refreshed automatically
 
 ### Direct Mode
 - **No third parties**: The integration communicates directly with Ajax servers

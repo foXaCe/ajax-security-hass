@@ -33,6 +33,7 @@ from custom_components.ajax.binary_sensor import (
     AjaxVideoEdgeBinarySensor,
     async_setup_entry as binary_async_setup_entry,
 )
+from custom_components.ajax.event_codes import get_event_message
 from custom_components.ajax.models import (
     AjaxDevice,
     AjaxSmartLock,
@@ -111,9 +112,38 @@ def test_format_event_text_unknown_action_falls_back_to_raw() -> None:
 
 
 def test_format_event_text_french_uses_par() -> None:
-    # A French-looking message switches the connector from "by" to "par".
-    text = format_event_text({"message": "Armé", "user_name": "Marie"})
-    assert text == "Armé par Marie"
+    # Expected adaptation: the message-sniffing french_words heuristic is
+    # gone by design (B2) — the connector now comes purely from the
+    # explicit `language` parameter, not from guessing at the message text.
+    text = format_event_text({"action": "arm", "user_name": "Marie"}, language="fr")
+    assert "par" in text
+    assert get_event_message("armed", "fr") in text
+
+
+def test_format_event_text_translates_fallback_dynamically_by_language() -> None:
+    # No hardcoded string for a migrated key — compare against
+    # get_event_message so a future EVENT_MESSAGES wording change can't
+    # silently desync the test from the table it exercises.
+    assert format_event_text({"action": "DISARM"}, language="fr") == get_event_message("disarmed", "fr")
+
+
+def test_format_event_text_de_uses_von() -> None:
+    text = format_event_text({"action": "arm", "user_name": "Otto"}, language="de")
+    assert "von " in text
+    assert "by " not in text
+
+
+def test_format_event_text_uk_uses_vid() -> None:
+    text = format_event_text({"action": "arm", "user_name": "Olena"}, language="uk")
+    assert "від " in text
+
+
+def test_format_event_text_uses_english_only_residual_for_untranslated_keys() -> None:
+    # Keys event_codes.EVENT_MESSAGES doesn't carry yet (see _FALLBACK_EN in
+    # _sensor_space.py) keep their historical English wording regardless of
+    # `language` — they are not part of the 7-language table.
+    assert format_event_text({"action": "tamper"}, language="fr") == "Tamper detected"
+    assert format_event_text({"action": "online"}) == "Device online"
 
 
 def test_get_last_event_text_no_events() -> None:
@@ -228,6 +258,29 @@ def test_space_sensor_device_info_none_when_space_missing() -> None:
     sensor.entity_description = AjaxSpaceSensorDescription(key="x", value_fn=lambda s: 0)
     sensor.coordinator = SimpleNamespace(last_update_success=True, get_space=lambda sid: None)
     assert sensor.device_info is None
+
+
+def test_space_sensor_recent_events_native_value_uses_hass_language() -> None:
+    """``native_value`` for the ``recent_events`` key resolves the real HA
+    language (``self.hass.config.language``), bypassing the English-only
+    lambda in the ``SPACE_SENSORS`` description table.
+    """
+    space = AjaxSpace(id="s1", name="Home", hub_id="hub1", security_state=SecurityState.DISARMED)
+    space.recent_events = [{"action": "arm", "user_name": "Marie"}]
+
+    sensor = object.__new__(AjaxSpaceSensor)
+    sensor._space_id = "s1"
+    # The lambda in SPACE_SENSORS stays as a filet for any other caller —
+    # native_value must not use it for this key, it must take the FR path.
+    sensor.entity_description = AjaxSpaceSensorDescription(
+        key="recent_events", value_fn=lambda s: get_last_event_text(s)
+    )
+    sensor.coordinator = SimpleNamespace(last_update_success=True, get_space=lambda sid: space)
+    sensor.hass = SimpleNamespace(config=SimpleNamespace(language="fr"))
+
+    text = sensor.native_value
+    assert "par" in text
+    assert get_event_message("armed", "fr") in text
 
 
 def _device(online: bool = True, **extra) -> AjaxDevice:

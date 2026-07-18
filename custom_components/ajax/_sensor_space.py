@@ -28,6 +28,7 @@ from . import AjaxConfigEntry
 from ._ids import device_identifier
 from .const import MANUFACTURER
 from .coordinator import AjaxDataCoordinator
+from .event_codes import EVENT_MESSAGES, get_event_message, resolve_event_language
 from .models import (
     AjaxSpace,
 )
@@ -65,7 +66,48 @@ def format_signal_level(signal: str | None) -> str | None:
     return signal.lower()
 
 
-def format_event_text(event: dict[str, Any]) -> str:
+# Raw SQS/SSE ``action`` strings -> canonical ``event_codes.EVENT_MESSAGES``
+# key. Keys already canonical map to themselves via the ``.get(x, x)`` lookup
+# below, so only the actual aliases need an entry here.
+_ACTION_ALIASES: dict[str, str] = {
+    "arm": "armed",
+    "disarm": "disarmed",
+    "grouparm": "group_armed",
+    "groupdisarm": "group_disarmed",
+    "nightmodeon": "night_mode_on",
+    "nightmodeoff": "night_mode_off",
+    "night_mode": "night_mode_on",
+    "partiallyarmed": "partially_armed",
+    "tampered": "tamper",
+}
+
+# English labels for canonical keys event_codes.EVENT_MESSAGES does not (yet)
+# carry. Must stay in sync with EVENT_MESSAGES' actual coverage — if a key
+# below starts appearing in EVENT_MESSAGES, remove it here (see module notes
+# in plans/015); it would otherwise silently shadow the 7-language table.
+_FALLBACK_EN: dict[str, str] = {
+    "night_mode_on": "Night mode on",
+    "tamper": "Tamper detected",
+    "online": "Device online",
+    "offline": "Device offline",
+    "external_power_on": "Power connected",
+    "external_power_off": "Power disconnected",
+    "glass_break_detected": "Glass break detected",
+}
+
+# Connector word between the message and the user name, by language.
+_BY_WORD: dict[str, str] = {
+    "en": "by",
+    "fr": "par",
+    "es": "por",
+    "de": "von",
+    "nl": "door",
+    "sv": "av",
+    "uk": "від",
+}
+
+
+def format_event_text(event: dict[str, Any], language: str = "en") -> str:
     """Format an SQS event into readable text."""
     event_type = event.get("event_type", "")
     action = event.get("action", "")
@@ -75,48 +117,20 @@ def format_event_text(event: dict[str, Any]) -> str:
     room_name = event.get("room_name")
 
     # Use translated message if available (from SQS/coordinator)
-    # Otherwise fall back to action-based lookup
+    # Otherwise fall back to action-based lookup, translated via
+    # event_codes.EVENT_MESSAGES (the same 7-language table the SSE/SQS
+    # managers already use) with a small English-only residual for the keys
+    # EVENT_MESSAGES doesn't carry yet.
     message = event.get("message")
     if not message:
-        # Fallback: Map actions to English messages
-        action_messages = {
-            # Arming/Disarming (from SQS events)
-            "arm": "Armed",
-            "armed": "Armed",
-            "disarm": "Disarmed",
-            "disarmed": "Disarmed",
-            "grouparm": "Group armed",
-            "group_armed": "Group armed",
-            "groupdisarm": "Group disarmed",
-            "group_disarmed": "Group disarmed",
-            "nightmodeon": "Night mode on",
-            "nightmodeoff": "Night mode off",
-            "night_mode": "Night mode on",
-            "night_mode_on": "Night mode on",
-            "night_mode_off": "Night mode off",
-            "partiallyarmed": "Partially armed",
-            "partially_armed": "Partially armed",
-            # Alarms
-            "motion_detected": "Motion detected",
-            "door_opened": "Door opened",
-            "door_closed": "Door closed",
-            "glass_break_detected": "Glass break detected",
-            "smoke_detected": "Smoke detected",
-            "leak_detected": "Water leak detected",
-            "tamper": "Tamper detected",
-            "tampered": "Tamper detected",
-            "panic": "Panic alarm",
-            # Device status
-            "online": "Device online",
-            "offline": "Device offline",
-            "low_battery": "Low battery",
-            "external_power_on": "Power connected",
-            "external_power_off": "Power disconnected",
-        }
-
-        # Get message from action (case-insensitive)
         action_lower = action.lower() if action else ""
-        message = action_messages.get(action_lower, action or event_type or "Event")
+        canonical = _ACTION_ALIASES.get(action_lower, action_lower)
+        if canonical in EVENT_MESSAGES:
+            message = get_event_message(canonical, language)
+        elif canonical in _FALLBACK_EN:
+            message = _FALLBACK_EN[canonical]
+        else:
+            message = action or event_type or "Event"
 
     parts = [message]
     if device_name and device_name.strip():
@@ -124,26 +138,17 @@ def format_event_text(event: dict[str, Any]) -> str:
     if room_name and room_name.strip():
         parts.append(f"({room_name.strip()})")
     if user_name and user_name.strip():
-        # Use French "par" if message appears to be French, otherwise "by"
-        french_words = (
-            "Armé",
-            "Désarmé",
-            "Groupe",
-            "Mode nuit",
-            "Armement",
-            "Ouverture",
-        )
-        by_word = "par" if any(fw in message for fw in french_words) else "by"
+        by_word = _BY_WORD.get(language, "by")
         parts.append(f"{by_word} {user_name.strip()}")
 
     return " ".join(parts)
 
 
-def get_last_event_text(space: AjaxSpace) -> str:
+def get_last_event_text(space: AjaxSpace, language: str = "en") -> str:
     """Get the last event formatted as text."""
     if not space.recent_events:
         return "no_event"
-    return format_event_text(space.recent_events[0])
+    return format_event_text(space.recent_events[0], language)
 
 
 def get_last_event_attributes(space: AjaxSpace) -> dict[str, Any]:
@@ -448,7 +453,11 @@ class AjaxSpaceSensor(CoordinatorEntity[AjaxDataCoordinator], SensorEntity):
     def native_value(self) -> Any:
         """Return the state of the sensor."""
         space = self.coordinator.get_space(self._space_id)
-        if not space or not self.entity_description.value_fn:
+        if not space:
+            return None
+        if self.entity_description.key == "recent_events":
+            return get_last_event_text(space, resolve_event_language(self.hass.config.language))
+        if not self.entity_description.value_fn:
             return None
         return self.entity_description.value_fn(space)
 

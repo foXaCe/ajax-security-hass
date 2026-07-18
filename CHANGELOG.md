@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.36.2] - 2026-07-18
+
+### Fixed
+- **The lock entity now reflects lock/unlock commands immediately (#88).** Field testing on real LockBridge/Yale hardware confirmed the v0.36 commands work, but the HA state waited for the next poll cycle — Ajax pushes no realtime event for the lock while disarmed, even though the physical lock reacts instantly. A successful command now applies the state optimistically; the existing 30 s freshness guard keeps a stale poll from bouncing it back, and a real event (or the first poll after the window) remains the final authority. A failed command leaves the state untouched.
+
 ## [0.36.1] - 2026-07-18
 
 ### Fixed

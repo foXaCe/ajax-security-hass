@@ -20,6 +20,15 @@ and 011 (burst coalescing) each tighten one of the assertions marked
 ``# BASELINE`` below — that is expected and will require updating this
 file, not a regression in it.
 
+Plan 009 has landed: ``async_force_state_refresh()`` now sets
+``_light_refresh_pending`` before calling ``async_refresh()``, and
+``_async_update_data()`` consumes that flag to skip both the
+``_cycle_counter`` increment and the video/smart-lock fan-out
+unconditionally. The tests that used to carry a plan-009 baseline marker
+now assert the fixed (no fan-out / no counter drift) behaviour instead;
+only the plan 010 (bypass single-miss) and plan 011 (burst coalescing)
+BASELINE assertions remain open.
+
 The only mocked "bridge" in the coordinator builder is ``async_refresh``
 itself, which stands in for ``DataUpdateCoordinator``'s real
 ``async_refresh`` (never initialised here, since ``__init__`` is bypassed)
@@ -130,6 +139,7 @@ def _coordinator(security_state: SecurityState = SecurityState.ARMED) -> AjaxDat
     coord._initial_load_done = True
     coord._force_metadata_refresh = False
     coord._bypass_cache_next_refresh = False
+    coord._light_refresh_pending = False
     coord._cycle_counter = 0
     coord._realtime_skip_factor = 3
     coord._last_metadata_refresh = 1e18  # far future -> no metadata refresh
@@ -324,7 +334,9 @@ async def test_sqs_arm_event_triggers_real_coordinator_tick(monkeypatch: pytest.
     # _async_update_devices is unconditional every tick, so one await means
     # one real pass through the coordinator's periodic-update branch.
     coord._async_update_devices.assert_awaited_once_with("s1")
-    assert coord._cycle_counter == 1
+    # This tick went through async_force_state_refresh() (a "light" refresh,
+    # plan 009), which must not advance the #194 throttle cadence.
+    assert coord._cycle_counter == 0
     assert space.security_state == SecurityState.ARMED
 
 
@@ -350,14 +362,20 @@ async def test_group_event_burst_runs_one_tick_per_event(monkeypatch: pytest.Mon
     # though group states are already refetched on every tick (#150) and a
     # single coalesced refresh would have been enough.
     assert coord._async_update_devices.await_count == 3
-    assert coord._cycle_counter == 3
+    # Each tick is a light refresh (plan 009): none of them advances the
+    # #194 throttle cadence, however many ran.
+    assert coord._cycle_counter == 0
 
 
-async def test_disarm_event_light_refresh_fetches_video_and_locks(monkeypatch: pytest.MonkeyPatch) -> None:
-    """A realtime-triggered 'light' refresh can still do the full REST fan-out."""
+async def test_disarm_event_light_refresh_skips_video_and_locks(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A realtime-triggered 'light' refresh never does the video/smart-lock fan-out (plan 009)."""
     monkeypatch.setattr("custom_components.ajax.sqs_manager.asyncio.sleep", AsyncMock())
     coord = _coordinator(SecurityState.ARMED)
-    # Land the upcoming tick on the Nth cycle of the #194 throttle.
+    # Land the upcoming tick on the Nth cycle of the #194 throttle — on
+    # purpose: this is exactly the phase that used to trigger the fan-out
+    # (see plan 008's BASELINE finding) before the _light_refresh_pending
+    # flag started overriding the modulo. Keeping this setup is the proof
+    # that the flag wins over the throttle's phase.
     coord._cycle_counter = coord._realtime_skip_factor - 1
     mgr = _make_manager(coord)
     coord.sqs_manager = mgr
@@ -371,33 +389,50 @@ async def test_disarm_event_light_refresh_fetches_video_and_locks(monkeypatch: p
     # assignment is textually after the "if is_group_event or
     # is_full_arm_disarm" block, sqs_manager.py:459-499) — so at the moment
     # _async_update_data() actually runs, the space still reports ARMED and
-    # realtime_active is still True. What forces the fetch below is the
-    # Nth-cycle sync cadence set up above, not "disarmed -> poll every
-    # cycle" (that path is covered by test_periodic_tick_... instead).
-    #
-    # BASELINE (plan 009): async_force_state_refresh's docstring promises a
-    # refresh "WITHOUT ... rooms/users/video re-fetches across all hubs" —
-    # but it only calls self.async_refresh(), i.e. the SAME
-    # _async_update_data() as an ordinary poll tick, so it inherits the
-    # #194 throttle verbatim and can still trigger the full video/smart-lock
-    # fan-out it claims to avoid.
-    assert coord.api.async_get_video_edges.await_count == 1
-    assert coord.api.async_get_smart_locks.await_count == 1
+    # realtime_active is still True. Before plan 009, that combination —
+    # armed-looking space + cycle landing on the Nth tick — was what forced
+    # the "light" refresh to do the full fan-out anyway (plan 008's
+    # BASELINE). async_force_state_refresh() now sets _light_refresh_pending
+    # before calling async_refresh(), which _async_update_data() consumes to
+    # skip the fan-out unconditionally — neither the throttle's modulo NOR
+    # realtime_active gets a vote once a refresh is flagged "light".
+    assert coord.api.async_get_video_edges.await_count == 0
+    assert coord.api.async_get_smart_locks.await_count == 0
+    # The light refresh also does not advance the throttle's cadence.
+    assert coord._cycle_counter == coord._realtime_skip_factor - 1
     assert space.security_state == SecurityState.DISARMED  # applied AFTER the refresh
 
 
-async def test_force_state_refresh_increments_cycle_counter() -> None:
-    """An out-of-band forced refresh is not free: it consumes a throttle cycle."""
+async def test_force_state_refresh_does_not_touch_cycle_counter() -> None:
+    """An out-of-band forced (light) refresh does not consume a throttle cycle (plan 009)."""
     coord = _coordinator(SecurityState.ARMED)
-    assert coord._cycle_counter == 0
+    coord._cycle_counter = 5
 
     await coord.async_force_state_refresh()
 
-    # BASELINE (plan 009): async_force_state_refresh() drives the same
-    # _cycle_counter used by the #194 armed-aware throttle, so a realtime
-    # event shifts the phase of the ordinary polling cadence instead of
-    # being a side-channel that leaves it alone.
-    assert coord._cycle_counter == 1
+    # async_force_state_refresh() sets _light_refresh_pending, which
+    # _async_update_data() consumes to skip the _cycle_counter increment —
+    # a realtime event no longer shifts the phase of the #194 armed-aware
+    # throttle's ordinary polling cadence.
+    assert coord._cycle_counter == 5
+
+
+async def test_light_refresh_with_forced_metadata_still_fans_out() -> None:
+    """need_metadata_refresh keeps priority over a light refresh's skip (plan 009)."""
+    coord = _coordinator(SecurityState.ARMED)
+    coord.sqs_manager = MagicMock()  # realtime manager present — would normally throttle
+    coord._force_metadata_refresh = True
+
+    await coord.async_force_state_refresh()
+
+    # A light refresh alone would skip the fan-out (see
+    # test_disarm_event_light_refresh_skips_video_and_locks above), but an
+    # explicit account-wide metadata refresh — requested independently of
+    # this being a "light" refresh — still forces it, exactly like an
+    # ordinary hourly/forced metadata tick would.
+    assert coord.api.async_get_video_edges.await_count == 1
+    assert coord.api.async_get_smart_locks.await_count == 1
+    assert coord._force_metadata_refresh is False  # consumed by this tick
 
 
 # ---------------------------------------------------------------------------

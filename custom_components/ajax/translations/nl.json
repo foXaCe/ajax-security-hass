@@ -6,7 +6,8 @@
       "hub_associated": "Hub gekoppeld aan bestaande configuratie.",
       "no_spaces_available": "Geen ruimtes beschikbaar. Herlaad de integratie.",
       "reauth_failed": "Herauthenticatie mislukt. Configureer de integratie opnieuw.",
-      "reauth_successful": "Herauthenticatie succesvol."
+      "reauth_successful": "Herauthenticatie succesvol.",
+      "wrong_account": "Het ingevoerde account komt niet overeen met het account dat voor deze vermelding is geconfigureerd. Voeg een nieuwe integratievermelding toe om een ander Ajax-account te gebruiken."
     },
     "error": {
       "cannot_connect": "Kan geen verbinding maken met Ajax API. Controleer je internetverbinding.",

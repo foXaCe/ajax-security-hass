@@ -3,6 +3,7 @@ ci:
   autoupdate_commit_msg: "build: pre-commit autoupdate"
   autofix_commit_msg: "style: pre-commit auto-fix"
   autofix_prs: true
+  skip: [mypy]
 
 repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
@@ -45,3 +46,10 @@ repos:
         entry: sed -i '/Co-Authored-By:.*[Cc]laude/d'
         language: system
         stages: [commit-msg]
+
+      - id: mypy
+        name: mypy (strict, mirrors CI gate)
+        entry: mypy custom_components/ajax/
+        language: system
+        pass_filenames: false
+        stages: [pre-push]

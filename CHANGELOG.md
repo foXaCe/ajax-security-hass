@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.36.1] - 2026-07-18
+
+### Fixed
+- **The immediate refresh after an arm/disarm event is now genuinely light (#201).** It promised to skip the camera/smart-lock re-fetches but ran the same code path as a full poll tick: every realtime event advanced the every-Nth-cycle throttle phase, and a disarm triggered the full video-edge/smart-lock REST fan-out — extra cloud calls at the worst possible moment. The light refresh now never fans out on its own and leaves the polling cadence untouched; the states catch up on the next regular poll.
+- **Reconfiguring an entry can no longer switch it to a different Ajax account (#202).** The e-mail field was editable with no guard — pointing an entry at another account would orphan every entity (device ids are tied to the original account) and, in direct mode, run two coordinators racing the same SQS queue. The flow now aborts with a clear "wrong account" message (translated in all 7 languages) before any network call; re-entering the same e-mail with different casing still works.
+- **Re-authenticating with an unchanged password but a new TOTP secret no longer reloads the integration twice (#202).**
+- **The last-event sensor's fallback text now speaks all 7 supported languages (#205).** When an event carries no pre-translated message, the sensor fell back to English-only labels plus a French-detection hack for the "by *user*" connector. It now uses the same 7-language event table as the notifications, with a per-language connector word (by/par/por/von/door/av/від). Four English fallback labels change wording to match what notifications already display (e.g. "Door opened" → "Opening detected").
+
+### Changed
+- **Fewer cloud API calls, continued (#201):** a multi-group "arm all" (Ajax emits one event per group) now triggers a single immediate refresh instead of one full REST cycle per group; and within the 2 s post-event no-cache window, the same space payload is fetched once and shared between the camera and smart-lock getters instead of being fetched twice.
+- README now documents the optional TOTP secret field for both connection modes (#204) — 2FA is mandatory on Ajax accounts since September 2025.
+- Internal: a new integration-level test harness counts the real REST calls produced by simulated SSE/SQS events — the manager↔coordinator boundary was previously only tested with each side mocked (#201); the raw-devices collection shared by diagnostics and the `get_raw_devices` service now lives in a single module (#205); CI gains pip caching and concurrency groups, a `Makefile` mirrors the CI gates locally, and pre-commit runs mypy on push (#203).
+
+### Dependencies
+- `pyotp>=2.10.0`, `aiobotocore>=3.8.0` (routine Renovate bumps).
+
 ## [0.36.0] - 2026-07-09
 
 ### Added

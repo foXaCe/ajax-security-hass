@@ -3,7 +3,9 @@
 This module creates lock entities for Ajax LockBridge Jeweller devices.
 State comes from the enriched device record (lockStatus / doorStatus) and
 real-time SSE/SQS events. Locking and unlocking are supported via the
-dedicated Ajax ``LOCK_SMART_LOCK`` / ``UNLOCK_SMART_LOCK`` commands.
+dedicated Ajax ``LOCK_SMART_LOCK`` / ``UNLOCK_SMART_LOCK`` commands. A
+successful command also applies an optimistic state update (#88) so HA
+reflects it immediately instead of waiting for the next poll.
 
 Note: Yale cloud locks are automatically filtered out in the coordinator
 since they don't send SSE events and only return minimal API data.
@@ -12,6 +14,7 @@ since they don't send SSE events and only return minimal API data.
 from __future__ import annotations
 
 import logging
+from datetime import UTC, datetime
 from typing import Any
 
 from homeassistant.components.lock import DOMAIN as LOCK_DOMAIN, LockEntity
@@ -132,7 +135,8 @@ class AjaxLock(CoordinatorEntity[AjaxDataCoordinator], LockEntity):
     async def _async_send_lock_command(self, command: str, verb: str) -> None:
         """Send a lock/unlock command to the smart lock.
 
-        No optimistic update: the real state catches up on the next poll / event.
+        On success, applies an optimistic state update so HA reflects the
+        command immediately instead of waiting for the next poll / event.
         """
         space = self.coordinator.get_space(self._space_id)
         smart_lock = self._get_smart_lock()
@@ -153,6 +157,18 @@ class AjaxLock(CoordinatorEntity[AjaxDataCoordinator], LockEntity):
                 translation_key="failed_to_change",
                 translation_placeholders={"entity": smart_lock.name, "error": str(err)},
             ) from err
+
+        # Optimistic update (#88): the physical lock reacts immediately but no
+        # realtime event arrives while disarmed, so without this the HA state
+        # waits for the next poll. Stamping last_event_time reuses the existing
+        # 30s freshness guard in _apply_smart_lock_rest_state, so a stale REST
+        # payload cannot bounce the state back; a real SSE/SQS event or the
+        # first poll after the window remains the final authority.
+        smart_lock.is_locked = command == "LOCK_SMART_LOCK"
+        smart_lock.last_event_tag = f"{verb}_command"
+        smart_lock.last_event_time = datetime.now(UTC)
+        self.async_write_ha_state()
+
         await self.coordinator.async_request_refresh()
 
     @property

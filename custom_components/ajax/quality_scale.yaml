@@ -23,7 +23,7 @@ rules:
     status: done
     comment: |
       Cross-platform helpers are factorised: `devices/base.py` (entity descriptor
-      helpers used by 15 device handlers), `_event_helpers.py` (SSE/SQS mixin),
+      helpers used by the device handlers in `devices/`), `_event_helpers.py` (SSE/SQS mixin),
       `_discovery.py` (dynamic-entity discovery, used by 11 platforms).
   config-flow:
     status: done

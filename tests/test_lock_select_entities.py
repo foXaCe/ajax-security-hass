@@ -11,12 +11,14 @@ Locking and unlocking both go through the dedicated Ajax
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from types import SimpleNamespace
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 
+from custom_components.ajax._coordinator_devices import AjaxDevicesMixin
 from custom_components.ajax.lock import AjaxLock
 from custom_components.ajax.models import AjaxDevice, AjaxSmartLock, DeviceType, SecurityState
 from custom_components.ajax.select import (
@@ -40,6 +42,7 @@ def _make_lock(smart_lock: AjaxSmartLock | None, *, hub_id: str | None = "hub1")
         api=SimpleNamespace(async_send_device_command=AsyncMock()),
         async_request_refresh=AsyncMock(),
     )
+    lock.async_write_ha_state = MagicMock()
     return lock
 
 
@@ -113,6 +116,79 @@ async def test_lock_async_unlock_api_error_raises() -> None:
     lock.coordinator.api.async_send_device_command = AsyncMock(side_effect=RuntimeError("boom"))
     with pytest.raises(HomeAssistantError):
         await lock.async_unlock()
+
+
+# ---------------------------------------------------------------------------
+# Optimistic state after a successful lock/unlock command (#88)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_lock_async_lock_applies_optimistic_state() -> None:
+    """A successful LOCK_SMART_LOCK reflects immediately instead of waiting for the next poll."""
+    sl = AjaxSmartLock(id="sl1", name="Front Door", space_id="s1")
+    lock = _make_lock(sl)
+    before = datetime.now(UTC)
+
+    await lock.async_lock()
+
+    assert sl.is_locked is True
+    assert sl.last_event_tag == "lock_command"
+    assert sl.last_event_time is not None
+    assert (sl.last_event_time - before).total_seconds() <= 2
+    lock.async_write_ha_state.assert_called_once()
+    lock.coordinator.async_request_refresh.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_lock_async_unlock_applies_optimistic_state() -> None:
+    """A successful UNLOCK_SMART_LOCK reflects immediately instead of waiting for the next poll."""
+    sl = AjaxSmartLock(id="sl1", name="Front Door", space_id="s1", is_locked=True)
+    lock = _make_lock(sl)
+    before = datetime.now(UTC)
+
+    await lock.async_unlock()
+
+    assert sl.is_locked is False
+    assert sl.last_event_tag == "unlock_command"
+    assert sl.last_event_time is not None
+    assert (sl.last_event_time - before).total_seconds() <= 2
+    lock.async_write_ha_state.assert_called_once()
+    lock.coordinator.async_request_refresh.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_lock_async_unlock_api_error_leaves_optimistic_state_untouched() -> None:
+    """A failed command must not apply the optimistic update - no rollback is needed."""
+    sl = AjaxSmartLock(id="sl1", name="X", space_id="s1", is_locked=True)
+    sl.last_event_tag = "previous_tag"
+    sl.last_event_time = None
+    lock = _make_lock(sl)
+    lock.coordinator.api.async_send_device_command = AsyncMock(side_effect=RuntimeError("boom"))
+
+    with pytest.raises(HomeAssistantError):
+        await lock.async_unlock()
+
+    assert sl.is_locked is True
+    assert sl.last_event_tag == "previous_tag"
+    assert sl.last_event_time is None
+    lock.async_write_ha_state.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_lock_optimistic_state_survives_stale_poll() -> None:
+    """The existing 30s freshness guard in _apply_smart_lock_rest_state protects the optimistic value."""
+    sl = AjaxSmartLock(id="sl1", name="Front Door", space_id="s1")
+    lock = _make_lock(sl)
+
+    await lock.async_lock()
+    assert sl.is_locked is True
+
+    space = lock.coordinator.get_space(lock._space_id)
+    mixin = object.__new__(AjaxDevicesMixin)
+    mixin._apply_smart_lock_rest_state(space, "sl1", {"lockStatus": "UNLOCKED"})
+
+    assert sl.is_locked is True  # stale REST payload must not bounce the state back
 
 
 # ---------------------------------------------------------------------------

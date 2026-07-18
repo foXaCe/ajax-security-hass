@@ -202,6 +202,10 @@ class AjaxDataCoordinator(
         # the cycle counter and the video/smart-lock fan-out.
         self._light_refresh_pending: bool = False
 
+        # Wall-clock start of the last forced light refresh; realtime managers
+        # use it to coalesce event bursts.
+        self._last_forced_state_refresh_started: float = 0.0
+
         # Auth error resilience: tolerate transient auth failures before triggering reauth
         self._consecutive_auth_errors: int = 0
         self._max_auth_errors: int = 3  # Trigger reauth after 3 consecutive auth failures
@@ -324,6 +328,7 @@ class AjaxDataCoordinator(
         """
         _LOGGER.info("Forcing light state refresh (immediate)")
         self._light_refresh_pending = True
+        self._last_forced_state_refresh_started = time.time()
         await self.async_refresh()
 
     async def async_request_refresh_bypass_cache(self) -> None:

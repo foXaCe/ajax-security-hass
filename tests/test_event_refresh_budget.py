@@ -31,8 +31,16 @@ Plan 010 has also landed: ``api/_base.py``'s ``bypass_cache_next()`` now
 records when the window opened (``_bypass_cache_opened_at``), and
 ``_cache_entry_usable()`` only rejects entries written before that instant
 — a fetch done inside the window is still reused by the next same-tick
-caller. Only the plan 011 (burst coalescing) BASELINE assertion remains
-open.
+caller.
+
+Plan 011 has also landed: ``coordinator.py`` now records when the last
+forced light refresh started (``_last_forced_state_refresh_started``), and
+both ``sse_manager.py``/``sqs_manager.py`` skip their own
+skip-set/sleep/bypass-flag/refresh sequence when a refresh that started
+after their event was received already covers it — a burst of
+near-simultaneous group-arm events coalesces into a single tick instead of
+one per event. No plan-011 BASELINE assertion remains open; none of the
+three plans chained from plan 008 do.
 
 The only mocked "bridge" in the coordinator builder is ``async_refresh``
 itself, which stands in for ``DataUpdateCoordinator``'s real
@@ -145,6 +153,7 @@ def _coordinator(security_state: SecurityState = SecurityState.ARMED) -> AjaxDat
     coord._force_metadata_refresh = False
     coord._bypass_cache_next_refresh = False
     coord._light_refresh_pending = False
+    coord._last_forced_state_refresh_started = 0.0
     coord._cycle_counter = 0
     coord._realtime_skip_factor = 3
     coord._last_metadata_refresh = 1e18  # far future -> no metadata refresh
@@ -350,26 +359,80 @@ async def test_sqs_arm_event_triggers_real_coordinator_tick(monkeypatch: pytest.
 # ---------------------------------------------------------------------------
 
 
-async def test_group_event_burst_runs_one_tick_per_event(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Three distinct group-arm events in a row each run their own full tick."""
-    monkeypatch.setattr("custom_components.ajax.sqs_manager.asyncio.sleep", AsyncMock())
+async def test_group_event_burst_coalesces_into_one_tick(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Three near-simultaneous group-arm events coalesce into a single tick (plan 011).
+
+    Production delivers a burst of SQS/SSE messages as concurrent asyncio
+    tasks (``sqs_client.py``/``sse_client.py`` both dispatch each message via
+    ``asyncio.gather``/``create_task``, not one after another), so this test
+    drives the 3 events the same way, via ``asyncio.gather`` — sequential
+    ``await``s (as this test used to do) would never let events 2 and 3
+    queue up on ``_security_event_lock`` before event 1's refresh starts,
+    which would defeat the coalescing regardless of whether it works.
+
+    The stock no-op sleep patch used elsewhere in this file
+    (``AsyncMock()``) never actually suspends the awaiting coroutine —
+    nothing yields, so ``asyncio.gather`` would still just run the 3 tasks
+    one after another to completion, the same false negative as the
+    sequential form. Swap in a real (but zero-duration) ``asyncio.sleep(0)``
+    instead: the yield is genuine, so events 2 and 3 get to capture their
+    own "received" timestamp and queue on the lock before event 1's refresh
+    sets ``_last_forced_state_refresh_started`` — real concurrency, not a
+    contrived clock. Verified empirically (ad hoc script) that the no-op
+    patch produces 3 ticks here and the real-yield patch produces 1.
+    """
     coord = _coordinator(SecurityState.ARMED)
     mgr = _make_manager(coord)
     coord.sqs_manager = mgr
 
-    for idx, group_id in enumerate(("g1", "g2", "g3")):
-        handled = await mgr._handle_event(_sqs_event("grouparm", source_id=group_id, timestamp=1700000000000 + idx))
-        assert handled is True
+    real_sleep = asyncio.sleep
 
-    # BASELINE (plan 011): no coalescing across the burst — 3 independent
-    # group-arm events produce 3 independent _async_update_data() ticks
-    # (each with its own 1.0s internal sleep, here patched to no-op), even
-    # though group states are already refetched on every tick (#150) and a
-    # single coalesced refresh would have been enough.
-    assert coord._async_update_devices.await_count == 3
-    # Each tick is a light refresh (plan 009): none of them advances the
-    # #194 throttle cadence, however many ran.
+    async def _instant_yield(_delay: float) -> None:
+        await real_sleep(0)
+
+    monkeypatch.setattr("custom_components.ajax.sqs_manager.asyncio.sleep", _instant_yield)
+
+    events = [
+        _sqs_event("grouparm", source_id=g, timestamp=1700000000000 + i) for i, g in enumerate(("g1", "g2", "g3"))
+    ]
+    handled = await asyncio.gather(*(mgr._handle_event(e) for e in events))
+
+    assert handled == [True, True, True]
+    # Coalescing: a burst that used to produce 3 independent
+    # _async_update_data() ticks (each with its own 1.0s internal sleep)
+    # now produces 1 — dedup on the group id still lets all 3 events
+    # through (each keeps its own notification/history entry, unaffected).
+    assert coord._async_update_devices.await_count == 1
+    # Each tick is still a light refresh (plan 009): it does not advance
+    # the #194 throttle cadence.
     assert coord._cycle_counter == 0
+
+
+async def test_group_event_spaced_out_does_not_over_coalesce(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Two events far enough apart that the 2nd is only received after the
+    1st's refresh has already started still produce 2 independent ticks —
+    the coalescing must not swallow genuinely separate actions."""
+    coord = _coordinator(SecurityState.ARMED)
+    mgr = _make_manager(coord)
+    coord.sqs_manager = mgr
+
+    real_sleep = asyncio.sleep
+
+    async def _instant_yield(_delay: float) -> None:
+        await real_sleep(0)
+
+    monkeypatch.setattr("custom_components.ajax.sqs_manager.asyncio.sleep", _instant_yield)
+
+    e1 = _sqs_event("grouparm", source_id="g1", timestamp=1700000000000)
+    e2 = _sqs_event("grouparm", source_id="g2", timestamp=1700000000001)
+
+    # Awaited fully to completion (including its own refresh) before the
+    # second event is even received — unlike the burst test above, there is
+    # nothing left in flight to interleave with.
+    assert await mgr._handle_event(e1) is True
+    assert await mgr._handle_event(e2) is True
+
+    assert coord._async_update_devices.await_count == 2
 
 
 async def test_disarm_event_light_refresh_skips_video_and_locks(monkeypatch: pytest.MonkeyPatch) -> None:

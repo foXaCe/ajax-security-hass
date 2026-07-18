@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [main]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   lint:
     name: Lint
@@ -20,6 +24,8 @@ jobs:
         uses: actions/setup-python@v6
         with:
           python-version: "3.14.6"
+          cache: pip
+          cache-dependency-path: requirements_test.txt
 
       - name: Install dependencies
         run: pip install ruff bandit codespell
@@ -55,6 +61,8 @@ jobs:
           # (pytest-homeassistant-custom-component) and recent Home Assistant
           # releases require it, and mypy must parse HA's 3.14 source.
           python-version: "3.14.6"
+          cache: pip
+          cache-dependency-path: requirements_test.txt
 
       - name: Install dependencies
         # mypy only needs itself + homeassistant for stubs — NOT the pytest
@@ -82,6 +90,8 @@ jobs:
           # and the pinned homeassistant in requirements_test.txt require it. The old
           # job pinned 3.12 and failed to install before a single test ran.
           python-version: "3.14.6"
+          cache: pip
+          cache-dependency-path: requirements_test.txt
 
       - name: Install dependencies
         # No editable install: there is no [project]/setup.py to build, and the suite

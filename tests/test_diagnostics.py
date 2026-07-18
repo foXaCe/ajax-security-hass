@@ -283,6 +283,32 @@ async def test_get_ajax_raw_data_filters_to_target_device_when_set() -> None:
 
 
 @pytest.mark.asyncio
+async def test_get_ajax_raw_data_video_edges_ignore_target_device_filter() -> None:
+    """``target_device_id`` filters devices and cameras but never video_edges.
+
+    This is the documented divergence between the two collection call sites
+    (diagnostics filters by device, the raw-devices service does not) — the
+    shared ``async_collect_raw_inventory`` preserves it deliberately, and this
+    test pins it as a contract rather than an accident.
+    """
+    entry, _coord = _coord_with_api_responses(
+        devices=[{"id": "d1", "deviceType": "DoorProtect"}, {"id": "d2", "deviceType": "MotionProtect"}],
+        cameras=[{"id": "d2", "deviceType": "MotionCam"}, {"id": "c1", "deviceType": "Cam"}],
+        video_edges=[{"id": "ve1"}, {"id": "ve2"}],
+    )
+    device = SimpleNamespace(identifiers={(diagnostics.DOMAIN, "entry_test_d2")})
+
+    result = await diagnostics.get_ajax_raw_data(hass=MagicMock(), entry=entry, device=device)
+
+    # Devices and cameras: only the item matching the (namespace-stripped)
+    # target id survives.
+    assert [d["id"] for d in result["devices"]] == ["d2"]
+    assert [c["id"] for c in result["cameras"]] == ["d2"]
+    # Video edges: fetched whole, no per-item filter applied.
+    assert [ve["id"] for ve in result["video_edges"]] == ["ve1", "ve2"]
+
+
+@pytest.mark.asyncio
 async def test_get_ajax_raw_data_returns_zero_summary_without_account() -> None:
     api = MagicMock()
     coord = SimpleNamespace(api=api, account=None)

@@ -29,6 +29,7 @@ from homeassistant.helpers.service import (
     async_extract_referenced_entity_ids,
 )
 
+from ._raw_inventory import async_collect_raw_inventory
 from .const import (
     DOMAIN,
     AjaxConfigEntry,
@@ -194,65 +195,11 @@ async def _async_setup_services(hass: HomeAssistant) -> None:
             coordinator = entry.runtime_data
             if not coordinator.account:
                 continue
-            for _space_id, space in coordinator.account.spaces.items():
-                hub_id = space.hub_id
-                if hub_id:
-                    hub_count += 1
-                    try:
-                        # First get device list (light)
-                        devices_list = await coordinator.api.async_get_devices(hub_id)
-                        # Then get full details for each device
-                        for device_summary in devices_list:
-                            device_id = device_summary.get("id")
-                            if device_id:
-                                try:
-                                    full_device = await coordinator.api.async_get_device(hub_id, device_id)
-                                    all_devices.append(full_device)
-                                except Exception as dev_err:
-                                    _LOGGER.warning(
-                                        "Failed to get device %s: %s",
-                                        device_id,
-                                        dev_err,
-                                    )
-                                    all_devices.append(device_summary)
-                    except Exception as err:
-                        _LOGGER.error("Failed to get devices for hub %s: %s", hub_id, err)
-
-            # Fetch cameras for each hub (same pattern as devices)
-            for _space_id, space in coordinator.account.spaces.items():
-                hub_id = space.hub_id
-                if hub_id:
-                    try:
-                        cameras_list = await coordinator.api.async_get_cameras(hub_id)
-                        for camera_summary in cameras_list:
-                            camera_id = camera_summary.get("id")
-                            if camera_id:
-                                try:
-                                    full_camera = await coordinator.api.async_get_camera(hub_id, camera_id)
-                                    all_cameras.append(full_camera)
-                                except Exception as cam_err:
-                                    _LOGGER.warning(
-                                        "Failed to get camera %s: %s",
-                                        camera_id,
-                                        cam_err,
-                                    )
-                                    all_cameras.append(camera_summary)
-                    except Exception as err:
-                        _LOGGER.warning("Failed to get cameras for hub %s: %s", hub_id, err)
-
-            # Fetch video edges for each space (requires real_space_id)
-            for _space_id, space in coordinator.account.spaces.items():
-                real_space_id = space.real_space_id
-                if real_space_id:
-                    try:
-                        video_edges_list = await coordinator.api.async_get_video_edges(real_space_id)
-                        all_video_edges.extend(video_edges_list)
-                    except Exception as err:
-                        _LOGGER.warning(
-                            "Failed to get video edges for space %s: %s",
-                            real_space_id,
-                            err,
-                        )
+            inventory = await async_collect_raw_inventory(coordinator)
+            all_devices += inventory["devices"]
+            all_cameras += inventory["cameras"]
+            all_video_edges += inventory["video_edges"]
+            hub_count += inventory["hub_count"]
 
         # Write to file (include devices, cameras, and video edges).
         # Redact sensitive fields before writing so the file is safe to share.

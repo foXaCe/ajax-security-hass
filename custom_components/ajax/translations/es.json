@@ -6,7 +6,8 @@
       "hub_associated": "Hub asociado a la configuración existente.",
       "no_spaces_available": "No hay espacios disponibles. Por favor, recargue la integración.",
       "reauth_failed": "Re-autenticación fallida. Por favor, reconfigure la integración.",
-      "reauth_successful": "Re-autenticación exitosa."
+      "reauth_successful": "Re-autenticación exitosa.",
+      "wrong_account": "La cuenta introducida no coincide con la cuenta configurada para esta entrada. Para usar otra cuenta de Ajax, añada una nueva entrada de integración."
     },
     "error": {
       "cannot_connect": "Error al conectar con la API de Ajax. Verifique su conexión a Internet.",

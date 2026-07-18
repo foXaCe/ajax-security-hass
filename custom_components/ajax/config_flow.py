@@ -611,16 +611,15 @@ class AjaxConfigFlow(ConfigFlow, domain=DOMAIN):
 
                     # Update + abort("reauth_successful"); the update listener
                     # schedules the reload (HA deprecates the flow-side reload
-                    # helper on entries with a listener). Same password
-                    # (expired-token case) → the listener will not fire, so
-                    # retry the setup explicitly. Same if the entry isn't loaded
-                    # (setup failed before the listener could be registered,
-                    # e.g. a previous ConfigEntryAuthFailed) — there is no
-                    # listener to rely on, so the flow must reschedule the setup.
-                    if (
-                        reauth_entry.data.get(CONF_PASSWORD) == password_hash
-                        or reauth_entry.state is not ConfigEntryState.LOADED
-                    ):
+                    # helper on entries with a listener). Same data (expired-
+                    # token case, no password or TOTP change) → the listener
+                    # will not fire, so retry the setup explicitly. Same if the
+                    # entry isn't loaded (setup failed before the listener
+                    # could be registered, e.g. a previous
+                    # ConfigEntryAuthFailed) — there is no listener to rely
+                    # on, so the flow must reschedule the setup.
+                    new_data = {**reauth_entry.data, **data_updates}
+                    if new_data == dict(reauth_entry.data) or reauth_entry.state is not ConfigEntryState.LOADED:
                         self.hass.config_entries.async_schedule_reload(reauth_entry.entry_id)
                     return self.async_update_and_abort(
                         reauth_entry,
@@ -678,6 +677,17 @@ class AjaxConfigFlow(ConfigFlow, domain=DOMAIN):
                 new_totp_secret = None
 
             if not errors:
+                # Reconfigure must stay on the same Ajax account: device
+                # unique_ids are namespaced by config entry and tied to the
+                # Ajax ids of the account this entry was originally set up
+                # with. Switching accounts here would orphan every entity
+                # and, in direct mode, spin up a second coordinator polling
+                # the same account (two SQS consumers racing for the same
+                # queue messages). Checked before any network call so a
+                # refused account switch never even attempts to log in.
+                await self.async_set_unique_id(user_input[CONF_EMAIL].lower())
+                self._abort_if_unique_id_mismatch(reason="wrong_account")
+
                 # A newly entered secret wins; otherwise keep using the one
                 # already stored on the entry.
                 totp_secret = new_totp_secret or reconfigure_entry.data.get(CONF_TOTP_SECRET)

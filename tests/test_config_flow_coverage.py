@@ -3,10 +3,10 @@
 These tests drive the flow steps in isolation (no HA flow-manager harness).
 The HA helper methods that need a running flow manager
 (``async_set_unique_id``, ``_abort_if_unique_id_configured``,
-``async_create_entry``, ``async_show_form``, ``async_abort`` ...) are patched
-on each instance so the step logic can be exercised directly. ``AjaxRestApi``
-is patched at the module level to simulate login OK / invalid_auth /
-cannot_connect without any network IO.
+``_abort_if_unique_id_mismatch``, ``async_create_entry``, ``async_show_form``,
+``async_abort`` ...) are patched on each instance so the step logic can be
+exercised directly. ``AjaxRestApi`` is patched at the module level to
+simulate login OK / invalid_auth / cannot_connect without any network IO.
 """
 
 from __future__ import annotations
@@ -16,6 +16,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from homeassistant.config_entries import ConfigEntryState
+from homeassistant.data_entry_flow import AbortFlow
 
 from custom_components.ajax.api import (
     AjaxRestApiError,
@@ -70,6 +71,7 @@ def _make_flow(source: str | None = None) -> AjaxConfigFlow:
     # HA flow-manager helpers — replaced with lightweight stand-ins.
     flow.async_set_unique_id = AsyncMock(return_value=None)
     flow._abort_if_unique_id_configured = MagicMock(return_value=None)
+    flow._abort_if_unique_id_mismatch = MagicMock(return_value=None)
     flow._async_current_entries = MagicMock(return_value=[])
 
     def _create_entry(*, title: str, data: dict[str, Any]) -> dict[str, Any]:
@@ -748,6 +750,72 @@ async def test_step_reauth_confirm_changed_password_loaded_no_reload() -> None:
     flow.hass.config_entries.async_schedule_reload.assert_not_called()
 
 
+async def test_step_reauth_confirm_same_password_new_totp_loaded_no_reload() -> None:
+    """Same password + a NEW TOTP secret on a LOADED entry must not double-reload.
+
+    ``data_updates`` still differs from the stored data (the TOTP secret
+    changed), so the update listener in ``__init__.py`` will see the diff and
+    schedule the reload itself. If the flow *also* scheduled one here (the
+    bug this guards against), the entry would go through two consecutive
+    unload/setup cycles for a single reauth submission.
+    """
+    import hashlib
+
+    same_hash = hashlib.sha256(b"samepass").hexdigest()
+    flow = _make_flow()
+    flow.context["entry_id"] = "e1"
+    entry = MagicMock()
+    entry.entry_id = "e1"
+    entry.state = ConfigEntryState.LOADED
+    entry.data = {
+        CONF_EMAIL: "u@e.com",
+        CONF_AUTH_MODE: AUTH_MODE_DIRECT,
+        CONF_API_KEY: "key",
+        CONF_PASSWORD: same_hash,
+    }
+    flow.hass.config_entries.async_get_entry = MagicMock(return_value=entry)
+    flow.hass.config_entries.async_update_entry = MagicMock()
+    flow.hass.config_entries.async_schedule_reload = MagicMock()
+    api = _mock_api()
+    with patch(API_PATH, return_value=api):
+        result = await flow.async_step_reauth_confirm({CONF_PASSWORD: "samepass", CONF_TOTP_SECRET: "jbswy3dpehpk3pxp"})
+    assert result["type"] == "abort"
+    assert result["reason"] == "reauth_successful"
+    flow.hass.config_entries.async_schedule_reload.assert_not_called()
+
+
+async def test_step_reauth_confirm_same_password_no_totp_loaded_schedules_reload() -> None:
+    """Same password, no TOTP change, on a LOADED entry.
+
+    Data is byte-for-byte identical to what's stored, so there is nothing
+    for the update listener to see — the flow must retry the setup itself.
+    This is the expired-token reauth case.
+    """
+    import hashlib
+
+    same_hash = hashlib.sha256(b"samepass").hexdigest()
+    flow = _make_flow()
+    flow.context["entry_id"] = "e1"
+    entry = MagicMock()
+    entry.entry_id = "e1"
+    entry.state = ConfigEntryState.LOADED
+    entry.data = {
+        CONF_EMAIL: "u@e.com",
+        CONF_AUTH_MODE: AUTH_MODE_DIRECT,
+        CONF_API_KEY: "key",
+        CONF_PASSWORD: same_hash,
+    }
+    flow.hass.config_entries.async_get_entry = MagicMock(return_value=entry)
+    flow.hass.config_entries.async_update_entry = MagicMock()
+    flow.hass.config_entries.async_schedule_reload = MagicMock()
+    api = _mock_api()
+    with patch(API_PATH, return_value=api):
+        result = await flow.async_step_reauth_confirm({CONF_PASSWORD: "samepass"})
+    assert result["type"] == "abort"
+    assert result["reason"] == "reauth_successful"
+    flow.hass.config_entries.async_schedule_reload.assert_called_once_with("e1")
+
+
 async def test_step_reauth_confirm_proxy_success() -> None:
     flow = _make_flow()
     flow.context["entry_id"] = "e1"
@@ -913,6 +981,45 @@ async def test_step_reconfigure_direct_success() -> None:
     assert result["data"][CONF_API_KEY] == "newkey"
     assert result["data"][CONF_EMAIL] == "new@e.com"
     assert result["data"][CONF_PASSWORD] != "newpass"
+
+
+async def test_step_reconfigure_same_account_different_case_continues() -> None:
+    """Reconfiguring the SAME account (different e-mail casing) must not abort.
+
+    The unique-id guard runs on every reconfigure submission, but re-casing
+    the e-mail of the account this entry already belongs to is not an
+    account switch — the flow must reach the success path.
+    """
+    flow = _reconfigure_flow({CONF_AUTH_MODE: AUTH_MODE_DIRECT, CONF_API_KEY: "k", CONF_EMAIL: "user@example.com"})
+    api = _mock_api()
+    with patch(API_PATH, return_value=api):
+        result = await flow.async_step_reconfigure(
+            {CONF_API_KEY: "k", CONF_EMAIL: "User@Example.com", CONF_PASSWORD: "newpass"}
+        )
+    assert result["type"] == "abort"
+    assert result["reason"] == "reconfigure_successful"
+    # unique id is lower-cased email, same as the direct/proxy entry-point steps.
+    flow.async_set_unique_id.assert_awaited_once_with("user@example.com")
+    flow._abort_if_unique_id_mismatch.assert_called_once_with(reason="wrong_account")
+
+
+async def test_step_reconfigure_different_account_aborts_without_network_call() -> None:
+    """Reconfiguring toward a DIFFERENT Ajax account must abort before any login.
+
+    Device unique_ids are namespaced by config entry and tied to the Ajax
+    ids of the account the entry was originally set up with — switching
+    accounts via reconfigure would orphan every entity and, in direct mode,
+    start a second coordinator racing the same account's SQS queue. The
+    guard must reject this before ``_build_api``/``async_login`` ever run.
+    """
+    flow = _reconfigure_flow({CONF_AUTH_MODE: AUTH_MODE_DIRECT, CONF_API_KEY: "k", CONF_EMAIL: "old@example.com"})
+    flow._abort_if_unique_id_mismatch = MagicMock(side_effect=AbortFlow("wrong_account"))
+    with patch(API_PATH) as api_cls, pytest.raises(AbortFlow) as exc_info:
+        await flow.async_step_reconfigure({CONF_API_KEY: "k", CONF_EMAIL: "new@example.com", CONF_PASSWORD: "newpass"})
+    assert exc_info.value.reason == "wrong_account"
+    # No REST client was ever built/logged in for the refused account.
+    api_cls.assert_not_called()
+    flow.async_set_unique_id.assert_awaited_once_with("new@example.com")
 
 
 async def test_step_reconfigure_proxy_success_strips_url() -> None:

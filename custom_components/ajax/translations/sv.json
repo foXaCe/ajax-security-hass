@@ -6,7 +6,8 @@
       "hub_associated": "Hubb associerad med befintlig konfiguration.",
       "no_spaces_available": "Inga space tillgängliga. Pröva att ladda om integrationen.",
       "reauth_failed": "Re-authentisering misslyckades. Vänligen omkonfigurera integrationen.",
-      "reauth_successful": "Re-authentisering lyckades."
+      "reauth_successful": "Re-authentisering lyckades.",
+      "wrong_account": "Det angivna kontot matchar inte kontot som konfigurerats för den här posten. Lägg till en ny integrationspost för att använda ett annat Ajax-konto."
     },
     "error": {
       "cannot_connect": "Misslyckades att ansluta till Ajax API. Kontollera internetanslutningen.",

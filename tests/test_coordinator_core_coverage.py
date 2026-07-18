@@ -74,6 +74,7 @@ def _coordinator() -> AjaxDataCoordinator:
     coord._initial_load_done = False
     coord._force_metadata_refresh = False
     coord._bypass_cache_next_refresh = False
+    coord._light_refresh_pending = False
     coord._cycle_counter = 0
     coord._realtime_skip_factor = 3
     coord._last_metadata_refresh = 0.0
@@ -346,6 +347,71 @@ async def test_periodic_update_realtime_manager_but_all_disarmed_always_refreshe
 
     coord._async_update_video_edges.assert_awaited_once_with("s1")
     coord._async_update_smart_locks.assert_awaited_once_with("s1")
+
+
+async def test_light_refresh_pending_skips_counter_and_fan_out_even_when_disarmed() -> None:
+    """A light refresh (plan 009) skips the fan-out unconditionally.
+
+    Neither the Nth-cycle modulo nor the "all spaces disarmed -> poll every
+    cycle" fallback gets a vote once _light_refresh_pending is set — only an
+    explicit need_metadata_refresh overrides it (see the forced-metadata
+    test below).
+    """
+    coord = _coordinator()
+    coord._initial_load_done = True
+    coord._light_refresh_pending = True
+    coord.sse_manager = None
+    coord.sqs_manager = None
+    coord._realtime_skip_factor = 3
+    coord._cycle_counter = 2  # would become 3 -> 3 % 3 == 0 if incremented
+    coord._last_metadata_refresh = 1e18
+    coord.account = _account_with_space(SecurityState.DISARMED)  # would also force a refresh on its own
+    coord.account.spaces["s1"].video_edges["ve1"] = MagicMock()
+    coord.account.spaces["s1"].smart_locks["sl1"] = MagicMock()
+
+    coord._async_update_spaces_from_hubs = AsyncMock()
+    coord._async_update_devices = AsyncMock()
+    coord._async_update_video_edges = AsyncMock()
+    coord._async_update_smart_locks = AsyncMock()
+    coord._reset_expired_motion_detections = MagicMock()
+
+    await coord._async_update_data()
+
+    assert coord._cycle_counter == 2  # unchanged — the increment was skipped
+    assert coord._light_refresh_pending is False  # consumed
+    coord._async_update_video_edges.assert_not_awaited()
+    coord._async_update_smart_locks.assert_not_awaited()
+
+
+async def test_light_refresh_pending_does_not_stick_to_the_next_tick() -> None:
+    """The _light_refresh_pending flag is consumed once; the next ordinary tick behaves normally."""
+    coord = _coordinator()
+    coord._initial_load_done = True
+    coord._light_refresh_pending = True
+    coord.sse_manager = None
+    coord.sqs_manager = None
+    coord._last_metadata_refresh = 1e18
+    coord.account = _account_with_space(SecurityState.DISARMED)
+    coord.account.spaces["s1"].video_edges["ve1"] = MagicMock()
+    coord.account.spaces["s1"].smart_locks["sl1"] = MagicMock()
+
+    coord._async_update_spaces_from_hubs = AsyncMock()
+    coord._async_update_devices = AsyncMock()
+    coord._async_update_video_edges = AsyncMock()
+    coord._async_update_smart_locks = AsyncMock()
+    coord._reset_expired_motion_detections = MagicMock()
+
+    await coord._async_update_data()  # light tick: fan-out + counter increment skipped
+
+    coord._async_update_video_edges.assert_not_awaited()
+    assert coord._cycle_counter == 0
+    assert coord._light_refresh_pending is False
+
+    await coord._async_update_data()  # ordinary periodic tick: normal behaviour resumes
+
+    coord._async_update_video_edges.assert_awaited_once_with("s1")
+    coord._async_update_smart_locks.assert_awaited_once_with("s1")
+    assert coord._cycle_counter == 1
 
 
 async def test_periodic_update_forced_metadata_refresh_clears_flag() -> None:
@@ -641,12 +707,16 @@ async def test_async_force_metadata_refresh_sets_flag_and_refreshes() -> None:
 async def test_async_force_state_refresh_refreshes_without_full_flag() -> None:
     coord = _coordinator()
     coord._force_metadata_refresh = False
+    coord._light_refresh_pending = False
     coord.async_refresh = AsyncMock()
 
     await coord.async_force_state_refresh()
 
     # Light refresh must NOT force the account-wide metadata pass.
     assert coord._force_metadata_refresh is False
+    # It DOES set the light-refresh flag so the upcoming _async_update_data
+    # tick skips the cycle counter and the video/smart-lock fan-out (plan 009).
+    assert coord._light_refresh_pending is True
     coord.async_refresh.assert_awaited_once()
 
 

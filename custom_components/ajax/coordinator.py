@@ -198,6 +198,10 @@ class AjaxDataCoordinator(
         # Flag to bypass proxy cache on next refresh (after SSE event or user action)
         self._bypass_cache_next_refresh: bool = False
 
+        # Set by async_force_state_refresh; the next _async_update_data run skips
+        # the cycle counter and the video/smart-lock fan-out.
+        self._light_refresh_pending: bool = False
+
         # Auth error resilience: tolerate transient auth failures before triggering reauth
         self._consecutive_auth_errors: int = 0
         self._max_auth_errors: int = 3  # Trigger reauth after 3 consecutive auth failures
@@ -308,8 +312,18 @@ class AjaxDataCoordinator(
         account-wide metadata pass: hub state and per-group states are
         fetched on every tick anyway (#150), so an arm/disarm event only
         needs immediacy - not rooms/users/video re-fetches across all hubs.
+
+        Sets ``_light_refresh_pending`` so the upcoming ``_async_update_data``
+        run neither advances the #194 armed-aware cycle counter nor performs
+        the video-edge/smart-lock fan-out, even if the throttle's modulo
+        would otherwise land on it or the affected space just went from
+        armed to disarmed. Trade-off: video AI detections and smart-lock
+        state discovered off an arm/disarm event catch up on the next
+        regular periodic tick (UPDATE_INTERVAL, see const.py) instead of
+        immediately.
         """
         _LOGGER.info("Forcing light state refresh (immediate)")
+        self._light_refresh_pending = True
         await self.async_refresh()
 
     async def async_request_refresh_bypass_cache(self) -> None:
@@ -338,6 +352,12 @@ class AjaxDataCoordinator(
                 self.api.bypass_cache_next()
                 self._bypass_cache_next_refresh = False
                 _LOGGER.debug("Bypassing proxy cache for this refresh")
+
+            # Consume the light-refresh flag set by async_force_state_refresh:
+            # this tick must not advance the cycle counter or trigger the
+            # video/smart-lock fan-out (see refresh_video_smart below).
+            light_refresh = self._light_refresh_pending
+            self._light_refresh_pending = False
 
             # Initialize account if needed
             if self.account is None:
@@ -441,7 +461,12 @@ class AjaxDataCoordinator(
                 # Light or full update based on metadata refresh need
                 await self._async_update_spaces_from_hubs(full_refresh=need_metadata_refresh)
 
-                self._cycle_counter += 1
+                # A light refresh (async_force_state_refresh, after a realtime
+                # security event) must not advance the cadence used by the
+                # throttle below - otherwise a burst of events skews the
+                # "every Nth cycle" schedule for everyone, armed or not.
+                if not light_refresh:
+                    self._cycle_counter += 1
                 # When real-time events are flowing in, video edges and smart
                 # locks are kept fresh by SSE/SQS. Throttle the REST sync so
                 # we only poll their full state every Nth cycle (or always on
@@ -465,10 +490,15 @@ class AjaxDataCoordinator(
                     for space in self.account.spaces.values()
                 )
                 realtime_active = ((self.sse_manager is not None) or (self.sqs_manager is not None)) and any_space_armed
-                refresh_video_smart = (
-                    need_metadata_refresh
-                    or not realtime_active
-                    or (self._cycle_counter % self._realtime_skip_factor == 0)
+                # A light refresh never does the video/smart-lock fan-out on
+                # its own - not because of a phase-alignment fluke in the
+                # modulo above, and not because the space it just disarmed
+                # looks unarmed for this tick's realtime_active check. Only an
+                # explicit need_metadata_refresh (unrelated to this refresh
+                # being "light") still forces it.
+                refresh_video_smart = need_metadata_refresh or (
+                    not light_refresh
+                    and (not realtime_active or (self._cycle_counter % self._realtime_skip_factor == 0))
                 )
 
                 for space_id in self.account.spaces:

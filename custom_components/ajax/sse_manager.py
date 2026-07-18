@@ -429,34 +429,49 @@ class SSEManager(EventHandlerMixin):
             # tick landing in the 0.3s window sees the flag still False and
             # fires a duplicate ajax_armed/ajax_disarmed bus event (#133).
             async with self._security_event_lock:
-                try:
-                    # Skip REST-side event creation for THIS hub until the refresh is done
-                    if space.hub_id:
-                        self.coordinator._skipped_state_change_hubs.add(space.hub_id)
-                    # Small delay to let Ajax backend process the change
-                    # Reduced from 1.0s to 0.3s for faster real-time updates
-                    await asyncio.sleep(0.3)
-                    _LOGGER.debug("SSE: Sleep completed at t=%dms", int((time.time() - start_time) * 1000))
-                    # CRITICAL: Bypass proxy cache to get fresh group states from Ajax API
-                    self.coordinator._bypass_cache_next_refresh = True
-                    # Group states are already fetched on every tick (#150), so an
-                    # arm/disarm event only needs an immediate light refresh - not a
-                    # full account-wide metadata pass (rooms/users/video re-fetches
-                    # across all hubs).
-                    await self.coordinator.async_force_state_refresh()
-                    elapsed = int((time.time() - start_time) * 1000)
-                    _LOGGER.info("SSE: Group refresh completed at t=%dms", elapsed)
-                except Exception as err:
-                    _LOGGER.error("SSE: State refresh failed after security event: %s", err)
-                    # Fallback: apply SSE state directly since refresh failed
-                    if state_changed:
-                        space.security_state = new_state
-                        self._last_state_update[space.hub_id] = time.time()  # type: ignore[index]
-                        _LOGGER.info("SSE: Fallback state update applied after refresh failure")
-                finally:
-                    # Always clear the per-hub skip flag
-                    if space.hub_id:
-                        self.coordinator._skipped_state_change_hubs.discard(space.hub_id)
+                # A forced refresh that STARTED after this event was received
+                # has already fetched backend state covering it - re-running
+                # the whole sleep+refresh sequence would just repeat the same
+                # REST calls (multi-group "arm all" bursts emit one event per
+                # group). Skip the skip-set/sleep/bypass-flag/refresh/fallback
+                # entirely for a coalesced event; per-event notification /
+                # history / bus-event handling below still runs unconditionally.
+                already_covered = self.coordinator._last_forced_state_refresh_started >= start_time
+                if already_covered:
+                    _LOGGER.debug(
+                        "SSE: Security event '%s' coalesced into the refresh started at %.3f",
+                        event_tag,
+                        self.coordinator._last_forced_state_refresh_started,
+                    )
+                else:
+                    try:
+                        # Skip REST-side event creation for THIS hub until the refresh is done
+                        if space.hub_id:
+                            self.coordinator._skipped_state_change_hubs.add(space.hub_id)
+                        # Small delay to let Ajax backend process the change
+                        # Reduced from 1.0s to 0.3s for faster real-time updates
+                        await asyncio.sleep(0.3)
+                        _LOGGER.debug("SSE: Sleep completed at t=%dms", int((time.time() - start_time) * 1000))
+                        # CRITICAL: Bypass proxy cache to get fresh group states from Ajax API
+                        self.coordinator._bypass_cache_next_refresh = True
+                        # Group states are already fetched on every tick (#150), so an
+                        # arm/disarm event only needs an immediate light refresh - not a
+                        # full account-wide metadata pass (rooms/users/video re-fetches
+                        # across all hubs).
+                        await self.coordinator.async_force_state_refresh()
+                        elapsed = int((time.time() - start_time) * 1000)
+                        _LOGGER.info("SSE: Group refresh completed at t=%dms", elapsed)
+                    except Exception as err:
+                        _LOGGER.error("SSE: State refresh failed after security event: %s", err)
+                        # Fallback: apply SSE state directly since refresh failed
+                        if state_changed:
+                            space.security_state = new_state
+                            self._last_state_update[space.hub_id] = time.time()  # type: ignore[index]
+                            _LOGGER.info("SSE: Fallback state update applied after refresh failure")
+                    finally:
+                        # Always clear the per-hub skip flag
+                        if space.hub_id:
+                            self.coordinator._skipped_state_change_hubs.discard(space.hub_id)
 
         # Update state immediately only for events that don't trigger a refresh
         # For group and full arm/disarm events, the metadata refresh will update the state

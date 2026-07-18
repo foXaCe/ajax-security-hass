@@ -457,6 +457,7 @@ class SQSManager(EventHandlerMixin):
         is_full_arm_disarm = event_tag in FULL_ARM_EVENT_TAGS
 
         if is_group_event or is_full_arm_disarm:
+            event_received = time.time()
             _LOGGER.info(
                 "SQS: Security event '%s' detected for hub %s, refreshing groups",
                 event_tag,
@@ -467,28 +468,43 @@ class SQSManager(EventHandlerMixin):
             # tick landing in the 1s window sees the flag still False and
             # fires a duplicate ajax_armed/ajax_disarmed bus event (#133).
             async with self._security_event_lock:
-                try:
-                    # Skip REST-side event creation for THIS hub until the refresh is done
-                    if space.hub_id:
-                        self.coordinator._skipped_state_change_hubs.add(space.hub_id)
-                    # Wait for Ajax backend to process the change before refreshing
-                    # Without this delay, the API may return stale state
-                    await asyncio.sleep(1.0)
-                    # Bypass proxy cache to get fresh group states from Ajax API
-                    # (parity with the SSE path)
-                    self.coordinator._bypass_cache_next_refresh = True
-                    # Group states are already fetched on every tick (#150), so an
-                    # arm/disarm event only needs an immediate light refresh - not a
-                    # full account-wide metadata pass (rooms/users/video re-fetches
-                    # across all hubs).
-                    await self.coordinator.async_force_state_refresh()
-                    _LOGGER.info("SQS: State refresh completed after security event")
-                except Exception as err:
-                    _LOGGER.error("SQS: State refresh failed after security event: %s", err)
-                finally:
-                    # Always clear the per-hub skip flag
-                    if space.hub_id:
-                        self.coordinator._skipped_state_change_hubs.discard(space.hub_id)
+                # A forced refresh that STARTED after this event was received
+                # has already fetched backend state covering it - re-running
+                # the whole sleep+refresh sequence would just repeat the same
+                # REST calls (multi-group "arm all" bursts emit one event per
+                # group). Skip the skip-set/sleep/bypass-flag/refresh
+                # entirely for a coalesced event; per-event notification /
+                # history / bus-event handling below still runs unconditionally.
+                already_covered = self.coordinator._last_forced_state_refresh_started >= event_received
+                if already_covered:
+                    _LOGGER.debug(
+                        "SQS: Security event '%s' coalesced into the refresh started at %.3f",
+                        event_tag,
+                        self.coordinator._last_forced_state_refresh_started,
+                    )
+                else:
+                    try:
+                        # Skip REST-side event creation for THIS hub until the refresh is done
+                        if space.hub_id:
+                            self.coordinator._skipped_state_change_hubs.add(space.hub_id)
+                        # Wait for Ajax backend to process the change before refreshing
+                        # Without this delay, the API may return stale state
+                        await asyncio.sleep(1.0)
+                        # Bypass proxy cache to get fresh group states from Ajax API
+                        # (parity with the SSE path)
+                        self.coordinator._bypass_cache_next_refresh = True
+                        # Group states are already fetched on every tick (#150), so an
+                        # arm/disarm event only needs an immediate light refresh - not a
+                        # full account-wide metadata pass (rooms/users/video re-fetches
+                        # across all hubs).
+                        await self.coordinator.async_force_state_refresh()
+                        _LOGGER.info("SQS: State refresh completed after security event")
+                    except Exception as err:
+                        _LOGGER.error("SQS: State refresh failed after security event: %s", err)
+                    finally:
+                        # Always clear the per-hub skip flag
+                        if space.hub_id:
+                            self.coordinator._skipped_state_change_hubs.discard(space.hub_id)
 
         # Skip state update if HA action is pending (protect optimistic update)
         # But still record the event in history and create notification

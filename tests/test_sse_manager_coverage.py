@@ -62,6 +62,7 @@ def _make_manager() -> SSEManager:
         _event_entities={},
         _skipped_state_change_hubs=set(),
         _bypass_cache_next_refresh=False,
+        _last_forced_state_refresh_started=0.0,
         has_pending_ha_action=MagicMock(return_value=False),
         async_set_updated_data=MagicMock(),
         async_request_refresh=AsyncMock(),
@@ -383,6 +384,64 @@ async def test_security_event_refresh_failure_applies_fallback_state() -> None:
     mgr.coordinator.async_force_state_refresh = AsyncMock(side_effect=RuntimeError("api down"))
     await mgr._handle_security_event(space, "arm", "User", "USER")
     # Fallback applied the new state because refresh failed and state changed.
+    assert space.security_state == SecurityState.ARMED
+    assert "hub1" in mgr._last_state_update
+
+
+# ---------------------------------------------------------------------------
+# _handle_security_event — burst coalescing (plan 011)
+# ---------------------------------------------------------------------------
+
+
+async def test_security_event_coalesced_skips_refresh_sequence() -> None:
+    """A refresh that started AFTER this event's own reception already covers
+    it - the skip-set/sleep/bypass-flag/refresh/fallback sequence must not
+    run again for this event (multi-group "arm all" bursts emit one event
+    per group)."""
+    mgr = _make_manager()
+    space = _space(SecurityState.DISARMED)
+    mgr.coordinator._bypass_cache_next_refresh = False
+    mgr.coordinator._last_forced_state_refresh_started = time.time() + 5  # "started" in the future
+
+    await mgr._handle_security_event(space, "arm", "User", "USER")
+
+    mgr.coordinator.async_force_state_refresh.assert_not_awaited()
+    # Neither the skip-set nor the bypass-cache flag may be touched by a
+    # coalesced event (they belong to the refresh that already covers it).
+    assert mgr.coordinator._bypass_cache_next_refresh is False
+    assert "hub1" not in mgr.coordinator._skipped_state_change_hubs
+    # Per-event notification / history / bus-event handling still runs
+    # unconditionally, even when the refresh itself is coalesced away.
+    mgr.coordinator._create_sqs_notification.assert_awaited_once()
+    mgr.coordinator._fire_security_state_event.assert_called_once()
+
+
+async def test_security_event_not_coalesced_when_no_refresh_started_yet() -> None:
+    """_last_forced_state_refresh_started defaults to 0.0 - today's full
+    sleep+refresh sequence still runs for the first event of a burst."""
+    mgr = _make_manager()
+    space = _space(SecurityState.DISARMED)
+    assert mgr.coordinator._last_forced_state_refresh_started == 0.0
+
+    await mgr._handle_security_event(space, "arm", "User", "USER")
+
+    mgr.coordinator.async_force_state_refresh.assert_awaited_once()
+    assert mgr.coordinator._bypass_cache_next_refresh is True
+
+
+async def test_security_event_fallback_still_applies_when_not_coalesced() -> None:
+    """Pinned explicitly against a regression from the coalescing
+    short-circuit: a NON-coalesced event (_last_forced_state_refresh_started
+    predates it) whose refresh fails still applies the SSE fallback state,
+    exactly like test_security_event_refresh_failure_applies_fallback_state."""
+    mgr = _make_manager()
+    space = _space(SecurityState.DISARMED)
+    mgr.coordinator._last_forced_state_refresh_started = 0.0
+    mgr.coordinator.async_force_state_refresh = AsyncMock(side_effect=RuntimeError("api down"))
+
+    await mgr._handle_security_event(space, "arm", "User", "USER")
+
+    mgr.coordinator.async_force_state_refresh.assert_awaited_once()  # refresh WAS attempted
     assert space.security_state == SecurityState.ARMED
     assert "hub1" in mgr._last_state_update
 

@@ -48,6 +48,7 @@ def _make_coordinator() -> MagicMock:
     coord.stats = {"events_sqs_received": 0, "discovery_refreshes": 0}
     coord._skipped_state_change_hubs = set()
     coord._event_entities = {}
+    coord._last_forced_state_refresh_started = 0.0
     coord.config_entry = SimpleNamespace(options={})
     # Async coordinator hooks
     coord.has_pending_ha_action = MagicMock(return_value=False)
@@ -366,6 +367,50 @@ async def test_handle_security_event_unknown_tag_returns_false() -> None:
     mgr = _make_manager()
     space = _space()
     assert await mgr._handle_security_event(space, "bogus", "John") is False
+
+
+# ---------------------------------------------------------------------------
+# _handle_security_event — burst coalescing (plan 011)
+# ---------------------------------------------------------------------------
+
+
+async def test_handle_security_event_coalesced_skips_refresh_sequence(monkeypatch) -> None:
+    """A refresh that started AFTER this event's own reception already covers
+    it - the skip-set/sleep/bypass-flag/refresh sequence must not run again
+    for this event (multi-group "arm all" bursts emit one event per group)."""
+    mgr = _make_manager()
+    monkeypatch.setattr("custom_components.ajax.sqs_manager.asyncio.sleep", AsyncMock())
+    mgr.coordinator._bypass_cache_next_refresh = False
+    mgr.coordinator._last_forced_state_refresh_started = time.time() + 5  # "started" in the future
+    space = _space(SecurityState.DISARMED)
+
+    result = await mgr._handle_security_event(space, "arm", "John", "USER")
+
+    assert result is True
+    mgr.coordinator.async_force_state_refresh.assert_not_awaited()
+    # Neither the skip-set nor the bypass-cache flag may be touched by a
+    # coalesced event (they belong to the refresh that already covers it).
+    assert mgr.coordinator._bypass_cache_next_refresh is False
+    assert "hub1" not in mgr.coordinator._skipped_state_change_hubs
+    # Per-event notification / history / bus-event handling still runs
+    # unconditionally, even when the refresh itself is coalesced away.
+    mgr.coordinator._create_sqs_notification.assert_awaited_once()
+    mgr.coordinator._fire_security_state_event.assert_called_once()
+
+
+async def test_handle_security_event_not_coalesced_when_no_refresh_started_yet(monkeypatch) -> None:
+    """_last_forced_state_refresh_started defaults to 0.0 - today's full
+    sleep+refresh sequence still runs for the first event of a burst."""
+    mgr = _make_manager()
+    monkeypatch.setattr("custom_components.ajax.sqs_manager.asyncio.sleep", AsyncMock())
+    assert mgr.coordinator._last_forced_state_refresh_started == 0.0
+    space = _space(SecurityState.DISARMED)
+
+    result = await mgr._handle_security_event(space, "arm", "John", "USER")
+
+    assert result is True
+    mgr.coordinator.async_force_state_refresh.assert_awaited_once()
+    assert mgr.coordinator._bypass_cache_next_refresh is True
 
 
 async def test_handle_security_event_ha_pending_skips_state_update(monkeypatch) -> None:

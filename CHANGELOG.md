@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.36.3] - 2026-07-24
+
+### Fixed
+- **Ajax NVR hardware variants are now recognised as recorders (#210).** An NVR reporting a variant type such as `NVR_H_AC` (an 8-channel AC/hardwired model) fell back to an unknown type and was treated as a single generic camera — no channel linkage, and its cameras were connected individually over ONVIF instead of through the NVR. Any `NVR*` model code now maps to the NVR type, so current and future NVR SKUs are handled correctly.
+
+### Dependencies
+- CI: `actions/setup-python` v6 → v7, `pytest-homeassistant-custom-component` ≥ 0.13.347; pre-commit hooks refreshed (ruff, codespell).
+
 ## [0.36.2] - 2026-07-18
 
 ### Fixed

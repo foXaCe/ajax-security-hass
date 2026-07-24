@@ -119,7 +119,13 @@ class AjaxStateUpdaterMixin:
                 try:
                     ve_type = VideoEdgeType(ve_type_str)
                 except ValueError:
-                    ve_type = VideoEdgeType.UNKNOWN
+                    # Ajax ships NVR hardware variants (e.g. NVR_H_AC, an 8-channel
+                    # AC/hardwired recorder) whose exact SKU code isn't in VideoEdgeType.
+                    # All downstream logic keys off `== VideoEdgeType.NVR`, so map any
+                    # NVR* code to NVR rather than UNKNOWN — otherwise a multi-channel
+                    # recorder is treated as a single generic camera (#210). Non-NVR
+                    # unknown types still fall through to UNKNOWN.
+                    ve_type = VideoEdgeType.NVR if ve_type_str.startswith("NVR") else VideoEdgeType.UNKNOWN
 
                 network = ve_data.get("networkInterface", {})
                 ethernet = network.get("ethernet", {})

@@ -21,7 +21,7 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v7
         with:
           python-version: "3.14.6"
           cache: pip
@@ -55,7 +55,7 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v7
         with:
           # 3.14 matches the project's runtime: the test harness
           # (pytest-homeassistant-custom-component) and recent Home Assistant
@@ -84,7 +84,7 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v7
         with:
           # 3.14 matches the project's runtime: pytest-homeassistant-custom-component
           # and the pinned homeassistant in requirements_test.txt require it. The old

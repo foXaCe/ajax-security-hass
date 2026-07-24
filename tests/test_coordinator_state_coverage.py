@@ -163,6 +163,46 @@ async def test_video_edges_add_new_with_full_payload() -> None:
 
 
 @pytest.mark.asyncio
+async def test_video_edges_nvr_variant_classified_as_nvr() -> None:
+    space = AjaxSpace(id="s1", name="Maison", real_space_id="real1")
+    mixin = _ve_mixin(space)
+    mixin.api.async_get_video_edges = AsyncMock(
+        return_value=[
+            {
+                "id": "ve_nvr",
+                "name": "NVR 8ch",
+                "type": "NVR_H_AC",  # 8-channel AC/hardwired variant -> ValueError branch
+                "connectionState": "ONLINE",
+                "networkInterface": {
+                    "ethernet": {
+                        "macAddress": "AA:CC",
+                        "configuration": {"v4": {"address": "192.168.1.20"}},
+                    },
+                    "wifi": {},
+                },
+                "channels": [
+                    {"spaceSettings": {"roomId": "r1"}},
+                    {"spaceSettings": {"roomId": "r1"}},
+                ],
+            }
+        ]
+    )
+    await mixin._async_update_video_edges("s1")
+    ve = space.video_edges["ve_nvr"]
+    assert ve.video_edge_type is VideoEdgeType.NVR
+
+
+@pytest.mark.asyncio
+async def test_video_edges_unknown_non_nvr_stays_unknown() -> None:
+    space = AjaxSpace(id="s1", name="Maison", real_space_id="real1")
+    mixin = _ve_mixin(space)
+    mixin.api.async_get_video_edges = AsyncMock(return_value=[{"id": "ve_unk", "type": "SOMETHING_ELSE"}])
+    await mixin._async_update_video_edges("s1")
+    ve = space.video_edges["ve_unk"]
+    assert ve.video_edge_type is VideoEdgeType.UNKNOWN
+
+
+@pytest.mark.asyncio
 async def test_video_edges_wifi_fallback_and_unknown_type_and_dict_channels() -> None:
     space = AjaxSpace(id="s1", name="Maison", real_space_id="real1")
     mixin = _ve_mixin(space)

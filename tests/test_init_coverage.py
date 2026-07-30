@@ -181,14 +181,14 @@ async def test_force_arm_no_target_uses_all_spaces(tmp_path: Any) -> None:
     _, handlers = await _handlers(tmp_path)
     coord = _coord_with_spaces(["s1", "s2"])
     call = _call(_entry(coord))
-    selected = SimpleNamespace(referenced=set(), indirectly_referenced=set())
+    selected: set[str] = set()
     with (
         patch(
             "custom_components.ajax._services.async_extract_config_entry_ids",
             AsyncMock(return_value=set()),
         ),
         patch(
-            "custom_components.ajax._services.async_extract_referenced_entity_ids",
+            "custom_components.ajax._services._extract_referenced_entity_ids",
             return_value=selected,
         ),
     ):
@@ -202,10 +202,7 @@ async def test_force_arm_resolves_referenced_entity_to_space(tmp_path: Any) -> N
     _, handlers = await _handlers(tmp_path)
     coord = _coord_with_spaces(["space42"])
     call = _call(_entry(coord))
-    selected = SimpleNamespace(
-        referenced={"alarm_control_panel.ajax"},
-        indirectly_referenced=set(),
-    )
+    selected = {"alarm_control_panel.ajax"}
     registry = MagicMock()
     reg_entry = SimpleNamespace(
         domain="alarm_control_panel",
@@ -218,7 +215,7 @@ async def test_force_arm_resolves_referenced_entity_to_space(tmp_path: Any) -> N
             AsyncMock(return_value=set()),
         ),
         patch(
-            "custom_components.ajax._services.async_extract_referenced_entity_ids",
+            "custom_components.ajax._services._extract_referenced_entity_ids",
             return_value=selected,
         ),
         patch("custom_components.ajax._services.er.async_get", return_value=registry),
@@ -232,10 +229,7 @@ async def test_force_arm_ignores_non_alarm_and_unknown_entities(tmp_path: Any) -
     _, handlers = await _handlers(tmp_path)
     coord = _coord_with_spaces(["known"])
     call = _call(_entry(coord))
-    selected = SimpleNamespace(
-        referenced={"sensor.foo", "alarm_control_panel.missing", "alarm_control_panel.unknown"},
-        indirectly_referenced=set(),
-    )
+    selected = {"sensor.foo", "alarm_control_panel.missing", "alarm_control_panel.unknown"}
     registry = MagicMock()
 
     def _get(entity_id: str) -> Any:
@@ -253,7 +247,7 @@ async def test_force_arm_ignores_non_alarm_and_unknown_entities(tmp_path: Any) -
             AsyncMock(return_value=set()),
         ),
         patch(
-            "custom_components.ajax._services.async_extract_referenced_entity_ids",
+            "custom_components.ajax._services._extract_referenced_entity_ids",
             return_value=selected,
         ),
         patch("custom_components.ajax._services.er.async_get", return_value=registry),
@@ -286,14 +280,14 @@ async def test_force_arm_collects_failures(tmp_path: Any) -> None:
     coord = _coord_with_spaces(["s1"])
     coord.async_arm_space.side_effect = RuntimeError("boom")
     call = _call(_entry(coord))
-    selected = SimpleNamespace(referenced=set(), indirectly_referenced=set())
+    selected: set[str] = set()
     with (
         patch(
             "custom_components.ajax._services.async_extract_config_entry_ids",
             AsyncMock(return_value=set()),
         ),
         patch(
-            "custom_components.ajax._services.async_extract_referenced_entity_ids",
+            "custom_components.ajax._services._extract_referenced_entity_ids",
             return_value=selected,
         ),
         pytest.raises(HomeAssistantError),
@@ -317,19 +311,47 @@ async def test_resolve_target_spaces_empty_when_account_none(tmp_path: Any) -> N
         await handlers[SERVICE_FORCE_ARM](call)
 
 
+def test_extract_referenced_entity_ids_legacy_branch(monkeypatch: Any) -> None:
+    """< HA 2026.8: uses async_extract_referenced_entity_ids and merges the breakdown."""
+    from custom_components.ajax import _services
+
+    sel = SimpleNamespace(referenced={"a"}, indirectly_referenced={"b"})
+    monkeypatch.setattr(
+        _services.ha_service,
+        "async_extract_referenced_entity_ids",
+        lambda hass, call, expand_group=True: sel,
+        raising=False,
+    )
+    assert _services._extract_referenced_entity_ids(MagicMock()) == {"a", "b"}
+
+
+def test_extract_referenced_entity_ids_fallback_branch(monkeypatch: Any) -> None:
+    """HA 2026.8+ removed the referenced helper: fall back to sync async_extract_entity_ids."""
+    from custom_components.ajax import _services
+
+    monkeypatch.delattr(_services.ha_service, "async_extract_referenced_entity_ids", raising=False)
+    monkeypatch.setattr(
+        _services.ha_service,
+        "async_extract_entity_ids",
+        lambda call, expand_group=True: {"x", "y"},
+        raising=False,
+    )
+    assert _services._extract_referenced_entity_ids(MagicMock()) == {"x", "y"}
+
+
 async def test_force_arm_night_success(tmp_path: Any) -> None:
     """force_arm_night arms each resolved space in night mode with force=True."""
     _, handlers = await _handlers(tmp_path)
     coord = _coord_with_spaces(["s1", "s2"])
     call = _call(_entry(coord))
-    selected = SimpleNamespace(referenced=set(), indirectly_referenced=set())
+    selected: set[str] = set()
     with (
         patch(
             "custom_components.ajax._services.async_extract_config_entry_ids",
             AsyncMock(return_value=set()),
         ),
         patch(
-            "custom_components.ajax._services.async_extract_referenced_entity_ids",
+            "custom_components.ajax._services._extract_referenced_entity_ids",
             return_value=selected,
         ),
     ):
@@ -359,10 +381,7 @@ async def test_force_arm_night_unresolved_target_raises(tmp_path: Any) -> None:
     _, handlers = await _handlers(tmp_path)
     coord = _coord_with_spaces(["known"])
     call = _call(_entry(coord))
-    selected = SimpleNamespace(
-        referenced={"alarm_control_panel.ghost"},
-        indirectly_referenced=set(),
-    )
+    selected = {"alarm_control_panel.ghost"}
     registry = MagicMock()
     registry.async_get.return_value = SimpleNamespace(
         domain="alarm_control_panel",
@@ -374,7 +393,7 @@ async def test_force_arm_night_unresolved_target_raises(tmp_path: Any) -> None:
             AsyncMock(return_value=set()),
         ),
         patch(
-            "custom_components.ajax._services.async_extract_referenced_entity_ids",
+            "custom_components.ajax._services._extract_referenced_entity_ids",
             return_value=selected,
         ),
         patch("custom_components.ajax._services.er.async_get", return_value=registry),
@@ -390,14 +409,14 @@ async def test_force_arm_night_collects_failures(tmp_path: Any) -> None:
     coord = _coord_with_spaces(["s1"])
     coord.async_arm_night_mode.side_effect = RuntimeError("nope")
     call = _call(_entry(coord))
-    selected = SimpleNamespace(referenced=set(), indirectly_referenced=set())
+    selected: set[str] = set()
     with (
         patch(
             "custom_components.ajax._services.async_extract_config_entry_ids",
             AsyncMock(return_value=set()),
         ),
         patch(
-            "custom_components.ajax._services.async_extract_referenced_entity_ids",
+            "custom_components.ajax._services._extract_referenced_entity_ids",
             return_value=selected,
         ),
         pytest.raises(HomeAssistantError),
@@ -1126,10 +1145,7 @@ async def test_force_arm_skips_group_panels(tmp_path: Any) -> None:
     _, handlers = await _handlers(tmp_path)
     coord = _coord_with_spaces(["g42"])
     call = _call(_entry(coord))
-    selected = SimpleNamespace(
-        referenced={"alarm_control_panel.perimeter_group"},
-        indirectly_referenced=set(),
-    )
+    selected = {"alarm_control_panel.perimeter_group"}
     registry = MagicMock()
     registry.async_get.return_value = SimpleNamespace(
         domain="alarm_control_panel",
@@ -1141,7 +1157,7 @@ async def test_force_arm_skips_group_panels(tmp_path: Any) -> None:
             AsyncMock(return_value=set()),
         ),
         patch(
-            "custom_components.ajax._services.async_extract_referenced_entity_ids",
+            "custom_components.ajax._services._extract_referenced_entity_ids",
             return_value=selected,
         ),
         patch("custom_components.ajax._services.er.async_get", return_value=registry),

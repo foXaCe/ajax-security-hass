@@ -20,6 +20,17 @@
       "enabled": false
     },
     {
+      "description": "Block minor/major aiobotocore bumps: HA core pins botocore==1.42.97 in its package_constraints, and aiobotocore>=3.8.0 requires botocore>=1.43.3, which is unresolvable at runtime (setup fails with 'Requirements not found') even though CI installs fine without HA's constraints. Keep on 3.7.x until HA raises its botocore pin. See the aiobotocore>=3.8.0 regression (#200).",
+      "matchPackageNames": [
+        "aiobotocore"
+      ],
+      "matchUpdateTypes": [
+        "major",
+        "minor"
+      ],
+      "enabled": false
+    },
+    {
       "description": "Auto-merge non-major updates once CI is green; major updates stay manual for review",
       "matchUpdateTypes": [
         "minor",

@@ -23,10 +23,10 @@ from homeassistant.exceptions import (
 from homeassistant.helpers import (
     config_validation as cv,
     entity_registry as er,
+    service as ha_service,
 )
 from homeassistant.helpers.service import (
     async_extract_config_entry_ids,
-    async_extract_referenced_entity_ids,
 )
 
 from ._raw_inventory import async_collect_raw_inventory
@@ -37,6 +37,28 @@ from .const import (
 from .coordinator import AjaxDataCoordinator
 
 _LOGGER = logging.getLogger(__name__)
+
+
+def _extract_referenced_entity_ids(call: ServiceCall) -> set[str]:
+    """Return the entity ids a service call targets, across HA versions.
+
+    HA 2026.8 removed ``async_extract_referenced_entity_ids`` (and its
+    ``SelectedEntities`` breakdown) and exposes a synchronous
+    ``async_extract_entity_ids(service_call, expand_group) -> set[str]``.
+    Older HA (< 2026.8, down to the integration's 2025.11 floor) still ships
+    the referenced-entity helper, so use it there to preserve the exact prior
+    behaviour (direct + indirectly referenced) and fall back otherwise.
+    """
+    legacy = getattr(ha_service, "async_extract_referenced_entity_ids", None)
+    if legacy is not None:
+        selected = legacy(call.hass, call, expand_group=True)
+        return set(selected.referenced) | set(selected.indirectly_referenced)
+    # Accessed dynamically: the signature changed across HA versions (sync,
+    # ``hass`` dropped in 2026.8), so let this stay untyped rather than pin it
+    # to the stubs of whichever HA version mypy happens to run against.
+    extract_ids = getattr(ha_service, "async_extract_entity_ids")  # noqa: B009
+    return set(extract_ids(call, expand_group=True))
+
 
 # Service names
 SERVICE_FORCE_ARM = "force_arm"
@@ -73,8 +95,7 @@ async def _async_setup_services(hass: HomeAssistant) -> None:
         if coordinator.account is None:
             return []
         account = coordinator.account
-        selected = async_extract_referenced_entity_ids(call.hass, call, expand_group=True)
-        referenced = set(selected.referenced) | set(selected.indirectly_referenced)
+        referenced = _extract_referenced_entity_ids(call)
         if not referenced:
             return list(account.spaces.keys())
 

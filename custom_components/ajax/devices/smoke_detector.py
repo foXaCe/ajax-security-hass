@@ -18,11 +18,22 @@ from homeassistant.components.sensor import (
     SensorDeviceClass,
     SensorStateClass,
 )
-from homeassistant.const import (
-    CONCENTRATION_PARTS_PER_MILLION,
-)
 
 from .base import AjaxDeviceHandler
+
+# CONCENTRATION_PARTS_PER_MILLION is deprecated since HA 2026.8 (removal in
+# 2027.8) in favour of UnitOfRatio, which only exists since HA 2026.7 — fall
+# back for the supported 2025.11–2026.6 range. Both spell the identical "ppm"
+# unit string, so recorded statistics are unaffected.
+_PARTS_PER_MILLION: str
+try:
+    from homeassistant.const import UnitOfRatio
+
+    _PARTS_PER_MILLION = UnitOfRatio.PARTS_PER_MILLION
+except ImportError:  # pragma: no cover - HA < 2026.7
+    from homeassistant.const import (
+        CONCENTRATION_PARTS_PER_MILLION as _PARTS_PER_MILLION,
+    )
 
 
 class SmokeDetectorHandler(AjaxDeviceHandler):
@@ -137,7 +148,7 @@ class SmokeDetectorHandler(AjaxDeviceHandler):
                 {
                     "key": "co_level",
                     "device_class": SensorDeviceClass.CO,
-                    "native_unit_of_measurement": CONCENTRATION_PARTS_PER_MILLION,
+                    "native_unit_of_measurement": _PARTS_PER_MILLION,
                     "state_class": SensorStateClass.MEASUREMENT,
                     "value_fn": lambda: self.device.attributes.get("co_level"),
                     "enabled_by_default": True,

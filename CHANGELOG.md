@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.36.4] - 2026-07-30
+
+### Fixed
+- **Home Assistant 2026.8 compatibility — the integration failed to load on 2026.8.** Two HA 2026.8 breaking changes were involved: (1) HA core now pins `botocore==1.42.97`, which is incompatible with the `aiobotocore>=3.8.0` floor a dependency bump had introduced, so the requirement install failed with `Requirements for ajax not found: ['aiobotocore>=3.8.0']`; the floor is back to `aiobotocore>=3.7.0` (compatible with every supported HA version). (2) HA removed `helpers.service.async_extract_referenced_entity_ids`; the `force_arm` / `force_arm_night` target resolution now uses a version-aware path that works on both older HA and 2026.8+. HA 2026.7.x and earlier were unaffected — this is a forward-compatibility fix. Verified on a live HA 2026.8.0b1 instance.
+
+### Dependencies
+- Renovate now blocks minor/major `aiobotocore` bumps while HA core pins an older botocore. Test toolchain and pre-commit hooks refreshed.
+
 ## [0.36.3] - 2026-07-24
 
 ### Fixed

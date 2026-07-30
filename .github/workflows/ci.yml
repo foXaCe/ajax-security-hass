@@ -74,6 +74,45 @@ jobs:
       - name: Run mypy
         run: mypy custom_components/ajax/
 
+  requirements:
+    name: Requirements
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    # Guards the exact gap that let aiobotocore>=3.8.0 ship broken: the other
+    # jobs install requirements with plain pip, WITHOUT Home Assistant core's
+    # package_constraints.txt, so a manifest requirement that resolves in CI can
+    # still be unresolvable at runtime. HA 2026.8 pins botocore==1.42.97, which
+    # aiobotocore>=3.8.0 cannot satisfy, so setup failed with "Requirements for
+    # ajax not found". This job re-resolves the manifest requirements under HA's
+    # own constraints, against the latest HA INCLUDING pre-releases so a
+    # forward-compat break surfaces before it reaches a release.
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.14.6"
+          cache: pip
+          cache-dependency-path: requirements_test.txt
+
+      - name: Install latest Home Assistant (incl. pre-releases)
+        run: pip install --pre --upgrade homeassistant
+
+      - name: Resolve manifest requirements under HA core constraints
+        run: |
+          CONSTRAINTS=$(python -c "import os, homeassistant; print(os.path.join(os.path.dirname(homeassistant.__file__), 'package_constraints.txt'))")
+          REQS=$(python -c "import json; print(' '.join(json.load(open('custom_components/ajax/manifest.json'))['requirements']))")
+          echo "Home Assistant: $(python -c 'import homeassistant.const as c; print(c.__version__)')"
+          echo "Constraints file: $CONSTRAINTS"
+          echo "Manifest requirements: $REQS"
+          # --dry-run resolves without installing; -c applies HA's pins so an
+          # incompatible floor (e.g. aiobotocore>=3.8.0 vs botocore==1.42.97)
+          # fails here instead of at a user's setup.
+          pip install --dry-run -c "$CONSTRAINTS" $REQS
+
   tests:
     name: Tests
     runs-on: ubuntu-latest

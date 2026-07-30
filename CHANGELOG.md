@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.36.5] - 2026-07-30
+
+### Fixed
+- **Continued Home Assistant 2026.8 compatibility: the ppm unit on the air-quality sensors.** HA 2026.8 deprecates `CONCENTRATION_PARTS_PER_MILLION` (removal in 2027.8) in favour of `UnitOfRatio.PARTS_PER_MILLION`. The LifeQuality CO₂ sensor and the FireProtect CO-level sensor now use the new unit with a fallback for HA 2025.11–2026.6. Both resolve to the identical `ppm` string, so recorded statistics carry over unchanged.
+
+### Changed
+- Internal: a new `Requirements` CI job resolves the manifest's requirements under Home Assistant core's package constraints (against the latest HA including pre-releases), so a dependency that is uninstallable at runtime — like the earlier `aiobotocore>=3.8.0` vs HA's `botocore` pin — is caught before merge instead of at a user's setup.
+
 ## [0.36.4] - 2026-07-30
 
 ### Fixed

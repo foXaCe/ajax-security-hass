@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.37.0] - 2026-08-01
+
+### Added
+- **Event codes now show what actually happened instead of a raw code.** Ajax publishes around 1500 event codes and the integration described 249 of them, so anything else appeared as `M_09_26` in the last-event sensor, notifications and the logbook. 875 official English labels have been added, covering the rest of Ajax's catalogue — that same event now reads *"Smoke chamber dirty"*, and its device is identified as a FireProtect Plus. Codes the integration already handled are unchanged and keep their translations in all 7 languages.
+- **8 device types Ajax added since the original table** are now recognised: DoorBell, SeismoProtect Fibra, SpeakerPhone Jeweller, Fibra ring, Crosszone, Telephony, Security company and Installation company.
+
+### Notes
+- The new labels are for display only: they deliberately carry no alarm semantics, so they can never put the system into a triggered state on their own. Turning an event code into a real alarm remains an explicit, reviewed change.
+- The labels are English only for now. Ajax's own table mixes French into its English column for 416 rows; those were left out rather than machine-translated, and the file carries no translations keyed by event code.
+
 ## [0.36.5] - 2026-07-30
 
 ### Fixed

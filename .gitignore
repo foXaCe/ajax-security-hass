@@ -14,6 +14,12 @@ test_*.sh
 # API documentation
 swagger.yaml
 
+# Vendor reference data from Ajax (event code / device type tables, exports).
+# Kept local only: it is Ajax-supplied documentation, not part of the shipped
+# integration.
+*.xlsx
+*.xls
+
 # Local development
 Julien AJax/
 docker-compose.yml

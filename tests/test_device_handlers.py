@@ -186,6 +186,16 @@ def test_button_handler_returns_button_press_event() -> None:
     assert _keys(events) == {"button_press"}
 
 
+def test_button_handler_adds_temperature_sensor_for_keypads() -> None:
+    no_temp = ButtonHandler(_device(DeviceType.KEYPAD))
+    assert "temperature" not in _keys(no_temp.get_sensors())
+
+    with_temp = ButtonHandler(_device(DeviceType.KEYPAD, {"temperature": 23.4}))
+    sensor = _by_key(with_temp.get_sensors(), "temperature")
+    assert sensor is not None
+    assert sensor["value_fn"]() == 23.4
+
+
 def test_doorbell_handler_emits_doorbell_ring_event() -> None:
     events = DoorbellHandler(_device(DeviceType.DOORBELL)).get_events()
     assert _keys(events) == {"doorbell_press"}

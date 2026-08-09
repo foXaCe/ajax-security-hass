@@ -41,6 +41,11 @@ class ButtonHandler(AjaxDeviceHandler):
             self._signal_strength_percent_sensor(),
         ]
 
+        # Keypad devices (KeyPadCombi, TouchScreen, Outdoor) report ambient
+        # temperature; plain buttons don't. Mirror the other handlers' pattern.
+        if "temperature" in self.device.attributes:
+            sensors.append(self._temperature_sensor())
+
         # Last button action (single_press, double_press, long_press, etc.)
         sensors.append(
             {

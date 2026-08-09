@@ -29,11 +29,11 @@ _PARTS_PER_MILLION: str
 try:
     from homeassistant.const import UnitOfRatio
 
-    _PARTS_PER_MILLION = UnitOfRatio.PARTS_PER_MILLION
+    _PARTS_PER_MILLION = str(UnitOfRatio.PARTS_PER_MILLION)
 except ImportError:  # pragma: no cover - HA < 2026.7
-    from homeassistant.const import (
-        CONCENTRATION_PARTS_PER_MILLION as _PARTS_PER_MILLION,
-    )
+    from homeassistant.const import CONCENTRATION_PARTS_PER_MILLION
+
+    _PARTS_PER_MILLION = CONCENTRATION_PARTS_PER_MILLION
 
 
 class SmokeDetectorHandler(AjaxDeviceHandler):

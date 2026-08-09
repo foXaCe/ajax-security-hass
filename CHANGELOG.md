@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.37.1] - 2026-08-09
+
+### Fixed
+- **Keyboard temperature sensors are back.** Keypads (KeyPadCombi, TouchScreen, Outdoor) lost their temperature sensor during a device-handler refactor — entities created before it turned unavailable and broke dashboard tiles. The button handler now exposes the temperature sensor again whenever the device reports one.
+
+### Dependencies
+- CI: `python` 3.14.6 → 3.14.7, `pytest-homeassistant-custom-component` ≥ 0.13.355; pre-commit hooks refreshed (ruff v0.16.1).
+- Fixed the mypy strict-typing gate on the ppm unit fallback, which had been failing on `main` and blocking every dependency PR.
+
 ## [0.37.0] - 2026-08-01
 
 ### Added

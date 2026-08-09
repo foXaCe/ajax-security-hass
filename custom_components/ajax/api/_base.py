@@ -174,6 +174,15 @@ class AjaxRestClientBase:
         self._devices_cache: dict[tuple[str, bool], tuple[float, list[dict[str, Any]]]] = {}
         self._devices_cache_ttl: float = 5.0
 
+        # Short-lived cache of the GET /user/{id}/hubs list. At setup the
+        # connection test and the coordinator's first refresh both fetch it
+        # back-to-back; without coalescing the first boot pays for the round
+        # trip twice. A short TTL also folds in any rapid consecutive ticks
+        # (e.g. an SSE/SQS-triggered refresh landing right after the periodic
+        # one) with no staleness risk — hub membership changes slowly.
+        self._hubs_cache: tuple[float, list[dict[str, Any]]] | None = None
+        self._hubs_cache_ttl: float = 5.0
+
         # Base headers with API key (may be empty for proxy modes initially)
         self._base_headers = {
             "Content-Type": "application/json",

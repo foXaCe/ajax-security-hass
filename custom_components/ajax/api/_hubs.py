@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from typing import Any
 
 from ._base import (
@@ -16,12 +17,24 @@ class _HubsMixin(AjaxRestClientBase):
     async def async_get_hubs(self) -> list[dict[str, Any]]:
         """Get all hubs.
 
+        Coalesced by a short-lived in-memory cache (``_hubs_cache``): the
+        setup connection test and the coordinator's first refresh fetch the
+        hub list back-to-back, so without it every boot pays the round trip
+        twice. The entry is served only inside its TTL and never across an
+        open cache-bypass window (see ``_cache_entry_usable``), so a post-SSE
+        refresh always reaches the real endpoint.
+
         Returns:
             List of hub dictionaries
         """
+        cached = self._hubs_cache
+        if cached and self._cache_entry_usable(cached[0], self._hubs_cache_ttl):
+            return cached[1]
         if not self.user_id:
             raise AjaxRestApiError("No user_id available. Call async_login() first.")
-        return await self._request("GET", f"user/{self.user_id}/hubs")  # type: ignore[no-any-return]
+        data = await self._request("GET", f"user/{self.user_id}/hubs")
+        self._hubs_cache = (time.time(), data)
+        return data  # type: ignore[no-any-return]
 
     async def async_get_hub(self, hub_id: str) -> dict[str, Any]:
         """Get hub details.

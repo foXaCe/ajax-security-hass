@@ -56,6 +56,49 @@ async def test_async_get_hub_routes_via_user() -> None:
 
 
 @pytest.mark.asyncio
+async def test_async_get_hubs_caches_response_for_ttl_window() -> None:
+    """Boot: the connection test and the first refresh both fetch hubs.
+
+    Two calls within the TTL window must hit the network only once — this is
+    the exact pattern `async_setup_entry` + the coordinator's first refresh
+    produce at every boot.
+    """
+    api = _api()
+    api._request.return_value = [{"hubId": "h1"}]
+
+    first = await api.async_get_hubs()
+    second = await api.async_get_hubs()
+
+    assert first == second == [{"hubId": "h1"}]
+    api._request.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_async_get_hubs_cache_expires_after_ttl() -> None:
+    """Past the TTL window, a fresh request must fire."""
+    api = _api()
+    api._hubs_cache_ttl = 0.01
+    api._request.return_value = [{"hubId": "h1"}]
+
+    await api.async_get_hubs()
+    # Forge an expired cache entry (rather than sleeping).
+    api._hubs_cache = (time.time() - 10.0, [{"hubId": "stale"}])
+    await api.async_get_hubs()
+    assert api._request.await_count == 2
+
+
+@pytest.mark.asyncio
+async def test_async_get_hubs_cache_bypassed_when_bypass_flag_set() -> None:
+    """bypass_cache_next() must let the next call escape the hubs cache."""
+    api = _api()
+    api._request.return_value = [{"hubId": "h1"}]
+    await api.async_get_hubs()
+    api.bypass_cache_next()
+    await api.async_get_hubs()
+    assert api._request.await_count == 2
+
+
+@pytest.mark.asyncio
 async def test_async_set_hub_mode_sends_post_with_mode_payload() -> None:
     api = _api()
     await api.async_set_hub_mode("h1", "full")

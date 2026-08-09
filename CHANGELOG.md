@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.37.2] - 2026-08-09
+
+### Changed
+- **One less API round-trip at every boot.** The setup connection test and the coordinator's first refresh both fetched the hub list back-to-back, so each start paid for the same request twice. `async_get_hubs()` now serves the second call from a short-lived cache (same pattern as the device/space caches), which also coalesces any rapid consecutive poll ticks. The cache is never served across an open cache-bypass window, so a refresh triggered by an SSE/SQS event always reaches the real endpoint.
+
 ## [0.37.1] - 2026-08-09
 
 ### Fixed

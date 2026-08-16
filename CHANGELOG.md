@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.37.3] - 2026-08-16
+
+### Dependencies
+- `pytest-homeassistant-custom-component` ≥ 0.13.356 (CI only).
+
 ## [0.37.2] - 2026-08-09
 
 ### Changed

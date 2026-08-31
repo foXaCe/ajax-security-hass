@@ -489,6 +489,7 @@ def test_update_device_registry_updates_existing_entry(monkeypatch: pytest.Monke
 
     registry = MagicMock()
     registry.async_get_device_by_identifier.return_value = SimpleNamespace(id="dev-entry-1")
+    registry.async_get_device.return_value = registry.async_get_device_by_identifier.return_value
     monkeypatch.setattr(
         "custom_components.ajax.alarm_control_panel.dr.async_get",
         lambda _hass: registry,
@@ -511,6 +512,7 @@ def test_update_device_registry_noop_when_entry_missing(monkeypatch: pytest.Monk
 
     registry = MagicMock()
     registry.async_get_device_by_identifier.return_value = None
+    registry.async_get_device.return_value = None
     monkeypatch.setattr(
         "custom_components.ajax.alarm_control_panel.dr.async_get",
         lambda _hass: registry,

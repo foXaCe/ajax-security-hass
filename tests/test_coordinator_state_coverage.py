@@ -294,6 +294,7 @@ async def test_video_edges_cleanup_removes_stale_with_ha_device() -> None:
     registry = MagicMock()
     ha_device = MagicMock(id="dev-entry")
     registry.async_get_device_by_identifier.return_value = ha_device
+    registry.async_get_device.return_value = ha_device
     with patch("custom_components.ajax._coordinator_state.dr.async_get", return_value=registry):
         await mixin._async_update_video_edges("s1")
 
@@ -313,6 +314,7 @@ async def test_video_edges_cleanup_no_ha_device() -> None:
 
     registry = MagicMock()
     registry.async_get_device_by_identifier.return_value = None
+    registry.async_get_device.return_value = None
     with patch("custom_components.ajax._coordinator_state.dr.async_get", return_value=registry):
         await mixin._async_update_video_edges("s1")
 
@@ -434,6 +436,7 @@ async def test_smart_locks_cleanup_removes_api_lock_preserves_sse_lock() -> None
 
     registry = MagicMock()
     registry.async_get_device_by_identifier.return_value = MagicMock(id="dev-1")
+    registry.async_get_device.return_value = registry.async_get_device_by_identifier.return_value
     with patch("custom_components.ajax._coordinator_state.dr.async_get", return_value=registry):
         await mixin._async_update_smart_locks("s1")
 
@@ -455,6 +458,7 @@ async def test_smart_locks_cleanup_no_ha_device() -> None:
     mixin.api.async_get_smart_locks = AsyncMock(return_value=[{"id": "kept", "name": "Kept", "type": "smartlock"}])
     registry = MagicMock()
     registry.async_get_device_by_identifier.return_value = None
+    registry.async_get_device.return_value = None
     with patch("custom_components.ajax._coordinator_state.dr.async_get", return_value=registry):
         await mixin._async_update_smart_locks("s1")
     assert "api_gone" not in space.smart_locks

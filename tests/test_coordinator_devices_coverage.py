@@ -897,6 +897,7 @@ async def test_update_devices_absent_device_removed_after_threshold() -> None:
 
     registry = MagicMock()
     registry.async_get_device_by_identifier = MagicMock(return_value=None)
+    registry.async_get_device = MagicMock(return_value=None)
     with patch(
         "custom_components.ajax._coordinator_devices.dr.async_get",
         return_value=registry,
@@ -1243,6 +1244,7 @@ async def test_update_devices_removed_device_unregistered_from_ha() -> None:
     ha_device = SimpleNamespace(id="ha-ghost")
     registry = MagicMock()
     registry.async_get_device_by_identifier = MagicMock(return_value=ha_device)
+    registry.async_get_device = MagicMock(return_value=ha_device)
     registry.async_remove_device = MagicMock()
     with patch(
         "custom_components.ajax._coordinator_devices.dr.async_get",

@@ -205,6 +205,17 @@ def test_device_info_links_to_recording_nvr() -> None:
     assert cam.device_info["via_device_id"] == fake_device_id("entry_test", "nvr-99")
 
 
+def test_device_info_omits_parent_when_nvr_not_registered() -> None:
+    """An unregistered parent drops the link; a dangling id would be rejected."""
+    cam = _camera(video_edge=_video_edge())
+    cam._get_recording_nvr_id = lambda: "nvr-99"
+    cam.coordinator.hass = fake_hass(missing=["nvr-99"])
+
+    info = cam.device_info
+    assert "via_device_id" not in info
+    assert info["identifiers"] == {("ajax", "entry_test_ve1")}
+
+
 # ---------------------------------------------------------------------------
 # Camera: _get_recording_nvr_id
 # ---------------------------------------------------------------------------

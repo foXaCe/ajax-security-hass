@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Generator
+from collections.abc import Collection, Generator
 from types import SimpleNamespace
 
 import pytest
@@ -34,13 +34,26 @@ class _FakeDeviceRegistry:
     unit tests bypass the HA harness entirely (``object.__new__`` + stubbed
     coordinator), so they get this stand-in instead: every identifier resolves
     to a stable, predictable device id.
+
+    That models the production invariant — hubs and NVRs are pre-registered
+    before the platforms run — so the parent is always found. Pass ``missing``
+    to model the opposite and check that the link is dropped rather than set
+    to a dangling id.
     """
 
-    def async_get_device_by_identifier(self, identifier: tuple[str, str], config_entry_id: str) -> SimpleNamespace:
-        """Resolve any identifier to a device whose id derives from it."""
+    def __init__(self, *, missing: Collection[str] = ()) -> None:
+        """Store the raw Ajax ids that must *not* resolve to a device."""
+        self._missing = set(missing)
+
+    def async_get_device_by_identifier(
+        self, identifier: tuple[str, str], config_entry_id: str
+    ) -> SimpleNamespace | None:
+        """Resolve an identifier to a device whose id derives from it."""
+        if any(identifier[1].endswith(f"_{raw_id}") for raw_id in self._missing):
+            return None
         return SimpleNamespace(id=f"dev_{identifier[1]}")
 
-    def async_get_device(self, identifiers: set[tuple[str, str]]) -> SimpleNamespace:
+    def async_get_device(self, identifiers: set[tuple[str, str]]) -> SimpleNamespace | None:
         """Same resolution through the pre-2026.8 lookup."""
         return self.async_get_device_by_identifier(next(iter(identifiers)), "")
 
@@ -50,6 +63,9 @@ def fake_device_id(entry_id: str, raw_id: str) -> str:
     return f"dev_{entry_id}_{raw_id}"
 
 
-def fake_hass() -> SimpleNamespace:
-    """Return a stand-in ``hass`` that ``device_registry.async_get`` accepts."""
-    return SimpleNamespace(data={dr.DATA_REGISTRY: _FakeDeviceRegistry()})
+def fake_hass(*, missing: Collection[str] = ()) -> SimpleNamespace:
+    """Return a stand-in ``hass`` that ``device_registry.async_get`` accepts.
+
+    ``missing`` lists raw Ajax ids the registry must not know about.
+    """
+    return SimpleNamespace(data={dr.DATA_REGISTRY: _FakeDeviceRegistry(missing=missing)})

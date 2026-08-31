@@ -28,6 +28,7 @@ from custom_components.ajax.switch import (
     async_setup_entry,
     is_lightswitch_device,
 )
+from tests.conftest import fake_hass
 
 # ---------------------------------------------------------------------------
 # Builders
@@ -72,6 +73,7 @@ def _coordinator(
     )
     return SimpleNamespace(
         entry_id="entry_test",
+        hass=fake_hass(),
         get_space=lambda sid: space,
         last_update_success=True,
         api=api,
@@ -563,6 +565,7 @@ async def test_async_setup_entry_creates_relay_switch() -> None:
     account = _account_with(device)
     coordinator = SimpleNamespace(
         entry_id="entry_test",
+        hass=fake_hass(),
         account=account,
         get_space=account.spaces.get,
     )
@@ -589,6 +592,7 @@ async def test_async_setup_entry_creates_dimmer_switches() -> None:
     account = _account_with(device)
     coordinator = SimpleNamespace(
         entry_id="entry_test",
+        hass=fake_hass(),
         account=account,
         get_space=account.spaces.get,
     )
@@ -613,6 +617,7 @@ async def test_async_setup_entry_creates_lightswitch_settings_switches() -> None
     account = _account_with(device)
     coordinator = SimpleNamespace(
         entry_id="entry_test",
+        hass=fake_hass(),
         account=account,
         get_space=account.spaces.get,
     )
@@ -633,6 +638,7 @@ async def test_async_setup_entry_no_entities_skips_add() -> None:
     account = _account_with(device)
     coordinator = SimpleNamespace(
         entry_id="entry_test",
+        hass=fake_hass(),
         account=account,
         get_space=account.spaces.get,
     )
@@ -650,6 +656,7 @@ async def _capture_builder(device: AjaxDevice | None):
         space.devices[device.id] = device
     coordinator = SimpleNamespace(
         entry_id="entry_test",
+        hass=fake_hass(),
         account=AjaxAccount(user_id="u1", name="U", email="u@e.com", spaces={"s1": space}),
         get_space=lambda sid: space if sid == "s1" else None,
     )

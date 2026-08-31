@@ -14,7 +14,7 @@ from homeassistant.components.sensor import (
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from ._ids import device_identifier
+from ._ids import device_identifier, via_device_info
 from .const import MANUFACTURER
 from .coordinator import AjaxDataCoordinator
 from .models import (
@@ -69,7 +69,7 @@ class AjaxSmartLockSensor(CoordinatorEntity[AjaxDataCoordinator], SensorEntity):
             name=smart_lock.name,
             manufacturer=MANUFACTURER,
             model="LockBridge Jeweller",
-            via_device=device_identifier(self.coordinator.entry_id, self._space_id),
+            **via_device_info(self.coordinator.hass, self.coordinator.entry_id, self._space_id),
         )
 
     def _get_smart_lock(self) -> AjaxSmartLock | None:

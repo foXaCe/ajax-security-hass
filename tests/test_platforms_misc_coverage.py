@@ -46,6 +46,7 @@ from custom_components.ajax.models import (
     VideoEdgeType,
 )
 from custom_components.ajax.valve import AjaxValve
+from tests.conftest import fake_hass
 
 # ===========================================================================
 # logbook.py
@@ -487,7 +488,8 @@ def test_update_device_registry_updates_existing_entry(monkeypatch: pytest.Monke
     panel.hass = MagicMock()
 
     registry = MagicMock()
-    registry.async_get_device.return_value = SimpleNamespace(id="dev-entry-1")
+    registry.async_get_device_by_identifier.return_value = SimpleNamespace(id="dev-entry-1")
+    registry.async_get_device.return_value = registry.async_get_device_by_identifier.return_value
     monkeypatch.setattr(
         "custom_components.ajax.alarm_control_panel.dr.async_get",
         lambda _hass: registry,
@@ -509,6 +511,7 @@ def test_update_device_registry_noop_when_entry_missing(monkeypatch: pytest.Monk
     panel.hass = MagicMock()
 
     registry = MagicMock()
+    registry.async_get_device_by_identifier.return_value = None
     registry.async_get_device.return_value = None
     monkeypatch.setattr(
         "custom_components.ajax.alarm_control_panel.dr.async_get",
@@ -774,7 +777,9 @@ def _event_entity(*, account_spaces: dict | None) -> AjaxEventEntity:
     ent = object.__new__(AjaxEventEntity)
     ent._device_id = "x1"
     account = SimpleNamespace(spaces=account_spaces) if account_spaces is not None else None
-    ent.coordinator = SimpleNamespace(last_update_success=True, account=account, entry_id="entry_test")
+    ent.coordinator = SimpleNamespace(
+        last_update_success=True, account=account, entry_id="entry_test", hass=fake_hass()
+    )
     return ent
 
 
@@ -855,7 +860,9 @@ def _lock(smart_lock: AjaxSmartLock | None) -> AjaxLock:
     lock._space_id = "s1"
     lock._smart_lock_id = "sl1"
     space = SimpleNamespace(smart_locks={"sl1": smart_lock} if smart_lock else {})
-    lock.coordinator = SimpleNamespace(last_update_success=True, get_space=lambda sid: space, entry_id="entry_test")
+    lock.coordinator = SimpleNamespace(
+        last_update_success=True, get_space=lambda sid: space, entry_id="entry_test", hass=fake_hass()
+    )
     return lock
 
 
@@ -909,7 +916,9 @@ def test_lock_get_smart_lock_none_when_space_missing() -> None:
 def _tracker(space: SimpleNamespace | None) -> AjaxHubTracker:
     tracker = object.__new__(AjaxHubTracker)
     tracker._space_id = "s1"
-    tracker.coordinator = SimpleNamespace(last_update_success=True, get_space=lambda sid: space, entry_id="entry_test")
+    tracker.coordinator = SimpleNamespace(
+        last_update_success=True, get_space=lambda sid: space, entry_id="entry_test", hass=fake_hass()
+    )
     return tracker
 
 
@@ -933,7 +942,9 @@ def _geofence_tracker(geofence: dict) -> AjaxHubTracker:
     space = SimpleNamespace(hub_details={"geoFence": geofence}, hub_id="hub1", name="Maison")
     tracker = object.__new__(AjaxHubTracker)
     tracker._space_id = "s1"
-    tracker.coordinator = SimpleNamespace(last_update_success=True, get_space=lambda sid: space, entry_id="entry_test")
+    tracker.coordinator = SimpleNamespace(
+        last_update_success=True, get_space=lambda sid: space, entry_id="entry_test", hass=fake_hass()
+    )
     return tracker
 
 

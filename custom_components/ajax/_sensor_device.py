@@ -16,7 +16,7 @@ from homeassistant.components.sensor import (
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from ._ids import device_identifier
+from ._ids import device_identifier, via_device_info
 from .const import MANUFACTURER
 from .coordinator import AjaxDataCoordinator
 from .devices.base import resolve_entity_category
@@ -121,7 +121,7 @@ class AjaxDeviceSensor(CoordinatorEntity[AjaxDataCoordinator], SensorEntity):
             name=device.name,
             manufacturer=MANUFACTURER,
             model=device.raw_type,
-            via_device=device_identifier(self.coordinator.entry_id, self._space_id),
+            **via_device_info(self.coordinator.hass, self.coordinator.entry_id, self._space_id),
             sw_version=device.firmware_version,
             hw_version=device.hardware_version,
             suggested_area=device.room_name,
@@ -242,19 +242,19 @@ class AjaxVideoEdgeSensor(CoordinatorEntity[AjaxDataCoordinator], SensorEntity):
         if video_edge.color:
             model_name = f"{model_name} ({video_edge.color.title()})"
 
-        # Determine via_device: if camera is recorded by NVR, link to NVR
+        # Determine the parent device: if the camera is recorded by an NVR, link to the NVR
         # Otherwise link to hub (space_id)
-        via_device_id = self._space_id
+        parent_id = self._space_id
         nvr_id = self._get_recording_nvr_id()
         if nvr_id:
-            via_device_id = nvr_id
+            parent_id = nvr_id
 
         return DeviceInfo(
             identifiers={device_identifier(self.coordinator.entry_id, self._video_edge_id)},
             name=video_edge.name,
             manufacturer=MANUFACTURER,
             model=model_name,
-            via_device=device_identifier(self.coordinator.entry_id, via_device_id),
+            **via_device_info(self.coordinator.hass, self.coordinator.entry_id, parent_id),
             sw_version=video_edge.firmware_version,
             suggested_area=video_edge.room_name,
         )

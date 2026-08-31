@@ -23,7 +23,7 @@ from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 
 from ._device_type_map import DEVICE_TYPE_MAP
-from ._ids import device_identifier
+from ._ids import find_device
 from .api import AjaxRestAuthError
 from .const import SIGNAL_NEW_SMART_LOCK, SIGNAL_NEW_VIDEO_EDGE
 from .models import (
@@ -218,9 +218,7 @@ class AjaxStateUpdaterMixin:
                         removed_ve = space.video_edges.get(ve_id)
                         ve_name = removed_ve.name if removed_ve else ve_id
 
-                        ha_device = device_registry.async_get_device(
-                            identifiers={device_identifier(self.entry_id, ve_id)}
-                        )
+                        ha_device = find_device(device_registry, self.entry_id, ve_id)
                         if ha_device:
                             device_registry.async_remove_device(ha_device.id)
                             _LOGGER.info(
@@ -334,9 +332,7 @@ class AjaxStateUpdaterMixin:
 
                         sl_name = removed_sl.name if removed_sl else sl_id
 
-                        ha_device = device_registry.async_get_device(
-                            identifiers={device_identifier(self.entry_id, sl_id)}
-                        )
+                        ha_device = find_device(device_registry, self.entry_id, sl_id)
                         if ha_device:
                             device_registry.async_remove_device(ha_device.id)
                             _LOGGER.info(

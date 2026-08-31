@@ -35,6 +35,7 @@ from custom_components.ajax.models import (
     DeviceType,
     VideoEdgeType,
 )
+from tests.conftest import fake_hass
 
 # ---------------------------------------------------------------------------
 # Builders
@@ -84,6 +85,7 @@ def _event_coordinator(account: AjaxAccount | None):
     space = account.spaces["s1"] if account else None
     return SimpleNamespace(
         entry_id="entry_test",
+        hass=fake_hass(),
         account=account,
         get_space=lambda sid: space if sid == "s1" else None,
         _event_entities={},
@@ -110,7 +112,9 @@ def _make_event(
     entity._attr_event_types = list(event_types)
     entity.hass = None
     entity._trigger_event = MagicMock()
-    entity.coordinator = coordinator or SimpleNamespace(entry_id="entry_test", _event_entities={}, account=None)
+    entity.coordinator = coordinator or SimpleNamespace(
+        entry_id="entry_test", hass=fake_hass(), _event_entities={}, account=None
+    )
     return entity
 
 
@@ -124,7 +128,9 @@ def test_fire_writes_ha_state_when_hass_present() -> None:
 
 
 def test_device_info_returns_none_when_account_missing() -> None:
-    entity = _make_event(coordinator=SimpleNamespace(entry_id="entry_test", _event_entities={}, account=None))
+    entity = _make_event(
+        coordinator=SimpleNamespace(entry_id="entry_test", hass=fake_hass(), _event_entities={}, account=None)
+    )
     assert entity.device_info is None
 
 
@@ -287,6 +293,7 @@ async def test_event_setup_entry_dedupes_duplicate_unique_ids() -> None:
     account.spaces["s2"] = space2
     coordinator = SimpleNamespace(
         entry_id="entry_test",
+        hass=fake_hass(),
         account=account,
         get_space=lambda sid: account.spaces.get(sid),
         _event_entities={},
@@ -404,6 +411,7 @@ def _make_panic(*, space) -> AjaxPanicButton:
     button._last_press_ts = 0.0
     button.coordinator = SimpleNamespace(
         entry_id="entry_test",
+        hass=fake_hass(),
         async_press_panic_button=AsyncMock(),
         get_space=lambda sid: space if sid == "s1" else None,
     )

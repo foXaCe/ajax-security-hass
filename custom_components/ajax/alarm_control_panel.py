@@ -20,7 +20,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import AjaxConfigEntry
 from ._discovery import connect_new_entity_signal
-from ._ids import device_identifier
+from ._ids import device_identifier, find_device
 from .const import DOMAIN, MANUFACTURER, SIGNAL_NEW_GROUP, SIGNAL_NEW_SPACE
 from .coordinator import AjaxDataCoordinator
 from .models import GroupState, SecurityState
@@ -282,9 +282,7 @@ class AjaxAlarmControlPanel(CoordinatorEntity[AjaxDataCoordinator], AlarmControl
             return
 
         device_registry = dr.async_get(self.hass)
-        device_entry = device_registry.async_get_device(
-            identifiers={device_identifier(self.coordinator.entry_id, self._space_id)}
-        )
+        device_entry = find_device(device_registry, self.coordinator.entry_id, self._space_id)
         if not device_entry:
             _LOGGER.debug("No device entry found for %s", self._space_id)
             return

@@ -889,6 +889,7 @@ async def test_setup_areas_creates_area_and_assigns_device() -> None:
 
     device_reg = MagicMock()
     ha_device = SimpleNamespace(id="ha-dev", area_id=None)
+    device_reg.async_get_device_by_identifier.return_value = ha_device
     device_reg.async_get_device.return_value = ha_device
 
     with (
@@ -919,7 +920,8 @@ async def test_setup_areas_respects_existing_area_and_assignment() -> None:
 
     device_reg = MagicMock()
     # d1 already has an area assigned -> skipped
-    device_reg.async_get_device.return_value = SimpleNamespace(id="x", area_id="set")
+    device_reg.async_get_device_by_identifier.return_value = SimpleNamespace(id="x", area_id="set")
+    device_reg.async_get_device.return_value = device_reg.async_get_device_by_identifier.return_value
 
     with (
         patch("custom_components.ajax.ar.async_get", return_value=area_reg),
@@ -945,7 +947,8 @@ async def test_setup_areas_missing_ha_device_skipped() -> None:
     area_reg = MagicMock()
     area_reg.async_get_area_by_name.return_value = SimpleNamespace(id="a")
     device_reg = MagicMock()
-    device_reg.async_get_device.return_value = None  # not in registry
+    device_reg.async_get_device_by_identifier.return_value = None  # not in registry
+    device_reg.async_get_device.return_value = None
 
     with (
         patch("custom_components.ajax.ar.async_get", return_value=area_reg),

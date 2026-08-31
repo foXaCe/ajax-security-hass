@@ -23,7 +23,7 @@ from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from ._ids import device_identifier
+from ._ids import device_identifier, find_device, via_device_info
 from .const import MANUFACTURER
 from .coordinator import AjaxDataCoordinator
 from .devices.base import resolve_entity_category
@@ -135,9 +135,7 @@ class AjaxBinarySensor(CoordinatorEntity[AjaxDataCoordinator], BinarySensorEntit
             return
 
         device_registry = dr.async_get(self.hass)
-        device_entry = device_registry.async_get_device(
-            identifiers={device_identifier(self.coordinator.entry_id, self._device_id)}
-        )
+        device_entry = find_device(device_registry, self.coordinator.entry_id, self._device_id)
         if not device_entry:
             return
 
@@ -174,7 +172,7 @@ class AjaxBinarySensor(CoordinatorEntity[AjaxDataCoordinator], BinarySensorEntit
             name=device.name,
             manufacturer=MANUFACTURER,
             model=model_name,
-            via_device=device_identifier(self.coordinator.entry_id, self._space_id),
+            **via_device_info(self.coordinator.hass, self.coordinator.entry_id, self._space_id),
             sw_version=device.firmware_version,
             hw_version=device.hardware_version,
             suggested_area=device.room_name,
@@ -270,19 +268,19 @@ class AjaxVideoEdgeBinarySensor(CoordinatorEntity[AjaxDataCoordinator], BinarySe
         if video_edge.color:
             model_name = f"{model_name} ({video_edge.color.title()})"
 
-        # Determine via_device: if camera is recorded by NVR, link to NVR
+        # Determine the parent device: if the camera is recorded by an NVR, link to the NVR
         # Otherwise link to hub (space_id)
-        via_device_id = self._space_id
+        parent_id = self._space_id
         nvr_id = self._get_recording_nvr_id()
         if nvr_id:
-            via_device_id = nvr_id
+            parent_id = nvr_id
 
         return DeviceInfo(
             identifiers={device_identifier(self.coordinator.entry_id, self._video_edge_id)},
             name=video_edge.name,
             manufacturer=MANUFACTURER,
             model=model_name,
-            via_device=device_identifier(self.coordinator.entry_id, via_device_id),
+            **via_device_info(self.coordinator.hass, self.coordinator.entry_id, parent_id),
             sw_version=video_edge.firmware_version,
             suggested_area=video_edge.room_name,
         )
@@ -438,7 +436,7 @@ class AjaxSmartLockBinarySensor(CoordinatorEntity[AjaxDataCoordinator], BinarySe
             name=smart_lock.name,
             manufacturer=MANUFACTURER,
             model="LockBridge Jeweller",
-            via_device=device_identifier(self.coordinator.entry_id, self._space_id),
+            **via_device_info(self.coordinator.hass, self.coordinator.entry_id, self._space_id),
         )
 
     def _get_smart_lock(self) -> AjaxSmartLock | None:

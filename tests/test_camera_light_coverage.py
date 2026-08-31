@@ -58,6 +58,7 @@ from custom_components.ajax.models import (
     DeviceType,
     VideoEdgeType,
 )
+from tests.conftest import fake_device_id, fake_hass
 
 # ---------------------------------------------------------------------------
 # Camera helpers
@@ -128,6 +129,7 @@ def _camera(
     cam.coordinator = SimpleNamespace(
         last_update_success=True,
         entry_id="entry_test",
+        hass=fake_hass(),
         data=SimpleNamespace(spaces={"s1": space}),
         get_space=lambda sid: space if sid == "s1" else None,
     )
@@ -185,7 +187,7 @@ def test_device_info_standalone_links_to_hub() -> None:
     assert info["identifiers"] == {("ajax", "entry_test_ve1")}
     assert info["name"] == "Front Door Cam"
     assert info["model"] == "TurretCam (White)"
-    assert info["via_device"] == ("ajax", "entry_test_s1")
+    assert info["via_device_id"] == fake_device_id("entry_test", "s1")
     assert info["sw_version"] == "1.2.3"
 
 
@@ -200,7 +202,18 @@ def test_device_info_links_to_recording_nvr() -> None:
     ve = _video_edge()
     cam = _camera(video_edge=ve)
     cam._get_recording_nvr_id = lambda: "nvr-99"
-    assert cam.device_info["via_device"] == ("ajax", "entry_test_nvr-99")
+    assert cam.device_info["via_device_id"] == fake_device_id("entry_test", "nvr-99")
+
+
+def test_device_info_omits_parent_when_nvr_not_registered() -> None:
+    """An unregistered parent drops the link; a dangling id would be rejected."""
+    cam = _camera(video_edge=_video_edge())
+    cam._get_recording_nvr_id = lambda: "nvr-99"
+    cam.coordinator.hass = fake_hass(missing=["nvr-99"])
+
+    info = cam.device_info
+    assert "via_device_id" not in info
+    assert info["identifiers"] == {("ajax", "entry_test_ve1")}
 
 
 # ---------------------------------------------------------------------------
@@ -495,6 +508,7 @@ def _light(
     )
     light.coordinator = SimpleNamespace(
         entry_id="entry_test",
+        hass=fake_hass(),
         get_space=lambda sid: space if sid == "s1" else None,
         last_update_success=update_success,
         api=api,
@@ -526,7 +540,7 @@ def test_light_device_info() -> None:
     assert info["name"] == "Dimmer Lounge"
     assert info["model"] == "LightSwitchDimmer"
     assert info["sw_version"] == "2.0.0"
-    assert info["via_device"] == ("ajax", "entry_test_s1")
+    assert info["via_device_id"] == fake_device_id("entry_test", "s1")
 
 
 def test_light_device_info_default_model_when_no_raw_type() -> None:
@@ -727,6 +741,7 @@ async def test_turn_off_rollback_pops_unset_attrs() -> None:
 def _setup_coordinator(spaces: dict[str, AjaxSpace], *, account: bool = False) -> SimpleNamespace:
     coord = SimpleNamespace(
         entry_id="entry_test",
+        hass=fake_hass(),
         data=SimpleNamespace(spaces=spaces),
         get_space=lambda sid: spaces.get(sid),
     )

@@ -896,6 +896,7 @@ async def test_update_devices_absent_device_removed_after_threshold() -> None:
     mixin = _make_mixin(account=account, devices_list=payload)
 
     registry = MagicMock()
+    registry.async_get_device_by_identifier = MagicMock(return_value=None)
     registry.async_get_device = MagicMock(return_value=None)
     with patch(
         "custom_components.ajax._coordinator_devices.dr.async_get",
@@ -1242,6 +1243,7 @@ async def test_update_devices_removed_device_unregistered_from_ha() -> None:
 
     ha_device = SimpleNamespace(id="ha-ghost")
     registry = MagicMock()
+    registry.async_get_device_by_identifier = MagicMock(return_value=ha_device)
     registry.async_get_device = MagicMock(return_value=ha_device)
     registry.async_remove_device = MagicMock()
     with patch(
@@ -1251,7 +1253,9 @@ async def test_update_devices_removed_device_unregistered_from_ha() -> None:
         await mixin._async_update_devices("s1")
 
     # Lookup uses the namespaced identifier (DOMAIN, "entry_test_ghost").
-    registry.async_get_device.assert_called_once_with(identifiers={device_identifier("entry_test", "ghost")})
+    registry.async_get_device_by_identifier.assert_called_once_with(
+        device_identifier("entry_test", "ghost"), "entry_test"
+    )
     registry.async_remove_device.assert_called_once_with("ha-ghost")
     assert "ghost" not in space.devices
 

@@ -24,8 +24,20 @@ def fake_hass() -> SimpleNamespace:
 
 @pytest.fixture
 def fake_entry() -> SimpleNamespace:
-    entry = SimpleNamespace(async_on_unload=MagicMock())
+    entry = SimpleNamespace(async_on_unload=MagicMock(), runtime_data=MagicMock())
     return entry
+
+
+@pytest.fixture
+def mock_register_parents():
+    """Stub the parent-device pre-registration the helper triggers.
+
+    Newly-discovered entities link to their parent by device-registry id, so
+    the helper registers hubs/NVRs before adding them. That needs a real
+    registry, which these dispatcher-level tests deliberately do without.
+    """
+    with patch.object(_discovery, "async_register_parent_devices") as mock:
+        yield mock
 
 
 def _registry(*existing_unique_ids: str) -> MagicMock:
@@ -55,6 +67,7 @@ def test_adds_only_unknown_entities(
     mock_er,
     fake_hass,
     fake_entry,
+    mock_register_parents,
 ) -> None:
     # Dedup is on entity.unique_id, so fake entities must carry it.
     ent_new = SimpleNamespace(unique_id="uid_new")
@@ -136,6 +149,7 @@ def test_passes_signal_and_domain_through(
     mock_er,
     fake_hass,
     fake_entry,
+    mock_register_parents,
 ) -> None:
     builder = MagicMock(return_value=[])
     mock_er.async_get.return_value = _registry()
@@ -149,3 +163,46 @@ def test_passes_signal_and_domain_through(
     builder.return_value = [("uid", SimpleNamespace(unique_id="uid"))]
     handler("s", "o")
     mock_er.async_get.return_value.async_get_entity_id.assert_called_with("event", _discovery.DOMAIN, "uid")
+
+
+@patch.object(_discovery, "er")
+@patch.object(_discovery, "async_dispatcher_connect")
+def test_registers_parent_devices_before_adding(
+    mock_dispatcher_connect,
+    mock_er,
+    fake_hass,
+    fake_entry,
+    mock_register_parents,
+) -> None:
+    """Parents are registered before the entities that link to them are added."""
+    entity = SimpleNamespace(unique_id="uid_new")
+    builder = MagicMock(return_value=[("uid_new", entity)])
+    mock_er.async_get.return_value = _registry()
+
+    async_add = _connect(fake_hass, fake_entry, builder)
+    handler = mock_dispatcher_connect.call_args.args[2]
+    handler("space-1", "obj-1")
+
+    mock_register_parents.assert_called_once_with(fake_hass, fake_entry, fake_entry.runtime_data)
+    async_add.assert_called_once_with([entity])
+
+
+@patch.object(_discovery, "er")
+@patch.object(_discovery, "async_dispatcher_connect")
+def test_no_parent_registration_when_nothing_to_add(
+    mock_dispatcher_connect,
+    mock_er,
+    fake_hass,
+    fake_entry,
+    mock_register_parents,
+) -> None:
+    """A signal that yields no fresh entity touches neither registry."""
+    entity = SimpleNamespace(unique_id="uid_seen")
+    builder = MagicMock(return_value=[("uid_seen", entity)])
+    mock_er.async_get.return_value = _registry("uid_seen")
+
+    _connect(fake_hass, fake_entry, builder)
+    handler = mock_dispatcher_connect.call_args.args[2]
+    handler("space-1", "obj-1")
+
+    mock_register_parents.assert_not_called()

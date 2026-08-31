@@ -157,7 +157,7 @@ rules:
       Each platform exposes a `DeviceInfo` with `identifiers`, `name`,
       `manufacturer="Ajax Systems"`, `model` (device-type display name) and
       `sw_version` / `hw_version` (sourced from the Ajax API on every
-      poll). NVR-channel cameras link back to the parent NVR via `via_device`.
+      poll). NVR-channel cameras link back to the parent NVR via `via_device_id`.
   diagnostics:
     status: done
     comment: |

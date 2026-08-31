@@ -18,7 +18,8 @@ from homeassistant.helpers import (
 )
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
-from ._ids import device_identifier
+from ._device_parents import async_register_parent_devices
+from ._ids import find_device
 from ._services import (  # noqa: F401  (SERVICE_* re-exported for tests/back-compat)
     SERVICE_FORCE_ARM,
     SERVICE_FORCE_ARM_NIGHT,
@@ -217,6 +218,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: AjaxConfigEntry) -> bool
     # Fetch initial data
     await coordinator.async_config_entry_first_refresh()
 
+    # Register the devices other devices hang off (hubs, then NVRs) before the
+    # platforms run: entities express their parent link as a device-registry id,
+    # which can only be resolved once the parent exists.
+    async_register_parent_devices(hass, entry, coordinator)
+
     # Set up platforms
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
@@ -342,9 +348,7 @@ async def _async_setup_areas(hass: HomeAssistant, coordinator: AjaxDataCoordinat
             for device_id, device in space.devices.items():
                 if device.room_id == room_id:
                     # Find the HA device by identifiers
-                    ha_device = device_reg.async_get_device(
-                        identifiers={device_identifier(coordinator.entry_id, device_id)}
-                    )
+                    ha_device = find_device(device_reg, coordinator.entry_id, device_id)
                     # Only assign area if device has no area yet (respect user changes)
                     if ha_device and ha_device.area_id is None:
                         device_reg.async_update_device(ha_device.id, area_id=area.id)

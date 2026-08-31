@@ -31,7 +31,7 @@ from homeassistant.helpers.dispatcher import async_dispatcher_send
 
 from ._device_apply import apply_device_payload
 from ._device_normalize import AjaxDeviceNormalizeMixin
-from ._ids import device_identifier
+from ._ids import find_device
 from .const import DOMAIN, SIGNAL_NEW_DEVICE
 from .models import AjaxDevice, DeviceType
 
@@ -304,9 +304,7 @@ class AjaxDevicesMixin(AjaxDeviceNormalizeMixin):
                     device_name = removed_device.name if removed_device else device_id
 
                     # Remove from HA device registry
-                    ha_device = device_registry.async_get_device(
-                        identifiers={device_identifier(self.entry_id, device_id)}
-                    )
+                    ha_device = find_device(device_registry, self.entry_id, device_id)
                     if ha_device:
                         device_registry.async_remove_device(ha_device.id)
                         _LOGGER.info(

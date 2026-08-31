@@ -17,7 +17,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import AjaxConfigEntry
 from ._discovery import connect_new_entity_signal
-from ._ids import device_identifier
+from ._ids import device_identifier, via_device_info
 from .const import MANUFACTURER, SIGNAL_NEW_DEVICE, SIGNAL_NEW_SMART_LOCK, SIGNAL_NEW_VIDEO_EDGE
 from .coordinator import AjaxDataCoordinator
 from .devices import get_device_handler
@@ -241,7 +241,7 @@ class AjaxEventEntity(CoordinatorEntity[AjaxDataCoordinator], EventEntity):
                     name=device.name,
                     manufacturer=MANUFACTURER,
                     model=device.type.value,
-                    via_device=device_identifier(self.coordinator.entry_id, space.id),
+                    **via_device_info(self.coordinator.hass, self.coordinator.entry_id, space.id),
                 )
             # Check video_edges (for doorbell)
             video_edge = space.video_edges.get(self._device_id)
@@ -252,7 +252,7 @@ class AjaxEventEntity(CoordinatorEntity[AjaxDataCoordinator], EventEntity):
                     name=video_edge.name,
                     manufacturer=MANUFACTURER,
                     model=model_name,
-                    via_device=device_identifier(self.coordinator.entry_id, space.id),
+                    **via_device_info(self.coordinator.hass, self.coordinator.entry_id, space.id),
                 )
             # Check smart_locks
             smart_lock = space.smart_locks.get(self._device_id)
@@ -262,7 +262,7 @@ class AjaxEventEntity(CoordinatorEntity[AjaxDataCoordinator], EventEntity):
                     name=smart_lock.name,
                     manufacturer=MANUFACTURER,
                     model="LockBridge Jeweller",
-                    via_device=device_identifier(self.coordinator.entry_id, space.id),
+                    **via_device_info(self.coordinator.hass, self.coordinator.entry_id, space.id),
                 )
         return None
 

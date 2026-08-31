@@ -7,7 +7,7 @@ uncovered:
 - the pure formatting helpers in ``sensor.py`` (``format_*``,
   ``get_last_event_*``, ``_format_time_ago``);
 - the ``device_info`` properties of every entity class (model naming,
-  via_device / NVR linking, hub firmware);
+  parent-device / NVR linking, hub firmware);
 - the hub/smart-lock binary sensors (``AjaxHubBinarySensor`` value_key vs
   value_fn, ``AjaxSmartLockBinarySensor`` door state);
 - the registry-update path of ``AjaxBinarySensor``;
@@ -59,6 +59,7 @@ from custom_components.ajax.sensor import (
     get_last_event_attributes,
     get_last_event_text,
 )
+from tests.conftest import fake_device_id, fake_hass
 
 # ===========================================================================
 # sensor.py — pure formatting helpers
@@ -229,7 +230,9 @@ def test_space_sensor_device_info_with_firmware_and_subtype() -> None:
     sensor = object.__new__(AjaxSpaceSensor)
     sensor._space_id = "s1"
     sensor.entity_description = AjaxSpaceSensorDescription(key="x", value_fn=lambda s: 0)
-    sensor.coordinator = SimpleNamespace(last_update_success=True, get_space=lambda sid: space, entry_id="entry_test")
+    sensor.coordinator = SimpleNamespace(
+        last_update_success=True, get_space=lambda sid: space, entry_id="entry_test", hass=fake_hass()
+    )
 
     info = sensor.device_info
     assert info["identifiers"] == {("ajax", "entry_test_s1")}
@@ -244,7 +247,9 @@ def test_space_sensor_device_info_renames_bare_hub_and_defaults_model() -> None:
     sensor = object.__new__(AjaxSpaceSensor)
     sensor._space_id = "s1"
     sensor.entity_description = AjaxSpaceSensorDescription(key="x", value_fn=lambda s: 0)
-    sensor.coordinator = SimpleNamespace(last_update_success=True, get_space=lambda sid: space, entry_id="entry_test")
+    sensor.coordinator = SimpleNamespace(
+        last_update_success=True, get_space=lambda sid: space, entry_id="entry_test", hass=fake_hass()
+    )
 
     info = sensor.device_info
     assert info["name"] == "Ajax Hub"
@@ -302,7 +307,9 @@ def _device_sensor(device: AjaxDevice | None) -> AjaxDeviceSensor:
     sensor._sensor_key = "battery"
     sensor._sensor_desc = {"key": "battery"}
     space = SimpleNamespace(devices={"d1": device} if device else {})
-    sensor.coordinator = SimpleNamespace(get_space=lambda sid: space, last_update_success=True, entry_id="entry_test")
+    sensor.coordinator = SimpleNamespace(
+        get_space=lambda sid: space, last_update_success=True, entry_id="entry_test", hass=fake_hass()
+    )
     return sensor
 
 
@@ -316,7 +323,7 @@ def test_device_sensor_device_info() -> None:
     info = _device_sensor(device).device_info
     assert info["identifiers"] == {("ajax", "entry_test_d1")}
     assert info["model"] == "MotionProtect"
-    assert info["via_device"] == ("ajax", "entry_test_s1")
+    assert info["via_device_id"] == fake_device_id("entry_test", "s1")
     assert info["sw_version"] == "1.2"
     assert info["hw_version"] == "HW3"
     assert info["suggested_area"] == "Kitchen"
@@ -360,7 +367,9 @@ def _ve_sensor(video_edge: AjaxVideoEdge | None, *, nvr_id: str | None = None) -
         video_edges={"ve1": video_edge} if video_edge else {},
         get_recording_nvr_id=lambda cam_id: nvr_id,
     )
-    sensor.coordinator = SimpleNamespace(get_space=lambda sid: space, last_update_success=True, entry_id="entry_test")
+    sensor.coordinator = SimpleNamespace(
+        get_space=lambda sid: space, last_update_success=True, entry_id="entry_test", hass=fake_hass()
+    )
     return sensor
 
 
@@ -369,12 +378,12 @@ def test_ve_sensor_device_info_standalone_links_to_hub() -> None:
     assert info["identifiers"] == {("ajax", "entry_test_ve1")}
     # Human-readable model name plus colour suffix.
     assert info["model"] == "BulletCam (White)"
-    assert info["via_device"] == ("ajax", "entry_test_s1")
+    assert info["via_device_id"] == fake_device_id("entry_test", "s1")
 
 
 def test_ve_sensor_device_info_links_to_nvr_when_recorded() -> None:
     info = _ve_sensor(_video_edge(), nvr_id="nvr99").device_info
-    assert info["via_device"] == ("ajax", "entry_test_nvr99")
+    assert info["via_device_id"] == fake_device_id("entry_test", "nvr99")
 
 
 def test_ve_sensor_device_info_none_when_missing() -> None:
@@ -441,7 +450,9 @@ def test_hub_sensor_device_info_links_to_space() -> None:
     space = _hub_space()
     sensor = object.__new__(AjaxHubSensor)
     sensor._space_id = "s1"
-    sensor.coordinator = SimpleNamespace(last_update_success=True, get_space=lambda sid: space, entry_id="entry_test")
+    sensor.coordinator = SimpleNamespace(
+        last_update_success=True, get_space=lambda sid: space, entry_id="entry_test", hass=fake_hass()
+    )
     assert sensor.device_info["identifiers"] == {("ajax", "entry_test_s1")}
 
 
@@ -463,11 +474,13 @@ def test_smart_lock_sensor_device_info() -> None:
     sensor._space_id = "s1"
     sensor._smart_lock_id = "lock1"
     space = SimpleNamespace(smart_locks={"lock1": lock})
-    sensor.coordinator = SimpleNamespace(last_update_success=True, get_space=lambda sid: space, entry_id="entry_test")
+    sensor.coordinator = SimpleNamespace(
+        last_update_success=True, get_space=lambda sid: space, entry_id="entry_test", hass=fake_hass()
+    )
     info = sensor.device_info
     assert info["identifiers"] == {("ajax", "entry_test_lock1")}
     assert info["model"] == "LockBridge Jeweller"
-    assert info["via_device"] == ("ajax", "entry_test_s1")
+    assert info["via_device_id"] == fake_device_id("entry_test", "s1")
 
 
 def test_smart_lock_sensor_device_info_none_when_missing() -> None:
@@ -492,7 +505,9 @@ def _binary_sensor(device: AjaxDevice | None) -> AjaxBinarySensor:
     sensor._sensor_key = "motion"
     sensor._sensor_desc = {"key": "motion"}
     space = SimpleNamespace(devices={"d1": device} if device else {})
-    sensor.coordinator = SimpleNamespace(get_space=lambda sid: space, last_update_success=True, entry_id="entry_test")
+    sensor.coordinator = SimpleNamespace(
+        get_space=lambda sid: space, last_update_success=True, entry_id="entry_test", hass=fake_hass()
+    )
     return sensor
 
 
@@ -506,7 +521,7 @@ def test_binary_sensor_device_info_with_color() -> None:
     )
     info = _binary_sensor(device).device_info
     assert info["model"] == "DoorProtect Plus (White)"
-    assert info["via_device"] == ("ajax", "entry_test_s1")
+    assert info["via_device_id"] == fake_device_id("entry_test", "s1")
     assert info["suggested_area"] == "Garage"
 
 
@@ -528,7 +543,7 @@ def test_binary_sensor_update_device_registry_updates_entry() -> None:
 
     device_entry = SimpleNamespace(id="entry-id")
     registry = MagicMock()
-    registry.async_get_device.return_value = device_entry
+    registry.async_get_device_by_identifier.return_value = device_entry
 
     with patch("custom_components.ajax._binary_sensor_entities.dr.async_get", return_value=registry):
         sensor._update_device_registry()
@@ -552,7 +567,7 @@ def test_binary_sensor_update_device_registry_noop_when_entry_missing() -> None:
     sensor = _binary_sensor(_device())
     sensor.hass = MagicMock()
     registry = MagicMock()
-    registry.async_get_device.return_value = None
+    registry.async_get_device_by_identifier.return_value = None
     with patch("custom_components.ajax._binary_sensor_entities.dr.async_get", return_value=registry):
         sensor._update_device_registry()
     registry.async_update_device.assert_not_called()
@@ -587,7 +602,9 @@ def _ve_binary(video_edge: AjaxVideoEdge | None, *, nvr_id: str | None = None) -
         video_edges={"ve1": video_edge} if video_edge else {},
         get_recording_nvr_id=lambda cam_id: nvr_id,
     )
-    sensor.coordinator = SimpleNamespace(get_space=lambda sid: space, last_update_success=True, entry_id="entry_test")
+    sensor.coordinator = SimpleNamespace(
+        get_space=lambda sid: space, last_update_success=True, entry_id="entry_test", hass=fake_hass()
+    )
     return sensor
 
 
@@ -631,7 +648,7 @@ def test_ve_binary_extra_state_attributes() -> None:
 def test_ve_binary_device_info_links_to_nvr() -> None:
     info = _ve_binary(_video_edge(ve_type=VideoEdgeType.MINIDOME, color="black"), nvr_id="nvr1").device_info
     assert info["model"] == "MiniDome (Black)"
-    assert info["via_device"] == ("ajax", "entry_test_nvr1")
+    assert info["via_device_id"] == fake_device_id("entry_test", "nvr1")
 
 
 def test_ve_binary_device_info_none_when_missing() -> None:
@@ -649,7 +666,9 @@ def _hub_binary(sensor_key: str, hub_details: dict | None) -> AjaxHubBinarySenso
     sensor._space_id = "s1"
     sensor._sensor_key = sensor_key
     sensor._sensor_config = AjaxHubBinarySensor.HUB_BINARY_SENSORS.get(sensor_key, {})
-    sensor.coordinator = SimpleNamespace(last_update_success=True, get_space=lambda sid: space, entry_id="entry_test")
+    sensor.coordinator = SimpleNamespace(
+        last_update_success=True, get_space=lambda sid: space, entry_id="entry_test", hass=fake_hass()
+    )
     return sensor
 
 
@@ -733,7 +752,9 @@ def _sl_binary(lock: object | None) -> AjaxSmartLockBinarySensor:
     sensor._space_id = "s1"
     sensor._smart_lock_id = "lock1"
     space = SimpleNamespace(smart_locks={"lock1": lock} if lock else {})
-    sensor.coordinator = SimpleNamespace(last_update_success=True, get_space=lambda sid: space, entry_id="entry_test")
+    sensor.coordinator = SimpleNamespace(
+        last_update_success=True, get_space=lambda sid: space, entry_id="entry_test", hass=fake_hass()
+    )
     return sensor
 
 
@@ -756,7 +777,7 @@ def test_smart_lock_binary_device_info() -> None:
     info = _sl_binary(lock).device_info
     assert info["identifiers"] == {("ajax", "entry_test_lock1")}
     assert info["model"] == "LockBridge Jeweller"
-    assert info["via_device"] == ("ajax", "entry_test_s1")
+    assert info["via_device_id"] == fake_device_id("entry_test", "s1")
 
 
 def test_smart_lock_binary_device_info_none_when_missing() -> None:

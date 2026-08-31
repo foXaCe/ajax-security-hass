@@ -17,7 +17,7 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from ._ids import device_identifier
+from ._ids import device_identifier, via_device_info
 from .const import DOMAIN, MANUFACTURER
 from .coordinator import AjaxDataCoordinator
 from .models import AjaxDevice, AjaxSpace, DeviceType, SecurityState
@@ -476,7 +476,7 @@ class AjaxSwitch(CoordinatorEntity[AjaxDataCoordinator], SwitchEntity):
             name=device.name,
             manufacturer=MANUFACTURER,
             model=device.raw_type,
-            via_device=device_identifier(self.coordinator.entry_id, self._space_id),
+            **via_device_info(self.coordinator.hass, self.coordinator.entry_id, self._space_id),
             sw_version=device.firmware_version,
             hw_version=device.hardware_version,
             suggested_area=device.room_name,

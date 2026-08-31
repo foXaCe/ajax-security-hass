@@ -293,7 +293,7 @@ async def test_video_edges_cleanup_removes_stale_with_ha_device() -> None:
 
     registry = MagicMock()
     ha_device = MagicMock(id="dev-entry")
-    registry.async_get_device.return_value = ha_device
+    registry.async_get_device_by_identifier.return_value = ha_device
     with patch("custom_components.ajax._coordinator_state.dr.async_get", return_value=registry):
         await mixin._async_update_video_edges("s1")
 
@@ -301,7 +301,7 @@ async def test_video_edges_cleanup_removes_stale_with_ha_device() -> None:
     assert "kept" in space.video_edges
     registry.async_remove_device.assert_called_once_with("dev-entry")
     # The stale device is looked up by its entry-namespaced identifier.
-    registry.async_get_device.assert_called_once_with(identifiers={(DOMAIN, "entry_test_stale")})
+    registry.async_get_device_by_identifier.assert_called_once_with((DOMAIN, "entry_test_stale"), "entry_test")
 
 
 @pytest.mark.asyncio
@@ -312,7 +312,7 @@ async def test_video_edges_cleanup_no_ha_device() -> None:
     mixin.api.async_get_video_edges = AsyncMock(return_value=[{"id": "kept", "type": "NVR"}])
 
     registry = MagicMock()
-    registry.async_get_device.return_value = None
+    registry.async_get_device_by_identifier.return_value = None
     with patch("custom_components.ajax._coordinator_state.dr.async_get", return_value=registry):
         await mixin._async_update_video_edges("s1")
 
@@ -433,7 +433,7 @@ async def test_smart_locks_cleanup_removes_api_lock_preserves_sse_lock() -> None
     mixin.api.async_get_smart_locks = AsyncMock(return_value=[{"id": "kept", "name": "Kept", "type": "smartlock"}])
 
     registry = MagicMock()
-    registry.async_get_device.return_value = MagicMock(id="dev-1")
+    registry.async_get_device_by_identifier.return_value = MagicMock(id="dev-1")
     with patch("custom_components.ajax._coordinator_state.dr.async_get", return_value=registry):
         await mixin._async_update_smart_locks("s1")
 
@@ -442,7 +442,7 @@ async def test_smart_locks_cleanup_removes_api_lock_preserves_sse_lock() -> None
     assert "kept" in space.smart_locks
     registry.async_remove_device.assert_called_once_with("dev-1")
     # The stale API lock is looked up by its entry-namespaced identifier.
-    registry.async_get_device.assert_called_once_with(identifiers={(DOMAIN, "entry_test_api_gone")})
+    registry.async_get_device_by_identifier.assert_called_once_with((DOMAIN, "entry_test_api_gone"), "entry_test")
 
 
 @pytest.mark.asyncio
@@ -454,7 +454,7 @@ async def test_smart_locks_cleanup_no_ha_device() -> None:
     mixin = _ve_mixin(space)
     mixin.api.async_get_smart_locks = AsyncMock(return_value=[{"id": "kept", "name": "Kept", "type": "smartlock"}])
     registry = MagicMock()
-    registry.async_get_device.return_value = None
+    registry.async_get_device_by_identifier.return_value = None
     with patch("custom_components.ajax._coordinator_state.dr.async_get", return_value=registry):
         await mixin._async_update_smart_locks("s1")
     assert "api_gone" not in space.smart_locks

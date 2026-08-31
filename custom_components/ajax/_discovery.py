@@ -23,6 +23,7 @@ from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
+from ._device_parents import async_register_parent_devices
 from .const import DOMAIN
 
 if TYPE_CHECKING:
@@ -81,6 +82,10 @@ def connect_new_entity_signal(
             and ent_reg.async_get_entity_id(platform_domain, DOMAIN, entity.unique_id) is None
         ]
         if fresh:
+            # A freshly-discovered object may be (or hang off) a parent device
+            # that is not in the registry yet; register parents first so the
+            # entities' via_device_id link resolves.
+            async_register_parent_devices(hass, entry, entry.runtime_data)
             async_add_entities(fresh)
             _LOGGER.info("Dynamically added %d %s", len(fresh), label)
 

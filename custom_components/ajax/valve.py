@@ -17,7 +17,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import AjaxConfigEntry
 from ._discovery import connect_new_entity_signal
-from ._ids import device_identifier
+from ._ids import device_identifier, via_device_info
 from .const import DOMAIN, MANUFACTURER, SIGNAL_NEW_DEVICE
 from .coordinator import AjaxDataCoordinator
 from .devices import WaterStopHandler
@@ -251,7 +251,7 @@ class AjaxValve(CoordinatorEntity[AjaxDataCoordinator], ValveEntity):
             name=device.name,
             manufacturer=MANUFACTURER,
             model="WaterStop",
-            via_device=device_identifier(self.coordinator.entry_id, self._space_id),
+            **via_device_info(self.coordinator.hass, self.coordinator.entry_id, self._space_id),
             sw_version=device.attributes.get("firmwareVersion"),
             suggested_area=device.room_name,
         )

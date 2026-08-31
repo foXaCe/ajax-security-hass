@@ -20,7 +20,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import AjaxConfigEntry
 from ._discovery import connect_new_entity_signal
-from ._ids import device_identifier
+from ._ids import device_identifier, via_device_info
 from .const import CONF_RTSP_PASSWORD, CONF_RTSP_USERNAME, MANUFACTURER, SIGNAL_NEW_VIDEO_EDGE
 from .coordinator import AjaxDataCoordinator
 from .models import VIDEO_EDGE_MODEL_NAMES, AjaxVideoEdge, VideoEdgeType
@@ -201,19 +201,19 @@ class AjaxVideoEdgeCamera(CoordinatorEntity[AjaxDataCoordinator], Camera):
 
         model_display = f"{self._model_name} ({self._color})" if self._color else self._model_name
 
-        # Determine via_device: if camera is recorded by NVR, link to NVR
+        # Determine the parent device: if the camera is recorded by an NVR, link to the NVR
         # Otherwise link to hub (space_id)
-        via_device_id = self._space_id
+        parent_id = self._space_id
         nvr_id = self._get_recording_nvr_id()
         if nvr_id:
-            via_device_id = nvr_id
+            parent_id = nvr_id
 
         return DeviceInfo(
             identifiers={device_identifier(self.coordinator.entry_id, video_edge.id)},
             name=video_edge.name,
             manufacturer=MANUFACTURER,
             model=model_display,
-            via_device=device_identifier(self.coordinator.entry_id, via_device_id),
+            **via_device_info(self.coordinator.hass, self.coordinator.entry_id, parent_id),
             sw_version=video_edge.firmware_version,
         )
 

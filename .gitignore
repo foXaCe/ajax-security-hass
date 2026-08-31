@@ -79,3 +79,8 @@ home-assistant_v2.db
 CLAUDE.md
 AGENTS.md
 ajax-hass-dev.md
+
+# Reverse-engineering app officielle Ajax (binaire + décompilation brute)
+*.apks
+*.apk
+/.reverse/

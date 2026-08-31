@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.37.4] - 2026-08-31
+
+### Fixed
+- **Camera entities are back on Home Assistant 2026.9.** Seven of eight cameras stopped registering at setup, with `Error adding entity None for domain camera` in the log and nothing on the dashboard. `DeviceInfo.via_device` — how each device pointed at its hub or its NVR — has been deprecated since 2026.8, and the deprecation notice is raised as a hard error when Home Assistant cannot attribute it to an integration frame, which is exactly what happens partway through adding an entity. Parent links now use `via_device_id`, and hubs and NVRs are registered before the platforms are set up so the link always resolves — an NVR-channel camera is created before the NVR's own entities exist. The device tree is unchanged: hub → NVR → cameras.
+- **No deprecation warnings left.** The other deprecated registry call (`async_get_device`, unreliable across config entries) was also replaced, clearing the remaining warnings scheduled to break in 2027.8.
+
+Home Assistant 2025.11 and later are still supported: both the old and the new form are used depending on the running core.
+
+### Dependencies
+- `pytest-homeassistant-custom-component` ≥ 0.13.361 (CI only).
+
 ## [0.37.3] - 2026-08-16
 
 ### Dependencies

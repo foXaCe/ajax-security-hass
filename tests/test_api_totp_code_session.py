@@ -9,6 +9,7 @@ would need a new code — it hands over to reauth instead.
 
 from __future__ import annotations
 
+import time
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -173,7 +174,7 @@ async def test_recover_auth_without_refresh_token_does_not_login() -> None:
 @pytest.mark.asyncio
 async def test_proactive_refresh_failure_does_not_login() -> None:
     api = _resumed_api([_FakeResponse(401, {})])
-    api._token_obtained_at = 1.0  # ancient: refresh is due
+    api._token_obtained_at = time.monotonic() - 86400  # a day old: refresh is due
     await api._proactive_token_refresh()
     assert len(api.session.calls) == 1  # type: ignore[union-attr]
     assert api.session.calls[0][1].endswith("/refresh")  # type: ignore[union-attr]
@@ -184,7 +185,7 @@ async def test_proactive_refresh_success_reports_tokens() -> None:
     seen: list[tuple[str, str]] = []
     api = _resumed_api([_FakeResponse(200, {"sessionToken": "S2", "refreshToken": "R2"})])
     api.on_tokens_updated = lambda uid, rt: seen.append((uid, rt))
-    api._token_obtained_at = 1.0
+    api._token_obtained_at = time.monotonic() - 86400
     await api._proactive_token_refresh()
     assert seen == [("U1", "R2")]
 

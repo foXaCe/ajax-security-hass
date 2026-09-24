@@ -246,6 +246,8 @@ class SSEManager(EventHandlerMixin):
 
             # Also check eventTypeV2 for video AI events
             event_type_v2 = event.get("eventTypeV2", "")
+            # Ajax's own alarm classification (either field may be the one set).
+            alarm_type = event_type_v2 or event.get("eventType", "") or ""
 
             # DEBUG, not INFO: source_name can be an Ajax user's display
             # name (PII) and this fires on every event.
@@ -344,6 +346,12 @@ class SSEManager(EventHandlerMixin):
                 self._handle_doorbell_event(space, source_name, source_id)
             elif event_tag in LOCK_EVENTS or event_tag in LOCK_DOOR_EVENTS:
                 self._handle_lock_event(space, event_tag, source_name, source_id, event_code, event)
+            elif self._is_accelerometer_event(event_tag, event_code):
+                action_key, is_alarm = self._handle_accelerometer_event(
+                    space, event_tag, event_code, alarm_type, source_name, source_id
+                )
+                if is_alarm:
+                    self._record_alarm_event(space, action_key, source_name)
             elif event_tag in HUB_EVENTS:
                 _LOGGER.info("SSE: Hub event: %s (%s)", event_tag, source_name)
             elif event_type_v2 == "LIFECYCLE":
@@ -357,15 +365,19 @@ class SSEManager(EventHandlerMixin):
                     source_id,
                 )
             else:
-                _LOGGER.warning(
-                    "SSE event not handled: tag=%s, type=%s, typeV2=%s, source=%s (id=%s). Raw: %s",
-                    event_tag,
-                    source_type,
-                    event_type_v2 or "none",
-                    source_name,
-                    source_id,
+                alarm_action = self._handle_unmapped_event(
+                    space,
                     event,
+                    transport="SSE",
+                    event_tag=event_tag,
+                    event_code=event_code,
+                    event_type=alarm_type,
+                    source_name=source_name,
+                    source_id=source_id,
+                    source_type=source_type,
                 )
+                if alarm_action:
+                    self._record_alarm_event(space, alarm_action, source_name)
 
             # Notify HA of update
             if self.coordinator.account is not None:

@@ -199,6 +199,8 @@ class SQSManager(EventHandlerMixin):
             event = event_data.get("event", {})
             event_tag = event.get("eventTag", "").lower()
             event_type = event.get("eventTypeV2", "")
+            # Ajax's own alarm classification (either field may be the one set).
+            alarm_type = event_type or event.get("eventType", "") or ""
             event_code = event.get("eventCode", "")  # M_XX_YY format
             hub_id = event.get("hubId", "")
             hub_name = event.get("hubName", "")
@@ -260,6 +262,7 @@ class SQSManager(EventHandlerMixin):
             self._add_event_to_history(space, event_record)
 
             # Process based on event type
+            accel_alarm = False
             if event_tag in EVENT_TAG_TO_STATE:
                 await self._handle_security_event(space, event_tag, source_name, source_type)
             elif event_tag in DOOR_EVENTS:
@@ -288,6 +291,10 @@ class SQSManager(EventHandlerMixin):
                 await self._handle_video_event(space, event_tag, event_type, source_name, source_id)
             elif event_tag in LOCK_EVENTS or event_tag in LOCK_DOOR_EVENTS:
                 await self._handle_lock_event(space, event_tag, source_name, source_id, event_code, event)
+            elif self._is_accelerometer_event(event_tag, event_code):
+                _, accel_alarm = self._handle_accelerometer_event(
+                    space, event_tag, event_code, alarm_type, source_name, source_id
+                )
             elif event_tag in HUB_EVENTS:
                 _LOGGER.info("SQS: Hub event: %s (%s)", event_tag, source_name)
             elif event_type == "LIFECYCLE":
@@ -301,17 +308,21 @@ class SQSManager(EventHandlerMixin):
                     source_id,
                 )
             else:
-                _LOGGER.warning(
-                    "SQS event not handled: tag=%s, type=%s, source=%s (id=%s). Raw: %s",
-                    event_tag,
-                    event_type,
-                    source_name,
-                    source_id,
+                # History and the alarm notification are handled below.
+                self._handle_unmapped_event(
+                    space,
                     event,
+                    transport="SQS",
+                    event_tag=event_tag,
+                    event_code=event_code,
+                    event_type=alarm_type,
+                    source_name=source_name,
+                    source_id=source_id,
+                    source_type=source_type,
                 )
 
             # Create notification if it's an alarm event
-            if event_type == "ALARM" or event_tag in SMOKE_EVENTS or event_tag in FLOOD_EVENTS:
+            if alarm_type == "ALARM" or accel_alarm or event_tag in SMOKE_EVENTS or event_tag in FLOOD_EVENTS:
                 await self._create_alarm_notification(space, event_record)
 
             # Always update UI to show new event in history

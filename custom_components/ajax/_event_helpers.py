@@ -13,10 +13,23 @@ from __future__ import annotations
 
 import logging
 import time
+from collections.abc import Callable
+from datetime import UTC, datetime
+from functools import partial
 from typing import TYPE_CHECKING, Any
 
-from .const import EVENT_AJAX_CAMERA_DETECTION
-from .event_maps import DEVICE_STATUS_EVENTS, TAMPER_EVENTS
+from .const import EVENT_AJAX_CAMERA_DETECTION, EVENT_AJAX_UNHANDLED_EVENT
+from .event_codes import parse_event_code
+from .event_maps import (
+    ACCELEROMETER_EVENT_CODES,
+    ACCELEROMETER_EVENTS,
+    ACCELEROMETER_RESET_SECONDS,
+    ALARM_EVENT_TYPE,
+    ARMED_SECURITY_STATES,
+    DEVICE_STATUS_EVENTS,
+    TAMPER_EVENTS,
+)
+from .models import SecurityState
 
 if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
@@ -74,6 +87,127 @@ class EventHandlerMixin:
 
     coordinator: AjaxDataCoordinator
     _last_discovery_refresh: float = 0.0
+    # Provided by each manager (tracked hass.loop.call_later).
+    _schedule_later: Callable[[float, Callable[[], Any]], None]
+    _find_device: Callable[[AjaxSpace, str, str], AjaxDevice | None]
+
+    @staticmethod
+    def _is_accelerometer_event(event_tag: str, event_code: str) -> bool:
+        return event_tag in ACCELEROMETER_EVENTS or event_code in ACCELEROMETER_EVENT_CODES
+
+    def _trigger_space_alarm(self, space: AjaxSpace, reason: str, source_name: str) -> None:
+        """Put the space panel in TRIGGERED (idempotent)."""
+        if space.security_state == SecurityState.TRIGGERED:
+            return
+        previous = space.security_state
+        space.security_state = SecurityState.TRIGGERED
+        _LOGGER.info("Alarm TRIGGERED by %s on %s (was %s)", reason, source_name, previous.value)
+
+    def _handle_accelerometer_event(
+        self,
+        space: AjaxSpace,
+        event_tag: str,
+        event_code: str,
+        event_type: str,
+        source_name: str,
+        source_id: str,
+    ) -> tuple[str, bool]:
+        """Tilt/shock on a DoorProtect Plus (#246); return (action key, is alarm).
+
+        These used to fall through as "not handled": the tilt/shock binary
+        sensors never turned on and a real alarm left the panel untouched.
+        The sensor is set and cleared after ``ACCELEROMETER_RESET_SECONDS``
+        (Ajax sends no "restored" event). The panel triggers when Ajax
+        classes the event as an alarm, or when the space is armed.
+        """
+        action = ACCELEROMETER_EVENTS.get(event_tag) or ACCELEROMETER_EVENT_CODES[event_code]
+        device = self._find_device(space, source_name, source_id)
+        if device is not None:
+            device.attributes[action] = True
+            device.attributes[f"{action}_at"] = datetime.now(UTC).isoformat()
+            self._schedule_later(
+                ACCELEROMETER_RESET_SECONDS,
+                partial(self._reset_device_flag, space.id, device.id, action),
+            )
+            source_name = device.name
+        else:
+            _LOGGER.debug("Accelerometer device not found: name=%s, id=%s", source_name, source_id)
+
+        is_alarm = event_type == ALARM_EVENT_TYPE or space.security_state in ARMED_SECURITY_STATES
+        if is_alarm:
+            self._trigger_space_alarm(space, action, source_name)
+        _LOGGER.info("Real-time: %s -> %s", source_name, action)
+        return action, is_alarm
+
+    def _reset_device_flag(self, space_id: str, device_id: str, attribute: str) -> None:
+        """Clear a transient device flag set by an IMPULSE event."""
+        try:
+            if not self.coordinator.account:
+                return
+            space = self.coordinator.account.spaces.get(space_id)
+            device = space.devices.get(device_id) if space else None
+            if device is not None and device.attributes.get(attribute):
+                device.attributes[attribute] = False
+                _LOGGER.debug("Auto-reset %s on %s", attribute, device.name)
+                self.coordinator.async_set_updated_data(self.coordinator.account)
+        except Exception as err:  # noqa: BLE001 — best-effort reset
+            _LOGGER.debug("Error resetting %s: %s", attribute, err)
+
+    def _handle_unmapped_event(
+        self,
+        space: AjaxSpace,
+        event: dict[str, Any],
+        *,
+        transport: str,
+        event_tag: str,
+        event_code: str,
+        event_type: str,
+        source_name: str,
+        source_id: str,
+        source_type: str,
+    ) -> str | None:
+        """Event with no handler: never drop an alarm silently (#246).
+
+        Returns the action key when Ajax classed it as an alarm (the panel
+        is then triggered), else ``None``. Every unmapped event is also
+        fired on the bus as ``ajax_unhandled_event``.
+        """
+        is_alarm = event_type == ALARM_EVENT_TYPE
+        (_LOGGER.error if is_alarm else _LOGGER.warning)(
+            "%s event not handled%s: tag=%s, type=%s, code=%s, source=%s (%s, id=%s). Raw: %s",
+            transport,
+            " — treated as a generic alarm" if is_alarm else "",
+            event_tag,
+            event_type or "none",
+            event_code or "none",
+            source_name,
+            source_type,
+            source_id,
+            event,
+        )
+        self.coordinator.hass.bus.async_fire(
+            EVENT_AJAX_UNHANDLED_EVENT,
+            {
+                "space_id": space.id,
+                "hub_id": space.hub_id,
+                "event_tag": event_tag,
+                "event_type": event_type,
+                "event_code": event_code,
+                "transition": event.get("transition", ""),
+                "source_id": source_id,
+                "source_name": source_name,
+                "source_type": source_type,
+                "room_name": event.get("sourceRoomName", ""),
+            },
+        )
+        if not is_alarm:
+            return None
+        code_info = parse_event_code(event_code) if event_code else None
+        action = str(code_info.get("action") or "") if code_info else ""
+        if action in ("", "unknown"):
+            action = "alarm"
+        self._trigger_space_alarm(space, action, source_name)
+        return action
 
     @staticmethod
     def _apply_tamper_state(device: AjaxDevice, event_tag: str, transition: str) -> str:

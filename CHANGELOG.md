@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.38.0] - 2026-09-24
+
+### Fixed
+- **A real alarm no longer goes unnoticed by Home Assistant (#246).** A DoorProtect Plus tilt alarm (`TiltDetected`) was logged as "not handled" and dropped, even though Ajax marked it as an alarm: the siren sounded, the monitoring company was called, and the alarm panel in Home Assistant went straight from armed to disarmed. Tilt and shock events are now handled on both transports (SSE/proxy and SQS/direct): the tilt and shock binary sensors turn on — they were never updated before — and clear after 30 seconds, since Ajax sends no "restored" event, and the panel reaches `triggered` when Ajax classes the event as an alarm or the system is armed.
+- **Any alarm Ajax sends is honoured, even with a tag the integration does not know yet.** An unhandled event that Ajax itself classes as `ALARM` (in `eventTypeV2` or `eventType`) now triggers the panel as a generic alarm, with a history entry and the alarm notification, and is logged as an error instead of a warning. This relies on Ajax's own classification only: the event-code labels added in 0.37.0 still carry no alarm semantics.
+- **No more endless login retries.** When Ajax refused a login with HTTP 423 (undocumented, no reason given), Home Assistant retried it every few seconds, forever. It now stops and asks you to re-authenticate.
+- **Clearer API errors.** A rejected request now logs what Ajax replied (message, invalid fields, `messageId`) instead of `400, message=''`.
+- A throttled session refresh (HTTP 429) is treated as temporary instead of as an authentication failure.
+
+### Added
+- **The 6-digit two-factor code is enough.** Accounts with two-factor authentication can be set up (direct mode) with the code from the authenticator app — the setup key is no longer required. The session opened with that code is kept and renewed automatically; Home Assistant asks for a new code only when Ajax ends it. Proxy mode still needs the setup key.
+- **More ways to enter the setup key:** grouped with spaces or dashes, pasted with stray whitespace, as an `otpauth://` link, or as a Google Authenticator export link (`otpauth-migration://`).
+- **`ajax_unhandled_event` bus event.** Every real-time event the integration has no handler for is published on the event bus, so automations can react to new Ajax event types before they are supported.
+
+### Notes
+- Two-factor authentication is not required to use the integration: accounts without it keep signing in with email and password.
+
 ## [0.37.4] - 2026-08-31
 
 ### Fixed

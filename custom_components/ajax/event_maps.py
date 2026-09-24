@@ -118,6 +118,29 @@ DOORBELL_EVENTS = {
     "doorbell": True,
 }
 
+# DoorProtect Plus accelerometer alarms (#246). Ajax sends them as IMPULSE
+# events with no "restored" counterpart, so the tilt/shock binary sensor is set
+# on the event and cleared by a timer. Routed by tag, or by event code in case
+# the tag is missing or renamed. Value = action key = device attribute read by
+# the binary sensor.
+ACCELEROMETER_EVENTS: dict[str, str] = {
+    "tiltdetected": "tilt_detected",
+    "shockdetected": "shock_detected",
+}
+ACCELEROMETER_EVENT_CODES: dict[str, str] = {
+    "M_0F_30": "shock_detected",  # DoorProtect Plus
+    "M_0F_31": "tilt_detected",
+    "M_6F_30": "shock_detected",  # DoorProtect Plus Fibra
+    "M_6F_31": "tilt_detected",
+}
+ACCELEROMETER_RESET_SECONDS = 30.0
+
+# ``eventTypeV2`` (or ``eventType``) Ajax sets on events that raised an alarm.
+ALARM_EVENT_TYPE = "ALARM"
+
+# Security states in which an intrusion-class event triggers the alarm panel.
+ARMED_SECURITY_STATES = frozenset({SecurityState.ARMED, SecurityState.NIGHT_MODE, SecurityState.PARTIALLY_ARMED})
+
 # Hub system/malfunction events (informational, logged but not actionable)
 HUB_EVENTS: set[str] = {
     "firmwareupdateinprogress",

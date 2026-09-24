@@ -116,3 +116,6 @@ EVENT_AJAX_DOORBELL_RING: Final = "ajax_doorbell_ring"
 EVENT_AJAX_SMART_LOCK_DOORBELL: Final = "ajax_smart_lock_doorbell"
 EVENT_AJAX_SCENARIO_TRIGGERED: Final = "ajax_scenario_triggered"
 EVENT_AJAX_CAMERA_DETECTION: Final = "ajax_camera_detection"
+# Any real-time event the integration has no handler for (#246): lets users
+# react to tags Ajax adds before they are supported.
+EVENT_AJAX_UNHANDLED_EVENT: Final = "ajax_unhandled_event"

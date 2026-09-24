@@ -43,7 +43,13 @@ MANUFACTURER = "Ajax Systems"
 CONF_API_KEY = "api_key"
 CONF_EMAIL = "email"
 CONF_PASSWORD = "password"
-CONF_TOTP_SECRET = "totp_secret"  # Optional Base32 TOTP secret (2FA, mandatory 2025-09-01)
+CONF_TOTP_SECRET = "totp_secret"  # Optional Base32 TOTP secret (accounts with 2FA enabled)
+# Session kept alive without a TOTP secret: when the user only has the
+# 6-digit code, one login with it yields a refresh token (1-year TTL) that is
+# stored here and rotated on every refresh, so restarts resume the session
+# instead of logging in again (which would need a fresh code).
+CONF_REFRESH_TOKEN = "refresh_token"
+CONF_AJAX_USER_ID = "ajax_user_id"
 CONF_NOTIFICATION_FILTER = "notification_filter"
 CONF_PERSISTENT_NOTIFICATION = "persistent_notification"
 CONF_MONITORED_SPACES = "monitored_spaces"

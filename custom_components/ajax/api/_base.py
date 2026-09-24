@@ -13,6 +13,7 @@ import hashlib
 import json
 import logging
 import time
+from collections.abc import Callable
 from email.utils import parsedate_to_datetime
 from typing import Any
 from urllib.parse import urlsplit
@@ -88,6 +89,7 @@ class AjaxRestClientBase:
         proxy_mode: str | None = None,
         session: aiohttp.ClientSession | None = None,
         verify_ssl: bool = True,
+        totp_code: str | None = None,
     ):
         """Initialize the API client.
 
@@ -102,10 +104,23 @@ class AjaxRestClientBase:
             proxy_mode: Authentication mode (direct, proxy_secure)
             session: Optional aiohttp session (use async_get_clientsession(hass) for HA)
             verify_ssl: Verify SSL certificates (set False for self-signed certs)
+            totp_code: One-shot 6-digit 2FA code, sent with the next /login
+                only. For users without the secret: the session is then kept
+                alive by refresh alone (see ``totp_required``).
         """
         self.api_key = api_key
         self.email = email
         self.totp_secret = totp_secret or None
+        self._totp_code: str | None = totp_code or None
+        # True once we know a login needs a 2FA code (a code was supplied, the
+        # session was resumed from a stored refresh token, or /login answered
+        # 423). Without a secret, a full login can then never succeed
+        # unattended, so auth recovery must stick to refresh and hand over to
+        # reauth instead of retrying a doomed login.
+        self.totp_required: bool = bool(totp_code)
+        # Called with (user_id, refresh_token) after every login/refresh, so
+        # the caller can persist the rotating refresh token.
+        self.on_tokens_updated: Callable[[str, str], None] | None = None
         self.proxy_url = proxy_url.rstrip("/") if proxy_url else None
         self.proxy_mode = proxy_mode or AUTH_MODE_DIRECT
         self.verify_ssl = verify_ssl  # Verify SSL certificates
@@ -273,6 +288,48 @@ class AjaxRestClientBase:
         if self._owns_session and self.session and not self.session.closed:
             await self.session.close()
 
+    @staticmethod
+    async def _error_detail(response: aiohttp.ClientResponse) -> str:
+        """Return what the API said about a failed request, for the log.
+
+        ``raise_for_status()`` only carries the status line, and Ajax leaves
+        the HTTP reason empty — a rejected request surfaces as
+        ``400, message=''``, which says nothing about what was wrong. The body
+        does: every error response carries ``{"message": ..., "messageId": ...}``
+        (plus a per-field ``errors`` list on a validation failure). Reading it
+        is the difference between a reportable error and a guess.
+
+        Never raises, and never returns the request payload — only what the
+        server sent back, truncated.
+        """
+        try:
+            body = await response.json()
+        except Exception:  # noqa: BLE001 - non-JSON body, or a connection gone
+            try:
+                text = (await response.text()).strip()
+            except Exception:  # noqa: BLE001
+                return ""
+            return text[:200]
+
+        if not isinstance(body, dict):
+            return str(body)[:200]
+
+        detail = str(body.get("message", "")).strip()
+        fields = body.get("errors")
+        if isinstance(fields, list):
+            named = [
+                f"{item.get('field')}: {item.get('code')}"
+                for item in fields
+                if isinstance(item, dict) and item.get("field")
+            ]
+            if named:
+                detail = f"{detail} ({', '.join(named[:5])})" if detail else ", ".join(named[:5])
+        message_id = str(body.get("messageId", "")).strip()
+        if message_id:
+            # Ajax support can look a request up by this id.
+            detail = f"{detail} [messageId {message_id}]" if detail else f"messageId {message_id}"
+        return detail[:300]
+
     async def _check_rate_limit(self) -> None:
         """Check and enforce rate limiting.
 
@@ -354,8 +411,7 @@ class AjaxRestClientBase:
 
         According to Swagger API 1.147.0:
         - Authenticates with email + SHA256(password) (+ TOTP code if 2FA is
-          enabled on the account — mandatory for all Enterprise API logins
-          from 2025-09-01)
+          enabled on the account; accounts without 2FA log in without it)
         - Returns sessionToken (15 min TTL), refreshToken (7 days TTL, or
           1 year when a valid TOTP was supplied), and userId
         - POST body: {"login": email, "passwordHash": hash, "totp": code?}
@@ -392,7 +448,18 @@ class AjaxRestClientBase:
                 payload["totp"] = pyotp.TOTP(self.totp_secret).now()
             except Exception as err:  # invalid base32 secret, etc.
                 raise AjaxRestAuthError("Invalid TOTP secret", error_type="invalid_totp_secret") from err
+        elif self._totp_code:
+            # Single use, whatever the outcome: a code is valid for one
+            # 30-second window, resending it later can only fail.
+            payload["totp"] = self._totp_code
+            self._totp_code = None
 
+        _LOGGER.debug(
+            "Login two-factor field: %s",
+            f"sent ({len(payload['totp'])} digits, from {'secret' if self.totp_secret else 'one-shot code'})"
+            if "totp" in payload
+            else "not sent",
+        )
         try:
             async with session.post(
                 url,
@@ -443,8 +510,38 @@ class AjaxRestClientBase:
                     # the config flow re-prompts instead of a generic error.
                     _LOGGER.debug("Login 403 - authentication rejected")
                     raise AjaxRestAuthError("Authentication failed", error_type="invalid_password")
+                elif response.status == 423:
+                    # Undocumented (absent from swagger up to 1.152.0), body
+                    # carries only a messageId. Seen on a 2FA-enabled account
+                    # both without a `totp` and with a freshly generated code,
+                    # so it is not simply "code missing". As "not ready" HA
+                    # retried it every few seconds, forever; as an auth error
+                    # it stops and hands over to the reauth form.
+                    self.totp_required = True
+                    with contextlib.suppress(Exception):
+                        _LOGGER.debug("Login 423 body: %s", (await response.text())[:500])
+                    detail = await self._error_detail(response)
+                    _LOGGER.error(
+                        "Login rejected (423, undocumented, no reason given): %s",
+                        detail or "no detail returned by the API",
+                    )
+                    raise AjaxRestAuthError(
+                        "Ajax refused the sign-in (HTTP 423)",
+                        error_type="totp_required",
+                    )
 
-                response.raise_for_status()
+                if response.status >= 400:
+                    # Anything not handled above (400 Bad Request, 422, ...).
+                    # Ajax describes the problem in the body; without it the
+                    # error reads "400, message=''" and cannot be acted on.
+                    detail = await self._error_detail(response)
+                    _LOGGER.error(
+                        "Login rejected with status %s: %s",
+                        response.status,
+                        detail or "no detail returned by the API",
+                    )
+                    raise AjaxRestApiError(f"Login failed: {response.status}" + (f" - {detail}" if detail else ""))
+
                 result = await response.json()
 
                 # Extract tokens from response
@@ -484,6 +581,7 @@ class AjaxRestClientBase:
                 self._last_login_time = time.monotonic()
                 self._token_obtained_at = time.monotonic()
                 self._refresh_failures = 0  # Reset on successful login
+                self._notify_tokens()
                 _LOGGER.info(
                     "Login successful, session token obtained (user: %s, effective TTL: %.0fs)",
                     (self.user_id or "")[:8] or "?",
@@ -550,12 +648,24 @@ class AjaxRestClientBase:
                     _LOGGER.warning("Refresh endpoint rate limited (429)")
                     raise AjaxRestAuthError("Refresh rate limited")
 
-                response.raise_for_status()
+                if response.status >= 400:
+                    detail = await self._error_detail(response)
+                    _LOGGER.error(
+                        "Token refresh rejected with status %s: %s",
+                        response.status,
+                        detail or "no detail returned by the API",
+                    )
+                    raise AjaxRestApiError(
+                        f"Token refresh failed: {response.status}" + (f" - {detail}" if detail else "")
+                    )
+
                 result = await response.json()
 
                 # Extract new tokens from response
                 self.session_token = result.get("sessionToken")
-                self.refresh_token = result.get("refreshToken")
+                # Keep the current refresh token if none is returned: losing it
+                # would strand a session that cannot log in again unattended.
+                self.refresh_token = result.get("refreshToken") or self.refresh_token
                 # userId should remain the same
 
                 if not self.session_token:
@@ -563,6 +673,7 @@ class AjaxRestClientBase:
 
                 self._token_version += 1
                 self._token_obtained_at = time.monotonic()
+                self._notify_tokens()
                 _LOGGER.info(
                     "Session token refreshed successfully (user: %s)",
                     (self.user_id or "")[:8] or "?",
@@ -575,6 +686,39 @@ class AjaxRestClientBase:
         except TimeoutError as err:
             _LOGGER.error("Token refresh request timeout")
             raise AjaxRestApiError("Token refresh timeout") from err
+
+    @property
+    def _can_login_unattended(self) -> bool:
+        """Whether a full /login can succeed without the user (no 2FA code needed)."""
+        return self.totp_secret is not None or not self.totp_required
+
+    def _notify_tokens(self) -> None:
+        if self.on_tokens_updated and self.user_id and self.refresh_token:
+            try:
+                self.on_tokens_updated(self.user_id, self.refresh_token)
+            except Exception:  # noqa: BLE001 - persistence must not break auth
+                _LOGGER.exception("Failed to persist the refreshed session")
+
+    async def async_resume_session(self, user_id: str, refresh_token: str) -> str:
+        """Resume a stored session through /refresh, without a full login.
+
+        Used when the account needs a 2FA code and no secret is stored: the
+        refresh token obtained with the user's one-shot code is the only way
+        back in. Raises ``AjaxRestAuthError`` (``totp_required``) when Ajax
+        rejects it, so setup hands over to reauth for a new code.
+        """
+        self.user_id = user_id
+        self.refresh_token = refresh_token
+        self.totp_required = True
+        try:
+            token = await self.async_refresh_token()
+        except AjaxRestAuthError as err:
+            raise AjaxRestAuthError(
+                "Stored session expired: a new two-factor code is required",
+                error_type="totp_required",
+            ) from err
+        self._refresh_failures = 0
+        return token
 
     async def _proactive_token_refresh(self) -> None:
         """Refresh token proactively before it expires.
@@ -604,8 +748,9 @@ class AjaxRestClientBase:
             if time.monotonic() - self._token_obtained_at < refresh_threshold:
                 return
 
-            # Skip refresh if it consistently fails (proxy mode)
-            if self._refresh_failures < 3 and self.refresh_token:
+            # Skip refresh if it consistently fails (proxy mode) — unless it is
+            # the only way to stay signed in (2FA code, no secret).
+            if self.refresh_token and (self._refresh_failures < 3 or not self._can_login_unattended):
                 try:
                     await self.async_refresh_token()
                     self._refresh_failures = 0
@@ -618,6 +763,11 @@ class AjaxRestClientBase:
                         err,
                         self._refresh_failures,
                     )
+
+            if not self._can_login_unattended:
+                # A login would need a fresh 2FA code; let the next request's
+                # 401 go through _recover_auth, which hands over to reauth.
+                return
 
             # Refresh failed or disabled — fall back to login immediately
             elapsed = time.monotonic() - self._last_login_time
@@ -651,14 +801,32 @@ class AjaxRestClientBase:
                     )
                     self._effective_ttl = new_ttl
 
+        can_login = self._can_login_unattended
         # Skip refresh if no refresh token or if refresh consistently fails
-        if self.refresh_token and self._refresh_failures < 3:
+        # (unless it is the only way to stay signed in).
+        if self.refresh_token and (self._refresh_failures < 3 or not can_login):
             try:
                 await self.async_refresh_token()
                 self._refresh_failures = 0
                 _LOGGER.info("Token refreshed successfully, retrying request")
                 return
-            except (AjaxRestAuthError, AjaxRestApiError):
+            except AjaxRestAuthError:
+                # Caught before AjaxRestApiError, of which it is a subclass.
+                if not can_login:
+                    raise AjaxRestAuthError(
+                        "Session expired: a new two-factor code is required",
+                        error_type="totp_required",
+                    ) from None
+                self._refresh_failures += 1
+                _LOGGER.warning(
+                    "Refresh token failed (attempt %d/3), falling back to full login",
+                    self._refresh_failures,
+                )
+            except AjaxRestApiError:
+                if not can_login:
+                    # Transient (network, 5xx): the session may still be
+                    # good, do not ask the user for a new code over it.
+                    raise
                 self._refresh_failures += 1
                 _LOGGER.warning(
                     "Refresh token failed (attempt %d/3), falling back to full login",
@@ -666,6 +834,10 @@ class AjaxRestClientBase:
                 )
         elif self._refresh_failures >= 3:
             _LOGGER.debug("Skipping refresh (failed %d times), using login", self._refresh_failures)
+
+        if not can_login:
+            # No refresh token and a login would need a 2FA code.
+            raise AjaxRestAuthError("A two-factor code is required", error_type="totp_required")
 
         # Fallback to full login (with cooldown)
         elapsed = time.monotonic() - self._last_login_time
@@ -820,7 +992,15 @@ class AjaxRestClientBase:
                     )
                     raise AjaxRestApiError(f"Server error: {response.status}")
 
-                response.raise_for_status()
+                if response.status >= 400:
+                    detail = await self._error_detail(response)
+                    _LOGGER.error(
+                        "Request to %s rejected with status %s: %s",
+                        endpoint,
+                        response.status,
+                        detail or "no detail returned by the API",
+                    )
+                    raise AjaxRestApiError(f"{response.status} on {endpoint}" + (f" - {detail}" if detail else ""))
 
                 # Read proxy cache and rate limit headers
                 if self.proxy_mode == AUTH_MODE_PROXY_SECURE:

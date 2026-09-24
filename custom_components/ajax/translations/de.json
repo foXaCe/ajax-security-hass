@@ -17,8 +17,10 @@
       "invalid_auth": "Ungültige API-Anmeldedaten. Überprüfen Sie Ihren API-Schlüssel, E-Mail und Passwort.",
       "invalid_password": "Ungültige E-Mail oder Passwort. Überprüfen Sie Ihre Ajax-Kontodaten.",
       "invalid_proxy_url": "Ungültige Proxy-URL. URL muss mit http:// oder https:// beginnen",
-      "invalid_totp_secret": "Ungültiger TOTP-Schlüssel. Geben Sie den Base32-Schlüssel ein, der beim Aktivieren der Zwei-Faktor-Authentifizierung angezeigt wurde.",
+      "invalid_totp_secret": "Ungültige Zwei-Faktor-Eingabe. Geben Sie den 6-stelligen Code aus Ihrer Authenticator-App oder den Base32-Einrichtungsschlüssel (oder den otpauth://-Link) ein, der beim Aktivieren der 2FA angezeigt wurde.",
       "no_spaces_selected": "Bitte wählen Sie mindestens einen Bereich aus.",
+      "totp_code_proxy": "Im Proxy-Modus reicht ein 6-stelliger Code nicht aus: Geben Sie den Base32-Einrichtungsschlüssel (oder den otpauth://-Link) ein, der beim Aktivieren der 2FA angezeigt wurde.",
+      "totp_required": "Ajax hat die Anmeldung abgelehnt (HTTP 423, ohne Begründung). Wenn für dieses Konto die Zwei-Faktor-Authentifizierung aktiviert ist, geben Sie den 6-stelligen Code aus Ihrer Authenticator-App oder den Base32-Einrichtungsschlüssel ein; bleibt die Ablehnung bestehen, wenden Sie sich an den Ajax-Support.",
       "unknown": "Unerwarteter Fehler. Überprüfen Sie die Protokolle für weitere Details."
     },
     "step": {
@@ -37,7 +39,7 @@
           "email": "E-Mail-Adresse",
           "password": "Passwort",
           "queue_name": "SQS-Warteschlangenname (Optional)",
-          "totp_secret": "Zwei-Faktor-Geheimschlüssel (optional)"
+          "totp_secret": "Zwei-Faktor-Code oder -Geheimnis (optional)"
         },
         "data_description": {
           "api_key": "Ihr von Ajax Systems bereitgestellter API-Schlüssel",
@@ -46,7 +48,7 @@
           "email": "Ihre Ajax-Konto-E-Mail-Adresse",
           "password": "Ihr Ajax-Konto-Passwort",
           "queue_name": "SQS-Warteschlangenname (z.B. ajax-events-xxxxx-prod.fifo)",
-          "totp_secret": "Base32-Schlüssel aus der Einrichtung Ihrer Authenticator-App. Leer lassen, wenn 2FA für Ihr Ajax-Konto nicht aktiviert ist."
+          "totp_secret": "Der 6-stellige Code aus Ihrer Authenticator-App oder der Base32-Einrichtungsschlüssel. Leer lassen, wenn 2FA für Ihr Ajax-Konto nicht aktiviert ist."
         },
         "description": "Geben Sie Ihre Ajax-API-Anmeldedaten ein.\n\n⚠️ **Nur Benutzerkonto** (keine PRO/Enterprise-Konten).\n\nOptional: AWS-Anmeldedaten für Echtzeit-Ereignisbenachrichtigungen hinzufügen.",
         "title": "Direkte Verbindung"
@@ -72,10 +74,10 @@
       "reauth_confirm": {
         "data": {
           "password": "Passwort",
-          "totp_secret": "Zwei-Faktor-Geheimschlüssel (optional)"
+          "totp_secret": "Zwei-Faktor-Code oder -Geheimnis (optional)"
         },
         "data_description": {
-          "totp_secret": "Base32-Schlüssel aus der Einrichtung Ihrer Authenticator-App. Leer lassen, wenn 2FA für Ihr Ajax-Konto nicht aktiviert ist."
+          "totp_secret": "Der 6-stellige Code aus Ihrer Authenticator-App oder der Base32-Einrichtungsschlüssel. Leer lassen, wenn 2FA für Ihr Ajax-Konto nicht aktiviert ist."
         },
         "description": "Ihre Sitzung ist abgelaufen. Bitte geben Sie Ihr Passwort für {email} erneut ein.",
         "title": "Erneut authentifizieren"
@@ -86,11 +88,11 @@
           "email": "E-Mail",
           "password": "Passwort",
           "proxy_url": "Proxy-URL",
-          "totp_secret": "Zwei-Faktor-Geheimschlüssel (optional)",
+          "totp_secret": "Zwei-Faktor-Code oder -Geheimnis (optional)",
           "verify_ssl": "SSL-Zertifikat überprüfen"
         },
         "data_description": {
-          "totp_secret": "Base32-Schlüssel aus der Einrichtung Ihrer Authenticator-App. Leer lassen, wenn 2FA für Ihr Ajax-Konto nicht aktiviert ist.",
+          "totp_secret": "Der 6-stellige Code aus Ihrer Authenticator-App oder der Base32-Einrichtungsschlüssel. Leer lassen, wenn 2FA für Ihr Ajax-Konto nicht aktiviert ist.",
           "verify_ssl": "Deaktivieren, wenn der Proxy ein selbstsigniertes Zertifikat verwendet."
         },
         "description": "Aktualisieren Sie Ihre Ajax-Anmeldedaten.",

@@ -17,8 +17,10 @@
       "invalid_auth": "Identifiants API invalides. Vérifiez votre clé API, e-mail et mot de passe.",
       "invalid_password": "E-mail ou mot de passe incorrect. Vérifiez vos identifiants de compte Ajax.",
       "invalid_proxy_url": "URL du proxy invalide. L'URL doit commencer par http:// ou https://",
-      "invalid_totp_secret": "Secret TOTP invalide. Saisissez la clé Base32 affichée lors de l'activation de l'authentification à deux facteurs.",
+      "invalid_totp_secret": "Saisie de double authentification invalide. Saisissez le code à 6 chiffres de votre application d'authentification, ou la clé de configuration Base32 (ou le lien otpauth://) affichée à l'activation de la double authentification.",
       "no_spaces_selected": "Veuillez sélectionner au moins un espace à activer.",
+      "totp_code_proxy": "En mode proxy, un code à 6 chiffres ne suffit pas : saisissez la clé de configuration Base32 (ou le lien otpauth://) affichée à l'activation de la double authentification.",
+      "totp_required": "Ajax a refusé la connexion (HTTP 423, sans motif). Si la double authentification est activée sur ce compte, saisissez le code à 6 chiffres de votre application d'authentification ou la clé de configuration Base32 ; si le refus persiste, contactez le support Ajax.",
       "unknown": "Erreur inattendue. Consultez les journaux pour plus de détails."
     },
     "step": {
@@ -37,7 +39,7 @@
           "email": "Adresse e-mail",
           "password": "Mot de passe",
           "queue_name": "Nom de file SQS (Optionnel)",
-          "totp_secret": "Secret à deux facteurs (facultatif)"
+          "totp_secret": "Code ou secret de double authentification (facultatif)"
         },
         "data_description": {
           "api_key": "Votre clé API fournie par Ajax Systems",
@@ -46,7 +48,7 @@
           "email": "Votre adresse e-mail de compte Ajax",
           "password": "Votre mot de passe de compte Ajax",
           "queue_name": "Nom de la file SQS (ex. : ajax-events-xxxxx-prod.fifo)",
-          "totp_secret": "Clé Base32 issue de la configuration de votre application d'authentification. Laissez vide si la 2FA n'est pas activée sur votre compte Ajax."
+          "totp_secret": "Le code à 6 chiffres de votre application d'authentification, ou la clé de configuration Base32. Laissez vide si la double authentification n'est pas activée sur votre compte Ajax."
         },
         "description": "Entrez vos identifiants API Ajax.\n\n⚠️ **Compte utilisateur uniquement** (pas de compte PRO/Entreprise).\n\nOptionnel : Ajoutez les identifiants AWS pour recevoir les événements en temps réel.",
         "title": "Connexion directe"
@@ -72,10 +74,10 @@
       "reauth_confirm": {
         "data": {
           "password": "Mot de passe",
-          "totp_secret": "Secret à deux facteurs (facultatif)"
+          "totp_secret": "Code ou secret de double authentification (facultatif)"
         },
         "data_description": {
-          "totp_secret": "Clé Base32 issue de la configuration de votre application d'authentification. Laissez vide si la 2FA n'est pas activée sur votre compte Ajax."
+          "totp_secret": "Le code à 6 chiffres de votre application d'authentification, ou la clé de configuration Base32. Laissez vide si la double authentification n'est pas activée sur votre compte Ajax."
         },
         "description": "Votre session a expiré. Veuillez entrer à nouveau votre mot de passe pour {email}.",
         "title": "Ré-authentification"
@@ -86,11 +88,11 @@
           "email": "E-mail",
           "password": "Mot de passe",
           "proxy_url": "URL du proxy",
-          "totp_secret": "Secret à deux facteurs (facultatif)",
+          "totp_secret": "Code ou secret de double authentification (facultatif)",
           "verify_ssl": "Vérifier le certificat SSL"
         },
         "data_description": {
-          "totp_secret": "Clé Base32 issue de la configuration de votre application d'authentification. Laissez vide si la 2FA n'est pas activée sur votre compte Ajax.",
+          "totp_secret": "Le code à 6 chiffres de votre application d'authentification, ou la clé de configuration Base32. Laissez vide si la double authentification n'est pas activée sur votre compte Ajax.",
           "verify_ssl": "Désactiver si le proxy utilise un certificat auto-signé."
         },
         "description": "Mettez à jour vos identifiants Ajax.",

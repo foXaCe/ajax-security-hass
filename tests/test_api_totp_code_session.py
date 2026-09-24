@@ -197,3 +197,22 @@ async def test_without_2fa_recovery_still_falls_back_to_login() -> None:
     api.user_id, api.session_token, api.refresh_token = "U1", "S0", "R0"
     await api._recover_auth()
     assert api.session.calls[1][1].endswith("/login")  # type: ignore[union-attr]
+
+
+@pytest.mark.asyncio
+async def test_resume_session_rate_limited_stays_transient() -> None:
+    """A 429 on /refresh must not throw the session away and ask for a new code."""
+    api = _code_api([_FakeResponse(429, {})], totp_code=None)
+    with pytest.raises(AjaxRestApiError) as exc:
+        await api.async_resume_session("U1", "R1")
+    assert not isinstance(exc.value, AjaxRestAuthError)
+    assert api.refresh_token == "R1"
+
+
+@pytest.mark.asyncio
+async def test_recover_auth_rate_limited_refresh_stays_transient() -> None:
+    api = _resumed_api([_FakeResponse(429, {})])
+    with pytest.raises(AjaxRestApiError) as exc:
+        await api._recover_auth()
+    assert not isinstance(exc.value, AjaxRestAuthError)
+    assert len(api.session.calls) == 1  # type: ignore[union-attr]

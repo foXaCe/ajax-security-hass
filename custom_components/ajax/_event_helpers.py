@@ -92,6 +92,18 @@ class EventHandlerMixin:
     _find_device: Callable[[AjaxSpace, str, str], AjaxDevice | None]
 
     @staticmethod
+    def _alarm_type(event: dict[str, Any]) -> str:
+        """Ajax's event classification, ``ALARM`` if either field says so.
+
+        Ajax sets ``eventTypeV2`` and/or ``eventType``; a non-alarm value in
+        one must not hide ``ALARM`` in the other.
+        """
+        types = (event.get("eventTypeV2") or "", event.get("eventType") or "")
+        if ALARM_EVENT_TYPE in types:
+            return ALARM_EVENT_TYPE
+        return types[0] or types[1]
+
+    @staticmethod
     def _is_accelerometer_event(event_tag: str, event_code: str) -> bool:
         return event_tag in ACCELEROMETER_EVENTS or event_code in ACCELEROMETER_EVENT_CODES
 
@@ -123,11 +135,14 @@ class EventHandlerMixin:
         action = ACCELEROMETER_EVENTS.get(event_tag) or ACCELEROMETER_EVENT_CODES[event_code]
         device = self._find_device(space, source_name, source_id)
         if device is not None:
+            stamp = datetime.now(UTC).isoformat()
             device.attributes[action] = True
-            device.attributes[f"{action}_at"] = datetime.now(UTC).isoformat()
+            device.attributes[f"{action}_at"] = stamp
+            # A later event re-stamps the flag; this timer then no-ops, so the
+            # sensor stays on for the full delay after the LAST event.
             self._schedule_later(
                 ACCELEROMETER_RESET_SECONDS,
-                partial(self._reset_device_flag, space.id, device.id, action),
+                partial(self._reset_device_flag, space.id, device.id, action, stamp),
             )
             source_name = device.name
         else:
@@ -139,13 +154,18 @@ class EventHandlerMixin:
         _LOGGER.info("Real-time: %s -> %s", source_name, action)
         return action, is_alarm
 
-    def _reset_device_flag(self, space_id: str, device_id: str, attribute: str) -> None:
-        """Clear a transient device flag set by an IMPULSE event."""
+    def _reset_device_flag(self, space_id: str, device_id: str, attribute: str, stamp: str | None = None) -> None:
+        """Clear a transient device flag set by an IMPULSE event.
+
+        With ``stamp``, only if no newer event re-armed the flag since.
+        """
         try:
             if not self.coordinator.account:
                 return
             space = self.coordinator.account.spaces.get(space_id)
             device = space.devices.get(device_id) if space else None
+            if stamp is not None and device is not None and device.attributes.get(f"{attribute}_at") != stamp:
+                return
             if device is not None and device.attributes.get(attribute):
                 device.attributes[attribute] = False
                 _LOGGER.debug("Auto-reset %s on %s", attribute, device.name)

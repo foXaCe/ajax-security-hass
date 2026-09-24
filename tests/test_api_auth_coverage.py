@@ -378,11 +378,13 @@ async def test_refresh_token_401_raises_auth_error() -> None:
 
 
 @pytest.mark.asyncio
-async def test_refresh_token_429_raises_auth_error() -> None:
+async def test_refresh_token_429_is_transient_not_auth() -> None:
+    """A throttled refresh keeps the session: rate-limit error, not auth error."""
     api = _api()
     api.session = _FakeSession([_FakeResponse(429)])  # type: ignore[assignment]
-    with pytest.raises(AjaxRestAuthError, match="rate limited"):
+    with pytest.raises(AjaxRestRateLimitError, match="rate limited") as exc:
         await api.async_refresh_token()
+    assert not isinstance(exc.value, AjaxRestAuthError)
 
 
 @pytest.mark.asyncio

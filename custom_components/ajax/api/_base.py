@@ -646,7 +646,10 @@ class AjaxRestClientBase:
 
                 if response.status == 429:
                     _LOGGER.warning("Refresh endpoint rate limited (429)")
-                    raise AjaxRestAuthError("Refresh rate limited")
+                    # Transient: the refresh token is still valid. As an auth
+                    # error it would, in two-factor code mode, discard the
+                    # session and ask the user for a new code.
+                    raise AjaxRestRateLimitError("Refresh rate limited")
 
                 if response.status >= 400:
                     detail = await self._error_detail(response)

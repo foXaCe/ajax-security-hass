@@ -171,3 +171,46 @@ async def test_reset_is_a_noop_once_the_device_is_gone() -> None:
     await mgr._handle_event(dict(_TILT))
     del space.devices[dev.id]
     _fire_timers(mgr)  # must not raise
+
+
+async def test_reset_follows_the_latest_event() -> None:
+    """A second tilt within the delay keeps the sensor on after the first timer."""
+    mgr, _, dev = _sse(SecurityState.ARMED)
+    await mgr._handle_event(dict(_TILT))
+    first_timer = mgr.coordinator.hass.loop.call_later.call_args_list[0].args[1]
+    mgr._recent_events.clear()  # bypass dedup: a genuine second event
+    dev.attributes["tilt_detected_at"] = "later"  # the second event re-stamps
+    first_timer()
+    assert dev.attributes["tilt_detected"] is True
+
+
+def test_alarm_type_reads_either_field() -> None:
+    from custom_components.ajax._event_helpers import EventHandlerMixin as M
+
+    assert M._alarm_type({"eventTypeV2": "SECURITY", "eventType": "ALARM"}) == "ALARM"
+    assert M._alarm_type({"eventTypeV2": "ALARM", "eventType": "SECURITY"}) == "ALARM"
+    assert M._alarm_type({"eventTypeV2": "", "eventType": "INFO"}) == "INFO"
+    assert M._alarm_type({}) == ""
+
+
+async def test_sse_alarm_in_event_type_only_is_not_masked_by_v2() -> None:
+    mgr, space, _ = _sse(SecurityState.ARMED)
+    await mgr._handle_event({**_TILT, "eventTag": "BrandNewAlarm", "eventCode": "", "eventTypeV2": "SECURITY"})
+    assert space.security_state == SecurityState.TRIGGERED
+
+
+async def test_sqs_unmapped_alarm_history_is_marked_as_alarm() -> None:
+    mgr, space, _ = _sqs(SecurityState.ARMED)
+    mgr._create_alarm_notification = AsyncMock()
+    await mgr._handle_event({"event": {**_TILT, "eventTag": "BrandNewAlarm", "eventCode": ""}})
+    record = space.recent_events[0]
+    assert record["is_alarm"] is True
+    assert record["action"] == "alarm"
+
+
+async def test_sqs_accelerometer_code_without_tag_is_processed() -> None:
+    mgr, space, dev = _sqs(SecurityState.ARMED)
+    mgr._create_alarm_notification = AsyncMock()
+    await mgr._handle_event({"event": {**_TILT, "eventTag": ""}})
+    assert dev.attributes["tilt_detected"] is True
+    assert space.security_state == SecurityState.TRIGGERED

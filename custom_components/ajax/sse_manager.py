@@ -247,7 +247,7 @@ class SSEManager(EventHandlerMixin):
             # Also check eventTypeV2 for video AI events
             event_type_v2 = event.get("eventTypeV2", "")
             # Ajax's own alarm classification (either field may be the one set).
-            alarm_type = event_type_v2 or event.get("eventType", "") or ""
+            alarm_type = self._alarm_type(event)
 
             # DEBUG, not INFO: source_name can be an Ajax user's display
             # name (PII) and this fires on every event.

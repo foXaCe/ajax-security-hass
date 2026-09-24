@@ -49,6 +49,7 @@ from .event_codes import (
     parse_event_code,
 )
 from .event_maps import (
+    ACCELEROMETER_EVENT_CODES,
     BUTTON_EVENTS,
     DEVICE_STATUS_EVENTS,
     DOOR_EVENTS,
@@ -200,7 +201,7 @@ class SQSManager(EventHandlerMixin):
             event_tag = event.get("eventTag", "").lower()
             event_type = event.get("eventTypeV2", "")
             # Ajax's own alarm classification (either field may be the one set).
-            alarm_type = event_type or event.get("eventType", "") or ""
+            alarm_type = self._alarm_type(event)
             event_code = event.get("eventCode", "")  # M_XX_YY format
             hub_id = event.get("hubId", "")
             hub_name = event.get("hubName", "")
@@ -228,7 +229,7 @@ class SQSManager(EventHandlerMixin):
             # Log raw event data at DEBUG level for troubleshooting
             _LOGGER.debug("SQS raw event data: %s", event)
 
-            if not hub_id or not event_tag:
+            if not hub_id or not (event_tag or event_code in ACCELEROMETER_EVENT_CODES):
                 _LOGGER.debug("SQS event missing hubId or eventTag")
                 return True
 
@@ -308,8 +309,8 @@ class SQSManager(EventHandlerMixin):
                     source_id,
                 )
             else:
-                # History and the alarm notification are handled below.
-                self._handle_unmapped_event(
+                # The alarm notification is raised below.
+                unmapped_alarm = self._handle_unmapped_event(
                     space,
                     event,
                     transport="SQS",
@@ -320,6 +321,12 @@ class SQSManager(EventHandlerMixin):
                     source_id=source_id,
                     source_type=source_type,
                 )
+                if unmapped_alarm:
+                    # The record was built before the event was classified.
+                    event_record["is_alarm"] = True
+                    if event_record.get("action") in ("", event_tag, "unknown"):
+                        event_record["action"] = unmapped_alarm
+                        event_record["message"] = get_event_message(unmapped_alarm, self._language)
 
             # Create notification if it's an alarm event
             if alarm_type == "ALARM" or accel_alarm or event_tag in SMOKE_EVENTS or event_tag in FLOOD_EVENTS:

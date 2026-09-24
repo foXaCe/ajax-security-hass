@@ -293,11 +293,37 @@ async def test_step_direct_invalid_totp_secret_reshows_form() -> None:
 
 
 @pytest.mark.parametrize(
+    "raw",
+    [
+        "JBSWY3DPEHPK3PXP",
+        "jbsw y3dp ehpk 3pxp",
+        "JBSW-Y3DP-EHPK-3PXP",
+        "JBSW\u00a0Y3DP\u00a0EHPK\u00a03PXP",
+        " JBSWY3DPEHPK3PXP\n",
+        "JBSW\tY3DPEHPK3PXP",
+        "JBSWY3DPEHPK3PXP====",
+        "otpauth://totp/Ajax:u%40e.com?secret=JBSWY3DPEHPK3PXP&issuer=Ajax",
+    ],
+)
+def test_clean_totp_secret_accepts_what_people_paste(raw: str) -> None:
+    """Grouping, clipboard whitespace, padding and the QR link all normalise."""
+    assert AjaxConfigFlow._clean_totp_secret(raw) == "JBSWY3DPEHPK3PXP"
+
+
+@pytest.mark.parametrize("raw", ["123456", "otpauth://totp/Ajax?issuer=Ajax", "---", "not-base32!"])
+def test_clean_totp_secret_rejects_non_secrets(raw: str) -> None:
+    """The 6-digit code, a link without secret, or garbage stay rejected."""
+    with pytest.raises(ValueError, match="invalid_totp_secret"):
+        AjaxConfigFlow._clean_totp_secret(raw)
+
+
+@pytest.mark.parametrize(
     ("error_type", "expected"),
     [
         ("invalid_api_key", "invalid_api_key"),
         ("invalid_password", "invalid_password"),
         ("invalid_account_type", "invalid_account_type"),
+        ("totp_required", "totp_required"),
         ("generic", "invalid_auth"),
         ("totally_unknown_type", "invalid_auth"),
     ],

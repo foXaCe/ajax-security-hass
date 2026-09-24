@@ -17,8 +17,10 @@
       "invalid_auth": "Ongeldige API-referenties. Controleer je API-sleutel, e-mail en wachtwoord.",
       "invalid_password": "Ongeldig e-mailadres of wachtwoord. Controleer je Ajax-accountgegevens.",
       "invalid_proxy_url": "Ongeldige proxy-URL. URL moet beginnen met http:// of https://",
-      "invalid_totp_secret": "Ongeldige TOTP-sleutel. Voer de Base32-sleutel in die werd getoond toen je tweefactorauthenticatie inschakelde.",
+      "invalid_totp_secret": "Ongeldige tweestapsinvoer. Voer de 6-cijferige code uit uw authenticator-app in, of de Base32-instelsleutel (of de otpauth://-link) die werd getoond bij het inschakelen van 2FA.",
       "no_spaces_selected": "Selecteer ten minste één ruimte om in te schakelen.",
+      "totp_code_proxy": "In proxymodus volstaat een 6-cijferige code niet: voer de Base32-instelsleutel (of de otpauth://-link) in die werd getoond bij het inschakelen van 2FA.",
+      "totp_required": "Ajax heeft de aanmelding geweigerd (HTTP 423, zonder reden). Als tweestapsverificatie is ingeschakeld voor dit account, voer dan de 6-cijferige code uit uw authenticator-app of de Base32-instelsleutel in; blijft het probleem bestaan, neem dan contact op met Ajax-support.",
       "unknown": "Onverwachte fout. Controleer de logs voor meer details."
     },
     "step": {
@@ -37,7 +39,7 @@
           "email": "E-mailadres",
           "password": "Wachtwoord",
           "queue_name": "SQS-wachtrijnaam (Optioneel)",
-          "totp_secret": "Twee-factor geheime sleutel (optioneel)"
+          "totp_secret": "Tweestapscode of -geheim (optioneel)"
         },
         "data_description": {
           "api_key": "Je API-sleutel verstrekt door Ajax Systems",
@@ -46,7 +48,7 @@
           "email": "Je Ajax-account e-mailadres",
           "password": "Je Ajax-accountwachtwoord",
           "queue_name": "SQS-wachtrijnaam (bijv. ajax-events-xxxxx-prod.fifo)",
-          "totp_secret": "Base32-sleutel van je authenticator-app instellingen. Laat leeg als 2FA niet is ingeschakeld voor je Ajax-account."
+          "totp_secret": "De 6-cijferige code uit uw authenticator-app, of de Base32-instelsleutel. Laat leeg als 2FA niet is ingeschakeld op uw Ajax-account."
         },
         "description": "Voer je Ajax API-referenties in.\n\n⚠️ **Alleen gebruikersaccount** (geen PRO/Enterprise-accounts).\n\nOptioneel: Voeg AWS-referenties toe voor real-time gebeurtenismeldingen.",
         "title": "Directe verbinding"
@@ -72,10 +74,10 @@
       "reauth_confirm": {
         "data": {
           "password": "Wachtwoord",
-          "totp_secret": "Twee-factor geheime sleutel (optioneel)"
+          "totp_secret": "Tweestapscode of -geheim (optioneel)"
         },
         "data_description": {
-          "totp_secret": "Base32-sleutel van je authenticator-app instellingen. Laat leeg als 2FA niet is ingeschakeld voor je Ajax-account."
+          "totp_secret": "De 6-cijferige code uit uw authenticator-app, of de Base32-instelsleutel. Laat leeg als 2FA niet is ingeschakeld op uw Ajax-account."
         },
         "description": "Je sessie is verlopen. Voer je wachtwoord opnieuw in voor {email}.",
         "title": "Opnieuw authenticeren"
@@ -86,11 +88,11 @@
           "email": "E-mailadres",
           "password": "Wachtwoord",
           "proxy_url": "Proxy-URL",
-          "totp_secret": "Twee-factor geheime sleutel (optioneel)",
+          "totp_secret": "Tweestapscode of -geheim (optioneel)",
           "verify_ssl": "SSL-certificaat verifiëren"
         },
         "data_description": {
-          "totp_secret": "Base32-sleutel van je authenticator-app instellingen. Laat leeg als 2FA niet is ingeschakeld voor je Ajax-account.",
+          "totp_secret": "De 6-cijferige code uit uw authenticator-app, of de Base32-instelsleutel. Laat leeg als 2FA niet is ingeschakeld op uw Ajax-account.",
           "verify_ssl": "Schakel uit als de proxy een zelfondertekend certificaat gebruikt."
         },
         "description": "Werk je Ajax-referenties bij.",

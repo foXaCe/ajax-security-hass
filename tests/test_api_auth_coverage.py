@@ -970,3 +970,116 @@ async def test_request_timeout_retry_preserves_bypass_cache() -> None:
     session = api.session
     assert len(session.calls) == 2
     assert session.calls[1][2]["headers"].get("X-Cache-Control") == "no-cache"
+
+
+# ---------------------------------------------------------------------------
+# Error bodies surfaced in the exception (400 and friends)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_login_400_surfaces_the_api_message() -> None:
+    """A rejected login must say what the API objected to.
+
+    `raise_for_status()` only carried the status line, and Ajax leaves the
+    HTTP reason empty, so the failure used to read `400, message=''` — nothing
+    to act on. The body's `message` is the whole diagnosis.
+    """
+    api = _api(session_token=None)
+    api.session = _FakeSession(  # type: ignore[assignment]
+        [_FakeResponse(400, {"message": "Failed to read JSON body", "messageId": "7fecf20b"})]
+    )
+
+    with pytest.raises(AjaxRestApiError) as exc:
+        await api.async_login()
+
+    assert "400" in str(exc.value)
+    assert "Failed to read JSON body" in str(exc.value)
+    assert "7fecf20b" in str(exc.value)
+
+
+@pytest.mark.asyncio
+async def test_login_400_lists_the_offending_fields() -> None:
+    """A validation failure names the fields; they belong in the message."""
+    api = _api(session_token=None)
+    api.session = _FakeSession(  # type: ignore[assignment]
+        [
+            _FakeResponse(
+                400,
+                {
+                    "message": "Validation failed",
+                    "errors": [{"resource": "Login", "field": "login", "code": "invalid"}],
+                },
+            )
+        ]
+    )
+
+    with pytest.raises(AjaxRestApiError) as exc:
+        await api.async_login()
+
+    assert "login: invalid" in str(exc.value)
+
+
+@pytest.mark.asyncio
+async def test_login_400_with_unreadable_body_still_reports_the_status() -> None:
+    """A non-JSON body falls back to the raw text, and never raises itself."""
+    api = _api(session_token=None)
+    api.session = _FakeSession(  # type: ignore[assignment]
+        [
+            _FakeResponse(
+                400,
+                json_exc=aiohttp.ContentTypeError(None, ()),  # type: ignore[arg-type]
+                text="<html>gateway rejected</html>",
+            )
+        ]
+    )
+
+    with pytest.raises(AjaxRestApiError) as exc:
+        await api.async_login()
+
+    assert "400" in str(exc.value)
+    assert "gateway rejected" in str(exc.value)
+
+
+@pytest.mark.asyncio
+async def test_refresh_400_surfaces_the_api_message() -> None:
+    api = _api()
+    api.session = _FakeSession([_FakeResponse(400, {"message": "Unknown userId"})])  # type: ignore[assignment]
+
+    with pytest.raises(AjaxRestApiError) as exc:
+        await api.async_refresh_token()
+
+    assert "Unknown userId" in str(exc.value)
+
+
+@pytest.mark.asyncio
+async def test_request_4xx_surfaces_the_api_message_and_endpoint() -> None:
+    api = _api()
+    api.session = _FakeSession([_FakeResponse(422, {"message": "Hub is busy"})])  # type: ignore[assignment]
+
+    with pytest.raises(AjaxRestApiError) as exc:
+        await api._request("GET", "/user/U1/hubs")
+
+    assert "422" in str(exc.value)
+    assert "/user/U1/hubs" in str(exc.value)
+    assert "Hub is busy" in str(exc.value)
+
+
+@pytest.mark.asyncio
+async def test_login_423_asks_for_the_totp_secret() -> None:
+    """A 423 (2FA code missing or invalid) must stop HA's setup retries.
+
+    As an `AjaxRestApiError` it became `ConfigEntryNotReady` and HA retried
+    the same doomed login every few seconds. As an auth error it becomes
+    `ConfigEntryAuthFailed` and opens the reauth form, where the TOTP secret
+    can be entered.
+    """
+    api = _api(session_token=None)
+    api.session = _FakeSession(  # type: ignore[assignment]
+        [_FakeResponse(423, {"messageId": "6d4b4f1e"})]
+    )
+
+    with pytest.raises(AjaxRestAuthError) as exc:
+        await api.async_login()
+
+    assert exc.value.error_type == "totp_required"

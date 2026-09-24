@@ -17,8 +17,10 @@
       "invalid_auth": "Credenciales API inválidas. Verifique su clave API, correo y contraseña.",
       "invalid_password": "Correo o contraseña incorrectos. Verifique sus credenciales de cuenta Ajax.",
       "invalid_proxy_url": "URL del proxy inválida. La URL debe comenzar con http:// o https://",
-      "invalid_totp_secret": "Secreto TOTP inválido. Introduzca la clave Base32 mostrada al activar la autenticación de dos factores.",
+      "invalid_totp_secret": "Entrada de doble factor no válida. Introduzca el código de 6 dígitos de su aplicación de autenticación, o la clave de configuración Base32 (o el enlace otpauth://) mostrada al activar la 2FA.",
       "no_spaces_selected": "Por favor, seleccione al menos un espacio para activar.",
+      "totp_code_proxy": "En modo proxy no basta con un código de 6 dígitos: introduzca la clave de configuración Base32 (o el enlace otpauth://) mostrada al activar la 2FA.",
+      "totp_required": "Ajax rechazó el inicio de sesión (HTTP 423, sin motivo). Si la autenticación de dos factores está activada en esta cuenta, introduzca el código de 6 dígitos de su aplicación de autenticación o la clave de configuración Base32; si persiste, contacte con el soporte de Ajax.",
       "unknown": "Error inesperado. Consulte los registros para más detalles."
     },
     "step": {
@@ -37,7 +39,7 @@
           "email": "Correo electrónico",
           "password": "Contraseña",
           "queue_name": "Nombre de cola SQS (Opcional)",
-          "totp_secret": "Secreto de doble factor (opcional)"
+          "totp_secret": "Código o secreto de doble factor (opcional)"
         },
         "data_description": {
           "api_key": "Su clave API proporcionada por Ajax Systems",
@@ -46,7 +48,7 @@
           "email": "Su correo electrónico de cuenta Ajax",
           "password": "Su contraseña de cuenta Ajax",
           "queue_name": "Nombre de la cola SQS (ej: ajax-events-xxxxx-prod.fifo)",
-          "totp_secret": "Clave Base32 de la configuración de su aplicación de autenticación. Déjelo en blanco si la 2FA no está habilitada en su cuenta Ajax."
+          "totp_secret": "El código de 6 dígitos de su aplicación de autenticación, o la clave de configuración Base32. Déjelo vacío si la 2FA no está activada en su cuenta de Ajax."
         },
         "description": "Ingrese sus credenciales API de Ajax.\n\n⚠️ **Solo cuenta de usuario** (no cuentas PRO/Empresarial).\n\nOpcional: Agregue las credenciales AWS para recibir eventos en tiempo real.",
         "title": "Conexión directa"
@@ -72,10 +74,10 @@
       "reauth_confirm": {
         "data": {
           "password": "Contraseña",
-          "totp_secret": "Secreto de doble factor (opcional)"
+          "totp_secret": "Código o secreto de doble factor (opcional)"
         },
         "data_description": {
-          "totp_secret": "Clave Base32 de la configuración de su aplicación de autenticación. Déjelo en blanco si la 2FA no está habilitada en su cuenta Ajax."
+          "totp_secret": "El código de 6 dígitos de su aplicación de autenticación, o la clave de configuración Base32. Déjelo vacío si la 2FA no está activada en su cuenta de Ajax."
         },
         "description": "Su sesión ha expirado. Por favor, ingrese nuevamente su contraseña para {email}.",
         "title": "Re-autenticación"
@@ -86,11 +88,11 @@
           "email": "Correo electrónico",
           "password": "Contraseña",
           "proxy_url": "URL del proxy",
-          "totp_secret": "Secreto de doble factor (opcional)",
+          "totp_secret": "Código o secreto de doble factor (opcional)",
           "verify_ssl": "Verificar certificado SSL"
         },
         "data_description": {
-          "totp_secret": "Clave Base32 de la configuración de su aplicación de autenticación. Déjelo en blanco si la 2FA no está habilitada en su cuenta Ajax.",
+          "totp_secret": "El código de 6 dígitos de su aplicación de autenticación, o la clave de configuración Base32. Déjelo vacío si la 2FA no está activada en su cuenta de Ajax.",
           "verify_ssl": "Desactivar si el proxy usa un certificado autofirmado."
         },
         "description": "Actualice sus credenciales de Ajax.",

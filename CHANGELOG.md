@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.38.1] - 2026-09-25
+
+### Fixed
+- **A rejected login no longer locks your Ajax account (#250).** On an account with two-factor authentication, a login without a code is answered with *"Totp is required for account with enabled 2FA"* (HTTP 400). That answer was treated as temporary, so Home Assistant retried it over and over — each attempt one more failed sign-in — until Ajax started refusing the account with HTTP 423, even once a valid code or setup key was entered. A login rejected with 400 or 422 now stops immediately and asks you to re-authenticate; the "code missing" case gets its own message asking for the 6-digit code or the setup key.
+- The HTTP 423 message now explains that it can follow repeated failed attempts, and that waiting before retrying helps.
+
+### If your account is already locked (HTTP 423)
+Update, then disable the Ajax entry for a while so nothing keeps signing in, and re-authenticate **once** with the correct password and two-factor code or setup key (setup key only in proxy mode). If the refusal persists, contact Ajax support with the `messageId` shown in the log.
+
 ## [0.38.0] - 2026-09-24
 
 ### Fixed

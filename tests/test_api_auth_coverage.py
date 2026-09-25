@@ -1085,3 +1085,45 @@ async def test_login_423_asks_for_the_totp_secret() -> None:
         await api.async_login()
 
     assert exc.value.error_type == "totp_required"
+
+
+# ---------------------------------------------------------------------------
+# #250: a client error on /login must never feed a retry loop
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_login_400_totp_required_asks_for_the_code() -> None:
+    """Ajax's real "code missing" answer: stop and reauth, don't retry.
+
+    Retried as "not ready", each attempt was one more failed sign-in, and Ajax
+    ended up locking the account with 423 (#250).
+    """
+    api = _api(session_token=None)
+    api.session = _FakeSession(  # type: ignore[assignment]
+        [_FakeResponse(400, {"message": "Totp is required for account with enabled 2FA", "messageId": "m"})]
+    )
+    with pytest.raises(AjaxRestAuthError) as exc:
+        await api.async_login()
+    assert exc.value.error_type == "totp_missing"
+    assert api.totp_required is True
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("status", [400, 404, 422])
+async def test_login_other_client_errors_stop_retrying(status: int) -> None:
+    api = _api(session_token=None)
+    api.session = _FakeSession([_FakeResponse(status, {"message": "nope"})])  # type: ignore[assignment]
+    with pytest.raises(AjaxRestAuthError) as exc:
+        await api.async_login()
+    assert exc.value.error_type == "generic"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("status", [429, 502, 503])
+async def test_login_transient_errors_stay_retryable(status: int) -> None:
+    api = _api(session_token=None)
+    api.session = _FakeSession([_FakeResponse(status, {"message": "later"})])  # type: ignore[assignment]
+    with pytest.raises(AjaxRestApiError) as exc:
+        await api.async_login()
+    assert not isinstance(exc.value, AjaxRestAuthError)

@@ -512,11 +512,11 @@ class AjaxRestClientBase:
                     raise AjaxRestAuthError("Authentication failed", error_type="invalid_password")
                 elif response.status == 423:
                     # Undocumented (absent from swagger up to 1.152.0), body
-                    # carries only a messageId. Seen on a 2FA-enabled account
-                    # both without a `totp` and with a freshly generated code,
-                    # so it is not simply "code missing". As "not ready" HA
-                    # retried it every few seconds, forever; as an auth error
-                    # it stops and hands over to the reauth form.
+                    # carries only a messageId. Seen on 2FA accounts after a
+                    # run of failed sign-ins (a missing `totp` is a 400), then
+                    # even with a valid code or with 2FA disabled: most likely
+                    # an anti-brute-force lock (#250). Never retry it: every
+                    # attempt may extend the lock. Hand over to reauth.
                     self.totp_required = True
                     with contextlib.suppress(Exception):
                         _LOGGER.debug("Login 423 body: %s", (await response.text())[:500])
@@ -540,7 +540,17 @@ class AjaxRestClientBase:
                         response.status,
                         detail or "no detail returned by the API",
                     )
-                    raise AjaxRestApiError(f"Login failed: {response.status}" + (f" - {detail}" if detail else ""))
+                    message = f"Login failed: {response.status}" + (f" - {detail}" if detail else "")
+                    if response.status == 429 or response.status >= 500:
+                        raise AjaxRestApiError(message)
+                    # A client error cannot fix itself: retrying it (as "not
+                    # ready") only piles up failed sign-ins, and Ajax then
+                    # locks the account with 423 (#250). Stop and reauth.
+                    if "totp" in detail.lower():
+                        # "Totp is required for account with enabled 2FA"
+                        self.totp_required = True
+                        raise AjaxRestAuthError(message, error_type="totp_missing")
+                    raise AjaxRestAuthError(message, error_type="generic")
 
                 result = await response.json()
 

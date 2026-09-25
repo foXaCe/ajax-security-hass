@@ -20,7 +20,8 @@
       "invalid_totp_secret": "Ungültige Zwei-Faktor-Eingabe. Geben Sie den 6-stelligen Code aus Ihrer Authenticator-App oder den Base32-Einrichtungsschlüssel (oder den otpauth://-Link) ein, der beim Aktivieren der 2FA angezeigt wurde.",
       "no_spaces_selected": "Bitte wählen Sie mindestens einen Bereich aus.",
       "totp_code_proxy": "Im Proxy-Modus reicht ein 6-stelliger Code nicht aus: Geben Sie den Base32-Einrichtungsschlüssel (oder den otpauth://-Link) ein, der beim Aktivieren der 2FA angezeigt wurde.",
-      "totp_required": "Ajax hat die Anmeldung abgelehnt (HTTP 423, ohne Begründung). Wenn für dieses Konto die Zwei-Faktor-Authentifizierung aktiviert ist, geben Sie den 6-stelligen Code aus Ihrer Authenticator-App oder den Base32-Einrichtungsschlüssel ein; bleibt die Ablehnung bestehen, wenden Sie sich an den Ajax-Support.",
+      "totp_missing": "Für Ihr Ajax-Konto ist die Zwei-Faktor-Authentifizierung aktiviert. Geben Sie den 6-stelligen Code aus Ihrer Authenticator-App oder den Base32-Einrichtungsschlüssel ein (im Proxy-Modus funktioniert nur der Einrichtungsschlüssel).",
+      "totp_required": "Ajax lehnt Anmeldungen für dieses Konto ab (HTTP 423). Das kann auf wiederholte fehlgeschlagene Versuche folgen: Warten Sie, bevor Sie es erneut versuchen, und prüfen Sie Passwort sowie Zwei-Faktor-Code oder Einrichtungsschlüssel. Bleibt es bestehen, wenden Sie sich an den Ajax-Support.",
       "unknown": "Unerwarteter Fehler. Überprüfen Sie die Protokolle für weitere Details."
     },
     "step": {

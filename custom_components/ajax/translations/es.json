@@ -20,7 +20,8 @@
       "invalid_totp_secret": "Entrada de doble factor no válida. Introduzca el código de 6 dígitos de su aplicación de autenticación, o la clave de configuración Base32 (o el enlace otpauth://) mostrada al activar la 2FA.",
       "no_spaces_selected": "Por favor, seleccione al menos un espacio para activar.",
       "totp_code_proxy": "En modo proxy no basta con un código de 6 dígitos: introduzca la clave de configuración Base32 (o el enlace otpauth://) mostrada al activar la 2FA.",
-      "totp_required": "Ajax rechazó el inicio de sesión (HTTP 423, sin motivo). Si la autenticación de dos factores está activada en esta cuenta, introduzca el código de 6 dígitos de su aplicación de autenticación o la clave de configuración Base32; si persiste, contacte con el soporte de Ajax.",
+      "totp_missing": "Su cuenta de Ajax tiene activada la autenticación de dos factores. Introduzca el código de 6 dígitos de su aplicación de autenticación o la clave de configuración Base32 (en modo proxy, solo funciona la clave de configuración).",
+      "totp_required": "Ajax rechaza los inicios de sesión de esta cuenta (HTTP 423). Puede ocurrir tras intentos fallidos repetidos: espere antes de volver a intentarlo y compruebe la contraseña y el código o la clave de doble factor. Si persiste, contacte con el soporte de Ajax.",
       "unknown": "Error inesperado. Consulte los registros para más detalles."
     },
     "step": {

@@ -20,7 +20,8 @@
       "invalid_totp_secret": "Saisie de double authentification invalide. Saisissez le code à 6 chiffres de votre application d'authentification, ou la clé de configuration Base32 (ou le lien otpauth://) affichée à l'activation de la double authentification.",
       "no_spaces_selected": "Veuillez sélectionner au moins un espace à activer.",
       "totp_code_proxy": "En mode proxy, un code à 6 chiffres ne suffit pas : saisissez la clé de configuration Base32 (ou le lien otpauth://) affichée à l'activation de la double authentification.",
-      "totp_required": "Ajax a refusé la connexion (HTTP 423, sans motif). Si la double authentification est activée sur ce compte, saisissez le code à 6 chiffres de votre application d'authentification ou la clé de configuration Base32 ; si le refus persiste, contactez le support Ajax.",
+      "totp_missing": "La double authentification est activée sur votre compte Ajax. Saisissez le code à 6 chiffres de votre application d'authentification ou la clé de configuration Base32 (en mode proxy, seule la clé de configuration fonctionne).",
+      "totp_required": "Ajax refuse les connexions de ce compte (HTTP 423). Cela peut suivre des tentatives échouées répétées : patientez avant de réessayer, et vérifiez le mot de passe ainsi que le code ou la clé de double authentification. Si le refus persiste, contactez le support Ajax.",
       "unknown": "Erreur inattendue. Consultez les journaux pour plus de détails."
     },
     "step": {

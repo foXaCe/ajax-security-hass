@@ -20,7 +20,8 @@
       "invalid_totp_secret": "Invalid two-factor entry. Enter the 6-digit code from your authenticator app, or the Base32 setup key (or the otpauth:// link) shown when you enabled 2FA.",
       "no_spaces_selected": "Please select at least one space to enable.",
       "totp_code_proxy": "In proxy mode a 6-digit code is not enough: enter the Base32 setup key (or the otpauth:// link) shown when you enabled 2FA.",
-      "totp_required": "Ajax refused the sign-in (HTTP 423, no reason given). If two-factor authentication is enabled on this account, enter the 6-digit code from your authenticator app or the Base32 setup key; if it persists, contact Ajax support.",
+      "totp_missing": "Your Ajax account has two-factor authentication enabled. Enter the 6-digit code from your authenticator app or the Base32 setup key (in proxy mode, only the setup key works).",
+      "totp_required": "Ajax is refusing sign-ins for this account (HTTP 423). This can follow repeated failed attempts: wait before trying again, and make sure the password and the two-factor code or setup key are correct. If it persists, contact Ajax support.",
       "unknown": "Unexpected error. Check the logs for more details."
     },
     "step": {

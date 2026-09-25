@@ -20,7 +20,8 @@
       "invalid_totp_secret": "Ongeldige tweestapsinvoer. Voer de 6-cijferige code uit uw authenticator-app in, of de Base32-instelsleutel (of de otpauth://-link) die werd getoond bij het inschakelen van 2FA.",
       "no_spaces_selected": "Selecteer ten minste één ruimte om in te schakelen.",
       "totp_code_proxy": "In proxymodus volstaat een 6-cijferige code niet: voer de Base32-instelsleutel (of de otpauth://-link) in die werd getoond bij het inschakelen van 2FA.",
-      "totp_required": "Ajax heeft de aanmelding geweigerd (HTTP 423, zonder reden). Als tweestapsverificatie is ingeschakeld voor dit account, voer dan de 6-cijferige code uit uw authenticator-app of de Base32-instelsleutel in; blijft het probleem bestaan, neem dan contact op met Ajax-support.",
+      "totp_missing": "Voor uw Ajax-account is tweestapsverificatie ingeschakeld. Voer de 6-cijferige code uit uw authenticator-app of de Base32-instelsleutel in (in proxymodus werkt alleen de instelsleutel).",
+      "totp_required": "Ajax weigert aanmeldingen voor dit account (HTTP 423). Dit kan volgen op herhaalde mislukte pogingen: wacht voordat u het opnieuw probeert en controleer het wachtwoord en de tweestapscode of instelsleutel. Blijft het probleem bestaan, neem dan contact op met Ajax-support.",
       "unknown": "Onverwachte fout. Controleer de logs voor meer details."
     },
     "step": {

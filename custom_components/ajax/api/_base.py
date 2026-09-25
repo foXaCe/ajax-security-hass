@@ -541,12 +541,16 @@ class AjaxRestClientBase:
                         detail or "no detail returned by the API",
                     )
                     message = f"Login failed: {response.status}" + (f" - {detail}" if detail else "")
-                    if response.status == 429 or response.status >= 500:
+                    if response.status not in (400, 422):
+                        # 429/5xx are transient; other 4xx (a 404 from a wrong
+                        # proxy URL...) never reach Ajax's credential check, so
+                        # retrying cannot lock the account and reauth could
+                        # not fix them.
                         raise AjaxRestApiError(message)
-                    # A client error cannot fix itself: retrying it (as "not
-                    # ready") only piles up failed sign-ins, and Ajax then
-                    # locks the account with 423 (#250). Stop and reauth.
-                    if "totp" in detail.lower():
+                    # A rejected sign-in cannot fix itself: retrying it (as
+                    # "not ready") only piles up failed attempts, and Ajax
+                    # then locks the account with 423 (#250). Stop and reauth.
+                    if "totp is required" in detail.lower():
                         # "Totp is required for account with enabled 2FA"
                         self.totp_required = True
                         raise AjaxRestAuthError(message, error_type="totp_missing")

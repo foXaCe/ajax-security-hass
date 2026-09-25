@@ -1110,7 +1110,7 @@ async def test_login_400_totp_required_asks_for_the_code() -> None:
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("status", [400, 404, 422])
+@pytest.mark.parametrize("status", [400, 422])
 async def test_login_other_client_errors_stop_retrying(status: int) -> None:
     api = _api(session_token=None)
     api.session = _FakeSession([_FakeResponse(status, {"message": "nope"})])  # type: ignore[assignment]
@@ -1120,10 +1120,22 @@ async def test_login_other_client_errors_stop_retrying(status: int) -> None:
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("status", [429, 502, 503])
+@pytest.mark.parametrize("status", [404, 405, 429, 502, 503])
 async def test_login_transient_errors_stay_retryable(status: int) -> None:
     api = _api(session_token=None)
     api.session = _FakeSession([_FakeResponse(status, {"message": "later"})])  # type: ignore[assignment]
     with pytest.raises(AjaxRestApiError) as exc:
         await api.async_login()
     assert not isinstance(exc.value, AjaxRestAuthError)
+
+
+@pytest.mark.asyncio
+async def test_login_invalid_code_is_not_reported_as_missing() -> None:
+    """A code that was sent but rejected must not say "enter the code"."""
+    api = _api(session_token=None)
+    api.session = _FakeSession(  # type: ignore[assignment]
+        [_FakeResponse(400, {"message": "Validation failed", "errors": [{"field": "totp", "code": "invalid"}]})]
+    )
+    with pytest.raises(AjaxRestAuthError) as exc:
+        await api.async_login()
+    assert exc.value.error_type == "generic"

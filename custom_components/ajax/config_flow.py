@@ -60,6 +60,7 @@ _AUTH_ERROR_MAP = {
     "invalid_account_type": "invalid_account_type",
     "generic": "invalid_auth",
     "totp_required": "totp_required",
+    "totp_missing": "totp_missing",
 }
 
 

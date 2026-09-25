@@ -324,6 +324,7 @@ def test_clean_totp_secret_rejects_non_secrets(raw: str) -> None:
         ("invalid_password", "invalid_password"),
         ("invalid_account_type", "invalid_account_type"),
         ("totp_required", "totp_required"),
+        ("totp_missing", "totp_missing"),
         ("generic", "invalid_auth"),
         ("totally_unknown_type", "invalid_auth"),
     ],

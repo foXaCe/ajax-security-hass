@@ -20,7 +20,8 @@
       "invalid_totp_secret": "Ogiltig tvåfaktorsinmatning. Ange den 6-siffriga koden från din autentiseringsapp, eller Base32-konfigurationsnyckeln (eller otpauth://-länken) som visades när du aktiverade 2FA.",
       "no_spaces_selected": "Välj minst ett space för aktivering.",
       "totp_code_proxy": "I proxyläge räcker inte en 6-siffrig kod: ange Base32-konfigurationsnyckeln (eller otpauth://-länken) som visades när du aktiverade 2FA.",
-      "totp_required": "Ajax nekade inloggningen (HTTP 423, utan orsak). Om tvåfaktorsautentisering är aktiverad för kontot, ange den 6-siffriga koden från din autentiseringsapp eller Base32-konfigurationsnyckeln; om det kvarstår, kontakta Ajax support.",
+      "totp_missing": "Ditt Ajax-konto har tvåfaktorsautentisering aktiverad. Ange den 6-siffriga koden från din autentiseringsapp eller Base32-konfigurationsnyckeln (i proxyläge fungerar bara konfigurationsnyckeln).",
+      "totp_required": "Ajax nekar inloggningar för det här kontot (HTTP 423). Det kan följa på upprepade misslyckade försök: vänta innan du försöker igen och kontrollera lösenordet samt tvåfaktorskoden eller konfigurationsnyckeln. Om det kvarstår, kontakta Ajax support.",
       "unknown": "Oväntat fel. Kontrollera loggar för mer information."
     },
     "step": {

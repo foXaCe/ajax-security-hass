@@ -368,6 +368,14 @@ def _apply_socket_power(device: AjaxDevice, device_data: dict[str, Any]) -> None
         device.attributes["current"] = (ma / 1000.0) if ma is not None else 0
     if "voltageVolts" in device_data:
         device.attributes["voltage"] = device_data.get("voltageVolts")
+    # WallSwitch reports neither powerConsumptionWatts nor power, only the
+    # current/voltage pair. Derive instantaneous power from them so the
+    # active power sensor is still instantiated (issue #254).
+    if "power" not in device.attributes:
+        voltage = device.attributes.get("voltage")
+        current = device.attributes.get("current")
+        if voltage is not None and current is not None:
+            device.attributes["power"] = round(voltage * current, 2)
     # Current threshold (SocketOutlet)
     if "currentThresholdAmpere" in device_data:
         device.attributes["current_threshold"] = device_data.get("currentThresholdAmpere")

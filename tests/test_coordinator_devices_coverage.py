@@ -665,6 +665,56 @@ async def test_update_devices_socket_power_monitoring() -> None:
     assert dev.attributes["is_on"] is True
 
 
+async def test_update_devices_wallswitch_derives_power_from_voltage_current() -> None:
+    """WallSwitch reports no power field, only current/voltage (issue #254)."""
+    space = _make_space()
+    account = _account_with_space(space)
+    payload = [
+        {
+            "id": "d1",
+            "deviceName": "Interrupteur",
+            "deviceType": "WallSwitch",
+            "model": {
+                "switchState": [],
+                "powerConsumedWattsPerHour": 36,
+                "currentMilliAmpers": 360,
+                "voltageVolts": 235,
+            },
+        }
+    ]
+    mixin = _make_mixin(account=account, devices_list=payload)
+    await mixin._async_update_devices("s1")
+    dev = space.devices["d1"]
+    # 235 V x 0.360 A = 84.6 W
+    assert dev.attributes["power"] == 84.6
+    assert dev.attributes["current"] == 0.36
+    assert dev.attributes["voltage"] == 235
+
+
+async def test_update_devices_keeps_reported_power_over_derived() -> None:
+    """An explicit powerConsumptionWatts must win over the derived value."""
+    space = _make_space()
+    account = _account_with_space(space)
+    payload = [
+        {
+            "id": "d1",
+            "deviceName": "Prise",
+            "deviceType": "SocketOutlet",
+            "model": {
+                "switchState": [],
+                "powerConsumptionWatts": 42,
+                "currentMilliAmpere": 200,
+                "voltageVolts": 230,
+            },
+        }
+    ]
+    mixin = _make_mixin(account=account, devices_list=payload)
+    await mixin._async_update_devices("s1")
+    dev = space.devices["d1"]
+    # 230 x 0.2 = 46 W, but the reported 42 W must be preserved.
+    assert dev.attributes["power"] == 42
+
+
 async def test_update_devices_socket_outlet_socket_state() -> None:
     space = _make_space()
     account = _account_with_space(space)

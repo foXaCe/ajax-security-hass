@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.38.2] - 2026-09-28
+
+### Fixed
+- **The active power sensor now appears on WallSwitch (#254).** Those switches never sent `power` nor `powerConsumptionWatts` to Home Assistant — only the current, the voltage and the consumed energy — so the power sensor was never created, even though the current and the voltage were reported normally. The instantaneous power is now derived from the current and the voltage when the switch reports no power of its own. A power reading sent by the device is still used as-is, so existing sockets are unchanged.
+
 ## [0.38.1] - 2026-09-25
 
 ### Fixed

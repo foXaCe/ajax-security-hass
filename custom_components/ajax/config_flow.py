@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 import logging
 import re
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import voluptuous as vol
 from homeassistant.config_entries import (
@@ -50,6 +50,17 @@ from .const import (
     CONF_VERIFY_SSL,
     DOMAIN,
 )
+
+if TYPE_CHECKING:
+    # Home Assistant 2026.10 (probatio) types the flow ``data_schema`` parameter
+    # as ``probatio.Schema``. At runtime Home Assistant aliases voluptuous to
+    # probatio (``install_as_voluptuous``), so ``vol.Schema`` already builds the
+    # very class HA expects; this alias only aligns the static type with HA's
+    # annotations. Importing probatio directly is not an option here: HA releases
+    # before 2026.10 do not ship it.
+    from probatio import Schema as _Schema
+else:
+    _Schema = vol.Schema
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -224,7 +235,7 @@ class AjaxConfigFlow(ConfigFlow, domain=DOMAIN):
                 return await self.async_step_proxy()
 
         # Show auth mode selection (2 options only, Proxy is default)
-        data_schema = vol.Schema(
+        data_schema = _Schema(
             {
                 vol.Required(CONF_AUTH_MODE, default=AUTH_MODE_PROXY_SECURE): SelectSelector(
                     SelectSelectorConfig(
@@ -349,7 +360,7 @@ class AjaxConfigFlow(ConfigFlow, domain=DOMAIN):
                     errors["base"] = "unknown"
 
         # Show configuration form for direct mode
-        data_schema = vol.Schema(
+        data_schema = _Schema(
             {
                 vol.Required(CONF_API_KEY): str,
                 vol.Required(CONF_EMAIL): str,
@@ -482,7 +493,7 @@ class AjaxConfigFlow(ConfigFlow, domain=DOMAIN):
                         errors["base"] = "unknown"
 
         # Show configuration form for proxy mode
-        data_schema = vol.Schema(
+        data_schema = _Schema(
             {
                 vol.Required(CONF_PROXY_URL): str,
                 vol.Required(CONF_EMAIL): str,
@@ -526,7 +537,7 @@ class AjaxConfigFlow(ConfigFlow, domain=DOMAIN):
         # Select all by default
         default_spaces = [space["id"] for space in self._spaces]
 
-        data_schema = vol.Schema(
+        data_schema = _Schema(
             {
                 vol.Required(
                     CONF_ENABLED_SPACES,
@@ -602,7 +613,7 @@ class AjaxConfigFlow(ConfigFlow, domain=DOMAIN):
             options.append(SelectOptionDict(value=entry.entry_id, label=f"{email}"))
         options.append(SelectOptionDict(value="new", label="Create new configuration"))
 
-        data_schema = vol.Schema(
+        data_schema = _Schema(
             {
                 vol.Required("action"): SelectSelector(
                     # translation_key so the static "new" option is localised;
@@ -725,7 +736,7 @@ class AjaxConfigFlow(ConfigFlow, domain=DOMAIN):
         # Show password re-entry form
         return self.async_show_form(
             step_id="reauth_confirm",
-            data_schema=vol.Schema(
+            data_schema=_Schema(
                 {
                     vol.Required(CONF_PASSWORD): str,
                     # Two-factor secret (optional) - leave blank to keep the
@@ -857,7 +868,7 @@ class AjaxConfigFlow(ConfigFlow, domain=DOMAIN):
         auth_mode = reconfigure_entry.data.get(CONF_AUTH_MODE, AUTH_MODE_DIRECT)
 
         if auth_mode == AUTH_MODE_DIRECT:
-            data_schema = vol.Schema(
+            data_schema = _Schema(
                 {
                     vol.Required(CONF_API_KEY, default=reconfigure_entry.data.get(CONF_API_KEY, "")): str,
                     vol.Required(CONF_EMAIL, default=reconfigure_entry.data.get(CONF_EMAIL, "")): str,
@@ -868,7 +879,7 @@ class AjaxConfigFlow(ConfigFlow, domain=DOMAIN):
                 }
             )
         else:
-            data_schema = vol.Schema(
+            data_schema = _Schema(
                 {
                     vol.Required(CONF_PROXY_URL, default=reconfigure_entry.data.get(CONF_PROXY_URL, "")): str,
                     vol.Required(CONF_EMAIL, default=reconfigure_entry.data.get(CONF_EMAIL, "")): str,

@@ -39,6 +39,16 @@
         "pin"
       ],
       "automerge": true
+    },
+    {
+      "description": "Tout ce qui monte se fusionne seul quand la CI est verte (op\u00e9rateur, 2026-10-14)",
+      "matchUpdateTypes": [
+        "minor",
+        "major"
+      ],
+      "automerge": true,
+      "platformAutomerge": true
     }
-  ]
+  ],
+  "rollbackPrs": false
 }

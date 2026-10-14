@@ -11,7 +11,7 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import voluptuous as vol
 from homeassistant.components.persistent_notification import async_create
@@ -35,6 +35,17 @@ from .const import (
     AjaxConfigEntry,
 )
 from .coordinator import AjaxDataCoordinator
+
+if TYPE_CHECKING:
+    # Home Assistant 2026.10 (probatio) types the flow ``data_schema`` parameter
+    # as ``probatio.Schema``. At runtime Home Assistant aliases voluptuous to
+    # probatio (``install_as_voluptuous``), so ``vol.Schema`` already builds the
+    # very class HA expects; this alias only aligns the static type with HA's
+    # annotations. Importing probatio directly is not an option here: HA releases
+    # before 2026.10 do not ship it.
+    from probatio import Schema as _Schema
+else:
+    _Schema = vol.Schema
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -281,7 +292,7 @@ async def _async_setup_services(hass: HomeAssistant) -> None:
             DOMAIN,
             SERVICE_FORCE_ARM,
             handle_force_arm,
-            schema=vol.Schema({vol.Optional("entity_id"): cv.entity_ids}),
+            schema=_Schema({vol.Optional("entity_id"): cv.entity_ids}),
         )
 
     if not hass.services.has_service(DOMAIN, SERVICE_FORCE_ARM_NIGHT):
@@ -289,7 +300,7 @@ async def _async_setup_services(hass: HomeAssistant) -> None:
             DOMAIN,
             SERVICE_FORCE_ARM_NIGHT,
             handle_force_arm_night,
-            schema=vol.Schema({vol.Optional("entity_id"): cv.entity_ids}),
+            schema=_Schema({vol.Optional("entity_id"): cv.entity_ids}),
         )
 
     if not hass.services.has_service(DOMAIN, SERVICE_GET_RAW_DEVICES):

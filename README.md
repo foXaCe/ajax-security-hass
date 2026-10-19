@@ -226,6 +226,25 @@ These credentials are provided by Ajax Systems with your enterprise API key.
 >
 > **Exception**: Sensors with **"Always Active"** mode enabled will send real-time events even when disarmed.
 
+### Switching from Proxy Mode to Direct Mode
+
+The authentication mode can't be changed on an existing entry: neither reconfigure nor the options allow it. The entry is keyed by the account email, so you remove the integration first, then add it again in direct mode.
+
+**Before you start**, ask Ajax for the SQS credentials (access key ID, secret access key, queue name) in the same request as the enterprise API key. Without them you keep full control and polling, but lose the real-time stream. Use a queue of your own: the integration reads one real-time source per account, and nothing else (such as a proxy still set up for your account) must consume it.
+
+**What survives:**
+- **Entity IDs** come back identical, with no `_2` suffix, as long as you haven't renamed them yourself. Automations, scripts and dashboards that reference `entity_id`s keep working, and recorder history continues under the same IDs.
+
+**What doesn't:**
+- **Device IDs** and internal unique IDs are tied to the config entry, so they change. Automations using **device** triggers, conditions or actions (those storing a `device_id`) must be re-selected.
+- Entity IDs you renamed manually, and per-entity customisations (names, icons, areas, disabled state), return to their defaults.
+
+**Steps:**
+1. Take a Home Assistant backup.
+2. Search your configuration for `device_id:` to list the automations to fix, and note any entity IDs you renamed.
+3. Remove the Ajax integration, then add it back in direct mode with the API key and the SQS credentials.
+4. Arm the system once and check the log for `SQS` events to confirm the stream works.
+
 ### Options (after setup)
 
 Go to the integration options to configure:

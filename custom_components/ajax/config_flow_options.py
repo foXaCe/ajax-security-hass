@@ -8,7 +8,7 @@ entry / runtime data — it never talks to the Ajax API.
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import voluptuous as vol
 from homeassistant.config_entries import (
@@ -42,6 +42,17 @@ from .const import (
     NOTIFICATION_FILTER_NONE,
     NOTIFICATION_FILTER_SECURITY_EVENTS,
 )
+
+if TYPE_CHECKING:
+    # Home Assistant 2026.10 (probatio) types the flow ``data_schema`` parameter
+    # as ``probatio.Schema``. At runtime Home Assistant aliases voluptuous to
+    # probatio (``install_as_voluptuous``), so ``vol.Schema`` already builds the
+    # very class HA expects; this alias only aligns the static type with HA's
+    # annotations. Importing probatio directly is not an option here: HA releases
+    # before 2026.10 do not ship it.
+    from probatio import Schema as _Schema
+else:
+    _Schema = vol.Schema
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -125,7 +136,7 @@ class AjaxOptionsFlow(OptionsFlow):
 
         # Build schema
         if space_options:
-            data_schema = vol.Schema(
+            data_schema = _Schema(
                 {
                     vol.Required(
                         CONF_ENABLED_SPACES,
@@ -220,7 +231,7 @@ class AjaxOptionsFlow(OptionsFlow):
 
         return self.async_show_form(
             step_id="notifications",
-            data_schema=vol.Schema(schema_dict),
+            data_schema=_Schema(schema_dict),
         )
 
     async def async_step_polling_settings(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
@@ -233,7 +244,7 @@ class AjaxOptionsFlow(OptionsFlow):
         # Get current options (default: disabled to reduce API calls)
         current_fast_poll = self.config_entry.options.get(CONF_DOOR_SENSOR_FAST_POLL, False)
 
-        data_schema = vol.Schema(
+        data_schema = _Schema(
             {
                 vol.Optional(
                     CONF_DOOR_SENSOR_FAST_POLL,
@@ -277,7 +288,7 @@ class AjaxOptionsFlow(OptionsFlow):
         current_proxy_url = self.config_entry.data.get(CONF_PROXY_URL, "")
         current_verify_ssl = self.config_entry.data.get(CONF_VERIFY_SSL, True)
 
-        data_schema = vol.Schema(
+        data_schema = _Schema(
             {
                 vol.Required(
                     CONF_PROXY_URL,
@@ -329,7 +340,7 @@ class AjaxOptionsFlow(OptionsFlow):
         current_queue = self.config_entry.data.get(CONF_QUEUE_NAME, "")
 
         # Build schema - show current values masked
-        data_schema = vol.Schema(
+        data_schema = _Schema(
             {
                 vol.Optional(
                     CONF_AWS_ACCESS_KEY_ID,
@@ -379,7 +390,7 @@ class AjaxOptionsFlow(OptionsFlow):
         current_username = self.config_entry.options.get(CONF_RTSP_USERNAME, "")
         current_password = self.config_entry.options.get(CONF_RTSP_PASSWORD, "")
 
-        data_schema = vol.Schema(
+        data_schema = _Schema(
             {
                 vol.Optional(
                     CONF_RTSP_USERNAME,

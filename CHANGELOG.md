@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.38.4] - 2026-10-23
+
+### Fixed
+- **A camera that refuses ONVIF no longer floods the log.** When a camera answered "Sender not Authorized" (or failed otherwise), it was retried on every 30-second refresh and each attempt was logged as an error — 81 lines in 40 minutes. Each camera now waits longer between attempts (1 minute, then 2, 4… up to 30 minutes), only the first failure is logged as an error, and its recovery is logged when it comes back.
+- **The ONVIF repair issues follow the real state.** "No camera connected" and "only X/Y cameras connected" were only checked at startup; they are now updated after every refresh, so they appear when a camera starts refusing and clear once it is back.
+
 ## [0.38.3] - 2026-10-21
 
 ### Changed

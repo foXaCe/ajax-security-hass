@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from collections.abc import Callable
 from typing import TYPE_CHECKING
 
@@ -18,6 +19,12 @@ if TYPE_CHECKING:
     from .models import AjaxVideoEdge
 
 _LOGGER = logging.getLogger(__name__)
+
+# A camera that refuses ONVIF (bad credentials, "Sender not Authorized"…) is not
+# retried on every 30 s video-edge refresh: the delay doubles from one minute up
+# to 30 minutes, and only the first failure is logged above debug level.
+ONVIF_RETRY_MIN_SECONDS = 60.0
+ONVIF_RETRY_MAX_SECONDS = 1800.0
 
 
 class AjaxOnvifManager:
@@ -47,6 +54,9 @@ class AjaxOnvifManager:
         self._target_ids: set[str] = set()
         # Serialise add/remove so concurrent callers cannot duplicate clients.
         self._clients_lock = asyncio.Lock()
+        # Per camera: consecutive failed attempts, and when the next one may run.
+        self._failures: dict[str, int] = {}
+        self._retry_at: dict[str, float] = {}
 
     @property
     def connected_count(self) -> int:
@@ -100,14 +110,27 @@ class AjaxOnvifManager:
                 event_callback=self._event_callback,
             )
 
+            # Only the first failure of a series is logged as an error.
+            log_errors = video_edge.id not in self._failures
+
             # Try to connect
-            if not await client.async_connect():
+            if not await client.async_connect(log_errors=log_errors):
+                self._record_failure(video_edge)
                 return False
 
             # Subscribe to events
-            if not await client.async_subscribe_events():
+            if not await client.async_subscribe_events(log_errors=log_errors):
                 await client.async_stop()  # Cleanup on partial failure
+                self._record_failure(video_edge)
                 return False
+
+            if failures := self._failures.pop(video_edge.id, 0):
+                self._retry_at.pop(video_edge.id, None)
+                _LOGGER.info(
+                    "ONVIF: %s is back after %d failed attempt(s)",
+                    video_edge.name,
+                    failures,
+                )
 
             # Start polling
             await client.async_start_polling()
@@ -120,6 +143,26 @@ class AjaxOnvifManager:
             video_edge.ip_address,
         )
         return True
+
+    def _record_failure(self, video_edge: AjaxVideoEdge) -> None:
+        """Schedule the next attempt for a camera that just failed (exponential backoff)."""
+        failures = self._failures.get(video_edge.id, 0) + 1
+        self._failures[video_edge.id] = failures
+        delay = min(ONVIF_RETRY_MIN_SECONDS * 2 ** (failures - 1), ONVIF_RETRY_MAX_SECONDS)
+        self._retry_at[video_edge.id] = time.monotonic() + delay
+        if failures == 1:
+            _LOGGER.warning(
+                "ONVIF: %s unavailable, retrying with backoff (up to every %d min); further failures are logged at debug level",
+                video_edge.name,
+                ONVIF_RETRY_MAX_SECONDS // 60,
+            )
+        else:
+            _LOGGER.debug(
+                "ONVIF: %s still unavailable (attempt %d), next try in %ds",
+                video_edge.name,
+                failures,
+                delay,
+            )
 
     async def async_remove_video_edge(self, video_edge_id: str) -> None:
         """Remove and disconnect a video edge device.
@@ -217,7 +260,13 @@ class AjaxOnvifManager:
         for video_edge_id in existing_ids - current_ids:
             await self.async_remove_video_edge(video_edge_id)
 
-        # Add new devices
+        # Forget the backoff of cameras that left the inventory.
+        for gone in set(self._failures) - current_ids:
+            self._failures.pop(gone, None)
+            self._retry_at.pop(gone, None)
+
+        # Add new devices (a camera that failed waits for its backoff delay)
+        now = time.monotonic()
         for ve in targets:
-            if ve.id not in existing_ids and ve.ip_address:
+            if ve.id not in existing_ids and ve.ip_address and self._retry_at.get(ve.id, 0.0) <= now:
                 await self.async_add_video_edge(ve)

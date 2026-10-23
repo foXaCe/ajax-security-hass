@@ -92,7 +92,7 @@ class AjaxOnvifClient:
         """Return True if connected to the camera."""
         return self._camera is not None and self._pullpoint_manager is not None
 
-    async def async_connect(self) -> bool:
+    async def async_connect(self, log_errors: bool = True) -> bool:
         """Connect to the camera via ONVIF.
 
         Returns:
@@ -134,7 +134,8 @@ class AjaxOnvifClient:
             return True
 
         except (ONVIFError, Fault, TimeoutError, OSError) as err:
-            _LOGGER.error(
+            _LOGGER.log(
+                logging.ERROR if log_errors else logging.DEBUG,
                 "ONVIF: Failed to connect to %s at %s:%s - %s: %s",
                 self.video_edge.name,
                 self.video_edge.ip_address,
@@ -145,7 +146,7 @@ class AjaxOnvifClient:
             self._camera = None
             return False
 
-    async def async_subscribe_events(self) -> bool:
+    async def async_subscribe_events(self, log_errors: bool = True) -> bool:
         """Subscribe to ONVIF events via PullPoint Manager.
 
         Returns:
@@ -186,7 +187,8 @@ class AjaxOnvifClient:
             return True
 
         except (ONVIFError, Fault, TimeoutError, OSError) as err:
-            _LOGGER.error(
+            _LOGGER.log(
+                logging.ERROR if log_errors else logging.DEBUG,
                 "ONVIF: Failed to create PullPoint subscription for %s - %s: %s",
                 self.video_edge.name,
                 type(err).__name__,
@@ -264,7 +266,9 @@ class AjaxOnvifClient:
                         self.video_edge.name,
                     )
                     self._subscription_lost = False
-                    if not await self.async_subscribe_events():
+                    # Only the first failure of a series is logged as an error.
+                    first_failure = backoff == PULLPOINT_POLL_INTERVAL
+                    if not await self.async_subscribe_events(log_errors=first_failure):
                         backoff = min(backoff * 2, PULLPOINT_MAX_BACKOFF)
                         await asyncio.sleep(backoff)
                         continue

@@ -145,8 +145,6 @@ class AjaxOnvifMixin:
 
         entry_id = self.config_entry.entry_id
         init_issue = f"onvif_init_failed_{entry_id}"
-        no_cam_issue = f"onvif_no_cameras_{entry_id}"
-        partial_issue = f"onvif_partial_cameras_{entry_id}"
 
         try:
             _LOGGER.info("Initializing ONVIF for local AI detections...")
@@ -163,49 +161,7 @@ class AjaxOnvifMixin:
             # Init succeeded — clear the "init failed" Repairs issue if it was raised before.
             ir.async_delete_issue(self.hass, DOMAIN, init_issue)
 
-            connected = self.onvif_manager.connected_count
-            # Use the manager's target_count (excludes NVRs which are intentionally
-            # skipped) rather than len(video_edges) — otherwise the repair issue
-            # reports e.g. 2/3 when the user actually has 2 cameras + 1 NVR and
-            # both cameras are connected fine.
-            total = self.onvif_manager.target_count
-            if connected == 0 and total == 0:
-                # All video_edges are NVRs / unsupported types — nothing to alert on.
-                _LOGGER.info("✓ ONVIF initialized - no individual cameras to connect to (NVR-only setup)")
-                ir.async_delete_issue(self.hass, DOMAIN, no_cam_issue)
-                ir.async_delete_issue(self.hass, DOMAIN, partial_issue)
-                return
-            if connected == 0:
-                _LOGGER.warning("ONVIF: No cameras connected - Check ONVIF credentials and camera network")
-                ir.async_delete_issue(self.hass, DOMAIN, partial_issue)
-                ir.async_create_issue(
-                    self.hass,
-                    DOMAIN,
-                    no_cam_issue,
-                    is_fixable=False,
-                    severity=ir.IssueSeverity.WARNING,
-                    translation_key="onvif_no_cameras",
-                )
-            elif connected < total:
-                _LOGGER.info(
-                    "✓ ONVIF initialized - %d/%d cameras connected for local AI detections",
-                    connected,
-                    total,
-                )
-                ir.async_delete_issue(self.hass, DOMAIN, no_cam_issue)
-                ir.async_create_issue(
-                    self.hass,
-                    DOMAIN,
-                    partial_issue,
-                    is_fixable=False,
-                    severity=ir.IssueSeverity.WARNING,
-                    translation_key="onvif_partial_cameras",
-                    translation_placeholders={"connected": str(connected), "total": str(total)},
-                )
-            else:
-                _LOGGER.info("✓ ONVIF initialized - %d/%d cameras connected for local AI detections", connected, total)
-                ir.async_delete_issue(self.hass, DOMAIN, no_cam_issue)
-                ir.async_delete_issue(self.hass, DOMAIN, partial_issue)
+            self._update_onvif_issues(log=True)
 
         except Exception as err:
             _LOGGER.warning("Failed to initialize ONVIF: %s", err)
@@ -227,6 +183,66 @@ class AjaxOnvifMixin:
             )
         finally:
             self._onvif_initialized = True
+
+    def _update_onvif_issues(self, log: bool = False) -> None:
+        """Raise or clear the "no camera" / "partial cameras" Repairs issues.
+
+        Called at startup and after every video-edge refresh, so the issue
+        follows the real state: it appears when a camera keeps refusing ONVIF
+        after startup, and clears itself once the camera is back.
+        """
+        config_entry = getattr(self, "config_entry", None)
+        if self.onvif_manager is None or config_entry is None:
+            return
+        entry_id = config_entry.entry_id
+        no_cam_issue = f"onvif_no_cameras_{entry_id}"
+        partial_issue = f"onvif_partial_cameras_{entry_id}"
+        connected = self.onvif_manager.connected_count
+        # Use the manager's target_count (excludes NVRs which are intentionally
+        # skipped) rather than len(video_edges) — otherwise the repair issue
+        # reports e.g. 2/3 when the user actually has 2 cameras + 1 NVR and
+        # both cameras are connected fine.
+        total = self.onvif_manager.target_count
+        if total == 0:
+            # All video_edges are NVRs / unsupported types — nothing to alert on.
+            if log:
+                _LOGGER.info("✓ ONVIF initialized - no individual cameras to connect to (NVR-only setup)")
+            ir.async_delete_issue(self.hass, DOMAIN, no_cam_issue)
+            ir.async_delete_issue(self.hass, DOMAIN, partial_issue)
+        elif connected == 0:
+            if log:
+                _LOGGER.warning("ONVIF: No cameras connected - Check ONVIF credentials and camera network")
+            ir.async_delete_issue(self.hass, DOMAIN, partial_issue)
+            ir.async_create_issue(
+                self.hass,
+                DOMAIN,
+                no_cam_issue,
+                is_fixable=False,
+                severity=ir.IssueSeverity.WARNING,
+                translation_key="onvif_no_cameras",
+            )
+        elif connected < total:
+            if log:
+                _LOGGER.info(
+                    "✓ ONVIF initialized - %d/%d cameras connected for local AI detections",
+                    connected,
+                    total,
+                )
+            ir.async_delete_issue(self.hass, DOMAIN, no_cam_issue)
+            ir.async_create_issue(
+                self.hass,
+                DOMAIN,
+                partial_issue,
+                is_fixable=False,
+                severity=ir.IssueSeverity.WARNING,
+                translation_key="onvif_partial_cameras",
+                translation_placeholders={"connected": str(connected), "total": str(total)},
+            )
+        else:
+            if log:
+                _LOGGER.info("✓ ONVIF initialized - %d/%d cameras connected for local AI detections", connected, total)
+            ir.async_delete_issue(self.hass, DOMAIN, no_cam_issue)
+            ir.async_delete_issue(self.hass, DOMAIN, partial_issue)
 
     async def _async_reconcile_onvif(self) -> None:
         """Keep ONVIF clients in sync with the current video-edge inventory.
@@ -267,6 +283,7 @@ class AjaxOnvifMixin:
                 if video_edge.ip_address
             ]
             await self.onvif_manager.async_update_video_edges(video_edges)
+            self._update_onvif_issues()
         finally:
             self._onvif_reconcile_in_progress = False
 

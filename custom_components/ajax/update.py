@@ -138,13 +138,13 @@ class AjaxVideoEdgeFirmwareUpdate(CoordinatorEntity[AjaxDataCoordinator], Update
         model_display = f"{model_name} ({color})" if color else model_name
 
         # Device info
-        self._attr_device_info = {
-            "identifiers": {device_identifier(self.coordinator.entry_id, video_edge.id)},
-            "name": video_edge.name,
-            "manufacturer": MANUFACTURER,
-            "model": model_display,
-            "sw_version": video_edge.firmware_version,
-        }
+        self._attr_device_info = DeviceInfo(
+            identifiers={device_identifier(self.coordinator.entry_id, video_edge.id)},
+            name=video_edge.name,
+            manufacturer=MANUFACTURER,
+            model=model_display,
+            sw_version=video_edge.firmware_version,
+        )
 
     @property
     def _video_edge(self) -> AjaxVideoEdge | None:

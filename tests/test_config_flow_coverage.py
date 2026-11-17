@@ -805,7 +805,9 @@ async def test_step_reauth_confirm_same_password_new_totp_loaded_no_reload() -> 
     flow.hass.config_entries.async_schedule_reload = MagicMock()
     api = _mock_api()
     with patch(API_PATH, return_value=api):
-        result = await flow.async_step_reauth_confirm({CONF_PASSWORD: "samepass", CONF_TOTP_SECRET: "jbswy3dpehpk3pxpjbswy3dpehpk3pxp"})
+        result = await flow.async_step_reauth_confirm(
+            {CONF_PASSWORD: "samepass", CONF_TOTP_SECRET: "jbswy3dpehpk3pxpjbswy3dpehpk3pxp"}
+        )
     assert result["type"] == "abort"
     assert result["reason"] == "reauth_successful"
     flow.hass.config_entries.async_schedule_reload.assert_not_called()
@@ -876,7 +878,9 @@ async def test_step_reauth_confirm_new_totp_secret_updates_entry() -> None:
     flow.hass.config_entries.async_update_entry = MagicMock()
     api = _mock_api()
     with patch(API_PATH, return_value=api) as api_cls:
-        result = await flow.async_step_reauth_confirm({CONF_PASSWORD: "newpass", CONF_TOTP_SECRET: "jbswy3dpehpk3pxpjbswy3dpehpk3pxp"})
+        result = await flow.async_step_reauth_confirm(
+            {CONF_PASSWORD: "newpass", CONF_TOTP_SECRET: "jbswy3dpehpk3pxpjbswy3dpehpk3pxp"}
+        )
     assert result["type"] == "abort"
     assert result["reason"] == "reauth_successful"
     assert api_cls.call_args.kwargs["totp_secret"] == "JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP"

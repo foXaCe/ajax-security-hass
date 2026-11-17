@@ -47,7 +47,7 @@ def test_six_digits_is_a_code(raw: str) -> None:
 
 
 def test_secret_is_a_secret() -> None:
-    assert AjaxConfigFlow._parse_totp_input("jbsw y3dp ehpk 3pxp") == ("JBSWY3DPEHPK3PXP", None)
+    assert AjaxConfigFlow._parse_totp_input("jbsw y3dp ehpk 3pxp jbsw y3dp ehpk 3pxp") == ("JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP", None)
 
 
 def test_blank_is_nothing() -> None:
@@ -97,10 +97,10 @@ async def test_direct_step_with_secret_stores_no_session() -> None:
                 CONF_API_KEY: "key",
                 CONF_EMAIL: "u@e.com",
                 CONF_PASSWORD: "pw",
-                CONF_TOTP_SECRET: "JBSWY3DPEHPK3PXP",
+                CONF_TOTP_SECRET: "JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP",
             }
         )
-    assert result["data"][CONF_TOTP_SECRET] == "JBSWY3DPEHPK3PXP"
+    assert result["data"][CONF_TOTP_SECRET] == "JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP"
     assert CONF_REFRESH_TOKEN not in result["data"]
 
 
@@ -232,7 +232,7 @@ async def test_setup_resumes_stored_session_instead_of_login(hass: HomeAssistant
 
 
 async def test_setup_with_secret_ignores_stored_session(hass: HomeAssistant) -> None:
-    entry = _entry(hass, **{CONF_TOTP_SECRET: "JBSWY3DPEHPK3PXP", CONF_AJAX_USER_ID: "U1", CONF_REFRESH_TOKEN: "R1"})
+    entry = _entry(hass, **{CONF_TOTP_SECRET: "JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP", CONF_AJAX_USER_ID: "U1", CONF_REFRESH_TOKEN: "R1"})
     p_api, p_sess, p_ref, p_areas, p_fwd = _patches(hass)
     with p_api as api_cls, p_sess, p_ref, p_areas, p_fwd:
         api = api_cls.return_value

@@ -58,7 +58,7 @@ async def test_code_is_sent_once_and_marks_totp_required() -> None:
 
 @pytest.mark.asyncio
 async def test_secret_wins_over_code() -> None:
-    api = AjaxRestApi(api_key="KEY", email="u@e.com", password="p", totp_secret="JBSWY3DPEHPK3PXP", totp_code="123456")
+    api = AjaxRestApi(api_key="KEY", email="u@e.com", password="p", totp_secret="JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP", totp_code="123456")
     api.session = _FakeSession([_FakeResponse(200, _LOGIN_OK)])  # type: ignore[assignment]
     with patch("pyotp.TOTP.now", return_value="999999"):
         await api.async_login()

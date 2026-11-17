@@ -50,7 +50,7 @@ from custom_components.ajax.const import (
 API_PATH = "custom_components.ajax.config_flow.AjaxRestApi"
 
 # pyotp's well-known public test vector (RFC 6238 example secret).
-_TEST_TOTP_SECRET = "JBSWY3DPEHPK3PXP"
+_TEST_TOTP_SECRET = "JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP"
 
 
 # --------------------------------------------------------------------------- #
@@ -258,12 +258,12 @@ async def test_step_direct_totp_secret_stored_normalized() -> None:
                 CONF_API_KEY: "key",
                 CONF_EMAIL: "u@e.com",
                 CONF_PASSWORD: "secret",
-                CONF_TOTP_SECRET: " jbswy3dpehpk3pxp ",
+                CONF_TOTP_SECRET: " jbswy3dpehpk3pxpjbswy3dpehpk3pxp ",
             }
         )
     assert result["type"] == "create_entry"
-    assert result["data"][CONF_TOTP_SECRET] == "JBSWY3DPEHPK3PXP"
-    assert api_cls.call_args.kwargs["totp_secret"] == "JBSWY3DPEHPK3PXP"
+    assert result["data"][CONF_TOTP_SECRET] == "JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP"
+    assert api_cls.call_args.kwargs["totp_secret"] == "JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP"
 
 
 async def test_step_direct_without_totp_secret_key_absent() -> None:
@@ -295,19 +295,19 @@ async def test_step_direct_invalid_totp_secret_reshows_form() -> None:
 @pytest.mark.parametrize(
     "raw",
     [
-        "JBSWY3DPEHPK3PXP",
-        "jbsw y3dp ehpk 3pxp",
-        "JBSW-Y3DP-EHPK-3PXP",
-        "JBSW\u00a0Y3DP\u00a0EHPK\u00a03PXP",
-        " JBSWY3DPEHPK3PXP\n",
-        "JBSW\tY3DPEHPK3PXP",
-        "JBSWY3DPEHPK3PXP====",
-        "otpauth://totp/Ajax:u%40e.com?secret=JBSWY3DPEHPK3PXP&issuer=Ajax",
+        "JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP",
+        "jbsw y3dp ehpk 3pxp jbsw y3dp ehpk 3pxp",
+        "JBSW-Y3DP-EHPK-3PXP-JBSW-Y3DP-EHPK-3PXP",
+        "JBSW\u00a0Y3DP\u00a0EHPK\u00a03PXP\u00a0JBSW\u00a0Y3DP\u00a0EHPK\u00a03PXP",
+        " JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP\n",
+        "JBSW\tY3DPEHPK3PXPJBSWY3DPEHPK3PXP",
+        "JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP====",
+        "otpauth://totp/Ajax:u%40e.com?secret=JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP&issuer=Ajax",
     ],
 )
 def test_clean_totp_secret_accepts_what_people_paste(raw: str) -> None:
     """Grouping, clipboard whitespace, padding and the QR link all normalise."""
-    assert AjaxConfigFlow._clean_totp_secret(raw) == "JBSWY3DPEHPK3PXP"
+    assert AjaxConfigFlow._clean_totp_secret(raw) == "JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP"
 
 
 @pytest.mark.parametrize("raw", ["123456", "otpauth://totp/Ajax?issuer=Ajax", "---", "not-base32!"])
@@ -449,12 +449,12 @@ async def test_step_proxy_totp_secret_stored_normalized() -> None:
                 CONF_PROXY_URL: "https://proxy",
                 CONF_EMAIL: "u@e.com",
                 CONF_PASSWORD: "secret",
-                CONF_TOTP_SECRET: "jbswy3dpehpk3pxp",
+                CONF_TOTP_SECRET: "jbswy3dpehpk3pxpjbswy3dpehpk3pxp",
             }
         )
     assert result["type"] == "create_entry"
-    assert result["data"][CONF_TOTP_SECRET] == "JBSWY3DPEHPK3PXP"
-    assert api_cls.call_args.kwargs["totp_secret"] == "JBSWY3DPEHPK3PXP"
+    assert result["data"][CONF_TOTP_SECRET] == "JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP"
+    assert api_cls.call_args.kwargs["totp_secret"] == "JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP"
 
 
 async def test_step_proxy_invalid_totp_secret_reshows_form() -> None:
@@ -805,7 +805,7 @@ async def test_step_reauth_confirm_same_password_new_totp_loaded_no_reload() -> 
     flow.hass.config_entries.async_schedule_reload = MagicMock()
     api = _mock_api()
     with patch(API_PATH, return_value=api):
-        result = await flow.async_step_reauth_confirm({CONF_PASSWORD: "samepass", CONF_TOTP_SECRET: "jbswy3dpehpk3pxp"})
+        result = await flow.async_step_reauth_confirm({CONF_PASSWORD: "samepass", CONF_TOTP_SECRET: "jbswy3dpehpk3pxpjbswy3dpehpk3pxp"})
     assert result["type"] == "abort"
     assert result["reason"] == "reauth_successful"
     flow.hass.config_entries.async_schedule_reload.assert_not_called()
@@ -876,12 +876,12 @@ async def test_step_reauth_confirm_new_totp_secret_updates_entry() -> None:
     flow.hass.config_entries.async_update_entry = MagicMock()
     api = _mock_api()
     with patch(API_PATH, return_value=api) as api_cls:
-        result = await flow.async_step_reauth_confirm({CONF_PASSWORD: "newpass", CONF_TOTP_SECRET: "jbswy3dpehpk3pxp"})
+        result = await flow.async_step_reauth_confirm({CONF_PASSWORD: "newpass", CONF_TOTP_SECRET: "jbswy3dpehpk3pxpjbswy3dpehpk3pxp"})
     assert result["type"] == "abort"
     assert result["reason"] == "reauth_successful"
-    assert api_cls.call_args.kwargs["totp_secret"] == "JBSWY3DPEHPK3PXP"
+    assert api_cls.call_args.kwargs["totp_secret"] == "JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP"
     updated_data = flow.hass.config_entries.async_update_entry.call_args.kwargs["data"]
-    assert updated_data[CONF_TOTP_SECRET] == "JBSWY3DPEHPK3PXP"
+    assert updated_data[CONF_TOTP_SECRET] == "JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP"
 
 
 async def test_step_reauth_confirm_blank_totp_secret_preserves_existing() -> None:
@@ -1082,12 +1082,12 @@ async def test_step_reconfigure_new_totp_secret_updates_entry() -> None:
                 CONF_API_KEY: "k",
                 CONF_EMAIL: "u@e.com",
                 CONF_PASSWORD: "newpass",
-                CONF_TOTP_SECRET: "jbswy3dpehpk3pxp",
+                CONF_TOTP_SECRET: "jbswy3dpehpk3pxpjbswy3dpehpk3pxp",
             }
         )
     assert result["reason"] == "reconfigure_successful"
-    assert result["data"][CONF_TOTP_SECRET] == "JBSWY3DPEHPK3PXP"
-    assert api_cls.call_args.kwargs["totp_secret"] == "JBSWY3DPEHPK3PXP"
+    assert result["data"][CONF_TOTP_SECRET] == "JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP"
+    assert api_cls.call_args.kwargs["totp_secret"] == "JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP"
 
 
 async def test_step_reconfigure_blank_totp_secret_preserves_existing() -> None:

@@ -29,7 +29,7 @@ from custom_components.ajax.api import (
 from custom_components.ajax.const import AUTH_MODE_PROXY_SECURE
 
 # pyotp's well-known public test vector (RFC 6238 example secret).
-_TEST_TOTP_SECRET = "JBSWY3DPEHPK3PXP"
+_TEST_TOTP_SECRET = "JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP"
 
 # ---------------------------------------------------------------------------
 # Mock aiohttp plumbing

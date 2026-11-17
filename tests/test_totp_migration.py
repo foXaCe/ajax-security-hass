@@ -10,7 +10,7 @@ import pytest
 from custom_components.ajax._totp_migration import secret_from_migration_uri
 from custom_components.ajax.config_flow import AjaxConfigFlow
 
-AJAX_KEY = "JBSWY3DPEHPK3PXP"
+AJAX_KEY = "JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP"
 OTHER_KEY = "GEZDGNBVGY3TQOJQ"
 
 

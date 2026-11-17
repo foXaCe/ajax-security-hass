@@ -112,7 +112,7 @@ async def test_setup_entry_direct_mode_happy_path(hass: HomeAssistant) -> None:
 
 
 async def test_setup_entry_passes_totp_secret_to_api(hass: HomeAssistant) -> None:
-    entry = _entry(hass, **{CONF_TOTP_SECRET: "JBSWY3DPEHPK3PXP"})
+    entry = _entry(hass, **{CONF_TOTP_SECRET: "JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP"})
     with (
         patch("custom_components.ajax.AjaxRestApi") as api_cls,
         patch("custom_components.ajax.async_get_clientsession"),
@@ -122,7 +122,7 @@ async def test_setup_entry_passes_totp_secret_to_api(hass: HomeAssistant) -> Non
     ):
         _mock_api(api_cls)
         assert await async_setup_entry(hass, entry) is True
-        assert api_cls.call_args.kwargs["totp_secret"] == "JBSWY3DPEHPK3PXP"
+        assert api_cls.call_args.kwargs["totp_secret"] == "JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP"
     await hass.async_block_till_done()
 
 

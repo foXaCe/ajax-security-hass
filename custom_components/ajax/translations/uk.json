@@ -1027,6 +1027,9 @@
       "nvr_cameras": {
         "name": "Камери"
       },
+      "onvif_cameras_connected": {
+        "name": "Підключені камери ONVIF"
+      },
       "online_devices": {
         "name": "Онлайн пристрої"
       },

@@ -1027,6 +1027,9 @@
       "nvr_cameras": {
         "name": "Kameror"
       },
+      "onvif_cameras_connected": {
+        "name": "Anslutna ONVIF-kameror"
+      },
       "online_devices": {
         "name": "Enheter online"
       },

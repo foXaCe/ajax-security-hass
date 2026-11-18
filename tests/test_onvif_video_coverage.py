@@ -23,7 +23,7 @@ import sys
 from datetime import UTC, datetime
 from types import ModuleType, SimpleNamespace
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -308,6 +308,7 @@ async def test_poll_loop_handles_exception_with_backoff(
 async def test_poll_loop_breaks_on_cancelled() -> None:
     client = _client()
     client._running = True
+    client._pullpoint_manager = MagicMock(closed=False)
 
     async def _pull() -> None:
         raise asyncio.CancelledError
@@ -1455,3 +1456,23 @@ def test_handler_get_linked_nvrs_self_is_nvr() -> None:
     nvr = _video_edge("nvr1", "NVR", VideoEdgeType.NVR)
     handler = VideoEdgeHandler(nvr)
     assert handler._get_linked_nvrs() == []
+
+
+async def test_poll_loop_retries_after_a_failed_resubscribe() -> None:
+    """A failed re-subscribe leaves no manager; the loop must keep retrying (#283)."""
+    client = _client()
+    client._running = True
+    client._pullpoint_manager = None
+    attempts = []
+
+    async def _subscribe(log_errors: bool = True) -> bool:
+        attempts.append(log_errors)
+        if len(attempts) >= 3:
+            client._running = False
+        return False
+
+    client.async_subscribe_events = _subscribe  # type: ignore[method-assign]
+    with patch("custom_components.ajax.onvif_client.asyncio.sleep", AsyncMock()):
+        await client._poll_loop()
+    assert len(attempts) == 3
+    assert client._resubscribe_failures == 3

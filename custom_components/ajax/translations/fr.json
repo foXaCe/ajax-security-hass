@@ -1027,6 +1027,9 @@
       "nvr_cameras": {
         "name": "Caméras"
       },
+      "onvif_cameras_connected": {
+        "name": "Caméras ONVIF connectées"
+      },
       "online_devices": {
         "name": "Dispositifs en ligne"
       },

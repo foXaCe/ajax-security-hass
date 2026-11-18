@@ -31,6 +31,7 @@ from .coordinator import AjaxDataCoordinator
 from .event_codes import EVENT_MESSAGES, get_event_message, resolve_event_language
 from .models import (
     AjaxSpace,
+    VideoEdgeType,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -230,9 +231,30 @@ class AjaxSpaceSensorDescription(SensorEntityDescription):
     value_fn: Callable[[AjaxSpace], Any] | None = None
     should_create: Callable[[AjaxSpace], bool] | None = None
     entity_category: EntityCategory | None = None
+    # For values held by the coordinator rather than the space (ONVIF state).
+    coordinator_value_fn: Callable[[AjaxDataCoordinator], Any] | None = None
+    coordinator_attributes_fn: Callable[[AjaxDataCoordinator], dict[str, Any] | None] | None = None
+
+
+def _has_onvif_cameras(space: AjaxSpace) -> bool:
+    """Return True when the space has cameras ONVIF connects to (NVRs are skipped)."""
+    return any(ve.video_edge_type != VideoEdgeType.NVR for ve in space.video_edges.values())
 
 
 SPACE_SENSORS: tuple[AjaxSpaceSensorDescription, ...] = (
+    AjaxSpaceSensorDescription(
+        key="onvif_cameras_connected",
+        translation_key="onvif_cameras_connected",
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        should_create=_has_onvif_cameras,
+        coordinator_value_fn=lambda coordinator: (
+            coordinator.onvif_manager.connected_count if coordinator.onvif_manager else None
+        ),
+        coordinator_attributes_fn=lambda coordinator: (
+            {"total": coordinator.onvif_manager.target_count} if coordinator.onvif_manager else None
+        ),
+    ),
     AjaxSpaceSensorDescription(
         key="total_devices",
         translation_key="total_devices",
@@ -457,6 +479,8 @@ class AjaxSpaceSensor(CoordinatorEntity[AjaxDataCoordinator], SensorEntity):
             return None
         if self.entity_description.key == "recent_events":
             return get_last_event_text(space, resolve_event_language(self.hass.config.language))
+        if self.entity_description.coordinator_value_fn:
+            return self.entity_description.coordinator_value_fn(self.coordinator)
         if not self.entity_description.value_fn:
             return None
         return self.entity_description.value_fn(space)
@@ -464,6 +488,8 @@ class AjaxSpaceSensor(CoordinatorEntity[AjaxDataCoordinator], SensorEntity):
     @property
     def extra_state_attributes(self) -> dict[str, Any] | None:
         """Return extra state attributes for recent_events sensor."""
+        if self.entity_description.coordinator_attributes_fn:
+            return self.entity_description.coordinator_attributes_fn(self.coordinator)
         if self.entity_description.key != "recent_events":
             return None
 

@@ -22,9 +22,10 @@ _LOGGER = logging.getLogger(__name__)
 
 # A camera that refuses ONVIF (bad credentials, "Sender not Authorized"…) is not
 # retried on every 30 s video-edge refresh: the delay doubles from one minute up
-# to 30 minutes, and only the first failure is logged above debug level.
+# to 5 minutes, and only the first failure is logged above debug level. The
+# delay is dropped as soon as Ajax reports the camera ONLINE again.
 ONVIF_RETRY_MIN_SECONDS = 60.0
-ONVIF_RETRY_MAX_SECONDS = 1800.0
+ONVIF_RETRY_MAX_SECONDS = 300.0
 
 
 class AjaxOnvifManager:
@@ -57,6 +58,8 @@ class AjaxOnvifManager:
         # Per camera: consecutive failed attempts, and when the next one may run.
         self._failures: dict[str, int] = {}
         self._retry_at: dict[str, float] = {}
+        # Last connection state Ajax reported per camera, to spot it coming back.
+        self._was_online: dict[str, bool] = {}
 
     @property
     def connected_count(self) -> int:
@@ -264,6 +267,16 @@ class AjaxOnvifManager:
         for gone in set(self._failures) - current_ids:
             self._failures.pop(gone, None)
             self._retry_at.pop(gone, None)
+
+        # A camera Ajax reports ONLINE again is retried at once, not after its backoff.
+        for ve in targets:
+            online = bool(getattr(ve, "online", True))
+            if online and self._was_online.get(ve.id) is False and ve.id in self._retry_at:
+                _LOGGER.info("ONVIF: %s is online again, retrying now", ve.name)
+                self._retry_at.pop(ve.id, None)
+            self._was_online[ve.id] = online
+        for gone in set(self._was_online) - current_ids:
+            self._was_online.pop(gone, None)
 
         # Add new devices (a camera that failed waits for its backoff delay)
         now = time.monotonic()

@@ -136,3 +136,27 @@ async def test_start_records_the_failure_for_the_next_refresh(clock) -> None:
     clock[0] += 30
     await mgr.async_update_video_edges([CAM])
     assert len(FakeClient.subscribe_calls) == 1
+
+
+def test_backoff_cap_is_five_minutes() -> None:
+    """A security camera must not stay blind for half an hour after an outage (#283)."""
+    assert ONVIF_RETRY_MAX_SECONDS == 300.0
+
+
+async def test_camera_back_online_is_retried_at_once(clock) -> None:
+    """Ajax reporting the camera ONLINE again drops the backoff delay (#283)."""
+    offline = SimpleNamespace(**{**vars(CAM), "online": False})
+    online = SimpleNamespace(**{**vars(CAM), "online": True})
+    mgr = _manager()
+    await mgr.async_update_video_edges([offline])
+    assert len(FakeClient.subscribe_calls) == 1
+
+    # Still offline, inside the backoff window: no attempt.
+    clock[0] += 10
+    await mgr.async_update_video_edges([offline])
+    assert len(FakeClient.subscribe_calls) == 1
+
+    # Back online, still inside the backoff window: retried right away.
+    clock[0] += 10
+    await mgr.async_update_video_edges([online])
+    assert len(FakeClient.subscribe_calls) == 2

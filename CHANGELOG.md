@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.39.0] - 2026-11-18
+
+### Added
+- **Diagnostic sensor "ONVIF cameras connected" (#283).** Shows how many cameras currently deliver local ONVIF detections, with the expected total in its `total` attribute, so you can see at a glance (and alert on) a camera that stopped sending detections.
+
+### Fixed
+- **Detections come back after a camera outage without restarting Home Assistant (#283).** When a camera went down long enough for its ONVIF subscription to be lost, the attempt to recreate it failed and the integration then stopped retrying, silently, until the next restart. It now keeps retrying, logs a warning every 10 failed attempts while detections are not received, and logs when the subscription is restored.
+- **Faster ONVIF recovery (#283).** The delay between connection attempts to a camera is capped at 5 minutes instead of 30, and is skipped as soon as Ajax reports the camera online again.
+- Tests use 160-bit TOTP secrets, as pyotp 2.12 rejects shorter ones (no change for users).
+
 ## [0.38.4] - 2026-10-23
 
 ### Fixed

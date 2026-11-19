@@ -1027,11 +1027,11 @@
       "nvr_cameras": {
         "name": "Camera's"
       },
-      "onvif_cameras_connected": {
-        "name": "Verbonden ONVIF-camera's"
-      },
       "online_devices": {
         "name": "Online apparaten"
+      },
+      "onvif_cameras_connected": {
+        "name": "Verbonden ONVIF-camera's"
       },
       "photos_per_alarm": {
         "name": "Foto's per alarm"

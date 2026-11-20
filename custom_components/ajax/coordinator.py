@@ -125,6 +125,8 @@ class AjaxDataCoordinator(
             None  # Continuous door sensor polling when disarmed or in night mode
         )
         self._door_sensor_poll_security_state: SecurityState = SecurityState.DISARMED
+        # Monotonic deadline of the post-disarm door polling window (#285).
+        self._door_post_disarm_until: float = 0.0
         self._initial_load_done: bool = False  # Track if initial data load is complete
         self._force_metadata_refresh: bool = False  # Flag to force full metadata refresh
         self._pending_ha_actions: dict[str, float] = {}  # hub_id -> timestamp of HA action

@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.39.1] - 2026-11-20
+
+### Fixed
+- **Doors opened right after a disarm are no longer missed (#285).** Realtime events can be missing for a while after a disarm, while the devices keep reporting, so a door opened then never changed in Home Assistant. For 10 minutes after each disarm, door contacts, transmitters and wired inputs are now polled every 10 seconds. This also applies in proxy mode and when *door sensor fast polling* is off, which until now meant no polling at all; the window keeps the extra API calls bounded (about 60 per disarm).
+
 ## [0.39.0] - 2026-11-18
 
 ### Added

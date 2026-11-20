@@ -93,6 +93,10 @@ AJAX_REST_API_TIMEOUT = 30  # seconds
 UPDATE_INTERVAL = 30  # Default poll interval when disarmed (need faster updates)
 UPDATE_INTERVAL_ARMED = 60  # Poll interval when armed (SSE/SQS handles real-time)
 UPDATE_INTERVAL_DOOR_SENSORS = 5  # Fast poll interval for door sensors when disarmed
+# Right after a disarm, door contacts are polled for a while even when fast polling
+# is off or the proxy is used: realtime events can be missing then (#285).
+POST_DISARM_POLL_SECONDS = 600
+POST_DISARM_POLL_INTERVAL = 10
 METADATA_REFRESH_INTERVAL = 3600  # Full metadata refresh every hour (rooms, users, groups)
 
 # Dispatcher signals

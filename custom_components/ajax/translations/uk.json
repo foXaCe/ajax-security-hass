@@ -1027,11 +1027,11 @@
       "nvr_cameras": {
         "name": "Камери"
       },
-      "onvif_cameras_connected": {
-        "name": "Підключені камери ONVIF"
-      },
       "online_devices": {
         "name": "Онлайн пристрої"
+      },
+      "onvif_cameras_connected": {
+        "name": "Підключені камери ONVIF"
       },
       "photos_per_alarm": {
         "name": "Фото на тривогу"

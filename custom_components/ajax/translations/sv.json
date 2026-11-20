@@ -1027,11 +1027,11 @@
       "nvr_cameras": {
         "name": "Kameror"
       },
-      "onvif_cameras_connected": {
-        "name": "Anslutna ONVIF-kameror"
-      },
       "online_devices": {
         "name": "Enheter online"
+      },
+      "onvif_cameras_connected": {
+        "name": "Anslutna ONVIF-kameror"
       },
       "photos_per_alarm": {
         "name": "Foton per larm"

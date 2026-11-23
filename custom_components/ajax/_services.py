@@ -235,16 +235,10 @@ async def _async_setup_services(hass: HomeAssistant) -> None:
 
         # Write to file (include devices, cameras, and video edges).
         # Redact sensitive fields before writing so the file is safe to share.
-        from homeassistant.components.diagnostics import async_redact_data
-
-        from .diagnostics import TO_REDACT
+        from .diagnostics import redact_ajax_data
 
         output_path = Path(hass.config.path("ajax_raw_devices.json"))
-        output_data = {
-            "devices": async_redact_data(all_devices, TO_REDACT),
-            "cameras": async_redact_data(all_cameras, TO_REDACT),
-            "video_edges": async_redact_data(all_video_edges, TO_REDACT),
-        }
+        output_data = redact_ajax_data({"devices": all_devices, "cameras": all_cameras, "video_edges": all_video_edges})
 
         def write_json() -> None:
             with open(output_path, "w", encoding="utf-8") as f:
@@ -405,12 +399,10 @@ async def _async_setup_services(hass: HomeAssistant) -> None:
 
         # Write to file.
         # Redact sensitive fields before writing so the file is safe to share.
-        from homeassistant.components.diagnostics import async_redact_data
-
-        from .diagnostics import TO_REDACT
+        from .diagnostics import redact_ajax_data
 
         output_path = Path(hass.config.path("ajax_nvr_recordings.json"))
-        redacted_nvr_data = async_redact_data(nvr_data, TO_REDACT)
+        redacted_nvr_data = redact_ajax_data(nvr_data)
 
         def write_json() -> None:
             with open(output_path, "w", encoding="utf-8") as f:
@@ -509,12 +501,10 @@ async def _async_setup_services(hass: HomeAssistant) -> None:
 
         # Write to file.
         # Redact sensitive fields before writing so the file is safe to share.
-        from homeassistant.components.diagnostics import async_redact_data
-
-        from .diagnostics import TO_REDACT
+        from .diagnostics import redact_ajax_data
 
         output_path = Path(hass.config.path("ajax_smart_locks.json"))
-        redacted_smart_locks = async_redact_data(smart_locks_data, TO_REDACT)
+        redacted_smart_locks = redact_ajax_data(smart_locks_data)
 
         def write_json() -> None:
             with open(output_path, "w", encoding="utf-8") as f:

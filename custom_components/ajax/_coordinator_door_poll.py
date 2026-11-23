@@ -139,8 +139,8 @@ class AjaxDoorPollingMixin:
                 self.hass, self._async_poll_door_sensors_loop(), "ajax_door_sensor_poll"
             )
             _LOGGER.info(
-                "Started door sensor fast polling (every %ds, state: %s)",
-                UPDATE_INTERVAL_DOOR_SENSORS,
+                "Started door sensor polling (every %ds, state: %s)",
+                UPDATE_INTERVAL_DOOR_SENSORS if self._fast_door_polling_allowed() else POST_DISARM_POLL_INTERVAL,
                 security_state.value,
             )
         elif not should_poll and self._door_sensor_poll_task is not None:
@@ -273,7 +273,7 @@ class AjaxDoorPollingMixin:
                                         normalized_attrs = self._normalize_device_attributes(api_attrs, device.type)
                                         new_door_state = bool(normalized_attrs.get("door_opened", old_door_state))
 
-                                    if old_door_state != new_door_state:
+                                    if old_door_state != new_door_state and not device.is_optimistic("door_opened"):
                                         device.attributes["door_opened"] = new_door_state
                                         _LOGGER.debug(
                                             "Door sensor %s state changed: %s -> %s",
@@ -309,7 +309,7 @@ class AjaxDoorPollingMixin:
                                             external_state, wiring_details
                                         )
 
-                                        if old_door_state != new_door_state:
+                                        if old_door_state != new_door_state and not device.is_optimistic("door_opened"):
                                             device.attributes["door_opened"] = new_door_state
                                             _LOGGER.debug(
                                                 "WireInput %s state changed: %s -> %s",

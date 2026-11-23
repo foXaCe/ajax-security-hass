@@ -26,6 +26,7 @@ from .const import (
     EVENT_AJAX_DOORBELL_RING,
     EVENT_AJAX_SCENARIO_TRIGGERED,
     EVENT_AJAX_SMART_LOCK_DOORBELL,
+    REALTIME_CONTACT_GUARD_SECONDS,
     SIGNAL_NEW_SMART_LOCK,
 )
 from .event_codes import DEFAULT_LANGUAGE, get_event_message, parse_event_code, resolve_event_language
@@ -659,6 +660,7 @@ class SSEManager(EventHandlerMixin):
             # real time instead of lagging on the next REST poll (issue #151).
             attr_key = "external_contact_opened" if event_tag.startswith("extcontact") else "door_opened"
             dev.attributes[attr_key] = is_triggered
+            dev.mark_optimistic(attr_key, REALTIME_CONTACT_GUARD_SECONDS)
             dev.attributes[f"{attr_key}_at"] = datetime.now(UTC).isoformat()
             _LOGGER.info("SSE instant: %s -> %s", dev.name, action_key)
 
@@ -912,6 +914,7 @@ class SSEManager(EventHandlerMixin):
             return
 
         dev.attributes["door_opened"] = is_triggered
+        dev.mark_optimistic("door_opened", REALTIME_CONTACT_GUARD_SECONDS)
 
         _LOGGER.info("SSE instant: %s -> %s (wire input)", source_name, action)
 

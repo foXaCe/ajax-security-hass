@@ -39,6 +39,7 @@ from .const import (
     EVENT_AJAX_SMART_LOCK_DOORBELL,
     NOTIFICATION_FILTER_ALL,
     NOTIFICATION_FILTER_NONE,
+    REALTIME_CONTACT_GUARD_SECONDS,
     SIGNAL_NEW_SMART_LOCK,
 )
 from .event_codes import (
@@ -596,6 +597,7 @@ class SQSManager(EventHandlerMixin):
         if device:
             attr_key = "external_contact_opened" if is_external else "door_opened"
             device.attributes[attr_key] = is_open
+            device.mark_optimistic(attr_key, REALTIME_CONTACT_GUARD_SECONDS)
             message = get_event_message(action, self._language)
             _LOGGER.info("SQS instant: %s -> %s", source_name, message)
             return True
@@ -726,6 +728,7 @@ class SQSManager(EventHandlerMixin):
         if device:
             # Update door_opened state (same as door events)
             device.attributes["door_opened"] = is_triggered
+            device.mark_optimistic("door_opened", REALTIME_CONTACT_GUARD_SECONDS)
 
             message = get_event_message(action, self._language)
             _LOGGER.info("SQS instant: %s -> %s (wire input)", source_name, message)

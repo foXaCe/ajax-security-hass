@@ -97,6 +97,10 @@ UPDATE_INTERVAL_DOOR_SENSORS = 5  # Fast poll interval for door sensors when dis
 # is off or the proxy is used: realtime events can be missing then (#285).
 POST_DISARM_POLL_SECONDS = 600
 POST_DISARM_POLL_INTERVAL = 10
+# The REST data can keep the previous contact state for a while after a realtime
+# event (up to 23 s observed, #285): polled values are ignored for that contact
+# meanwhile. Beyond it, polling recovers a lost realtime event as before.
+REALTIME_CONTACT_GUARD_SECONDS = 45.0
 METADATA_REFRESH_INTERVAL = 3600  # Full metadata refresh every hour (rooms, users, groups)
 
 # Dispatcher signals

@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.39.4] - 2026-11-23
+
+### Fixed
+- **MAC addresses no longer appear in the integration's log lines (#285).** 0.39.2 masked them in exported files, but they stayed in clear in the debug log, through entity keys, RTSP paths and raw events. Every log line of the integration, and the tracebacks written with it, now shows a placeholder (`**MAC_1**`, `**MAC_2**`…) that stays the same for a given address until Home Assistant restarts. Only the log of this integration is covered, not lines written by Home Assistant or other libraries; device names and other identifiers are still shown. Logs written by an earlier version are not changed.
+
 ## [0.39.3] - 2026-11-23
 
 ### Fixed

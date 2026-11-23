@@ -14,6 +14,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceEntry
 
 from . import AjaxConfigEntry
+from ._log_redaction import MAC_PATTERN, normalize_mac
 from ._raw_inventory import async_collect_raw_inventory
 from .const import CONF_AUTH_MODE, DOMAIN
 
@@ -179,16 +180,8 @@ TO_REDACT = {
 
 # Field names alone are not enough: NVR channel ids embed the camera MAC
 # (``<token>-<MAC>-0``), so MAC addresses are also masked inside values (#282).
-_MAC_IN_TEXT = re.compile(
-    r"(?<![0-9A-Fa-f])"
-    r"(?:[0-9A-Fa-f]{12}|[0-9A-Fa-f]{2}(?P<sep>[:-])(?:[0-9A-Fa-f]{2}(?P=sep)){4}[0-9A-Fa-f]{2})"
-    r"(?![0-9A-Fa-f])"
-)
+_MAC_IN_TEXT = re.compile(MAC_PATTERN)
 _MAC_FIELDS = {"mac", "mac_address", "macaddress", "discovered_macs"}
-
-
-def _normalize_mac(value: str) -> str:
-    return value.replace(":", "").replace("-", "").lower()
 
 
 def _collect_macs(data: Any, found: set[str]) -> None:
@@ -198,7 +191,7 @@ def _collect_macs(data: Any, found: set[str]) -> None:
             if str(key).lower() in _MAC_FIELDS:
                 for item in value if isinstance(value, (list, tuple, set)) else [value]:
                     if isinstance(item, str) and _MAC_IN_TEXT.fullmatch(item):
-                        found.add(_normalize_mac(item))
+                        found.add(normalize_mac(item))
             _collect_macs(value, found)
     elif isinstance(data, (list, tuple, set)):
         for item in data:
@@ -216,7 +209,7 @@ def redact_ajax_data(data: Any) -> Any:
     placeholders: dict[str, str] = {}
 
     def placeholder(match: re.Match[str]) -> str:
-        return placeholders.setdefault(_normalize_mac(match.group(0)), f"**MAC_{len(placeholders) + 1}**")
+        return placeholders.setdefault(normalize_mac(match.group(0)), f"**MAC_{len(placeholders) + 1}**")
 
     # Known MACs are matched even when glued to other hexadecimal characters.
     known_pattern = (

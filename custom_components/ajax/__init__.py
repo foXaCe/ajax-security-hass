@@ -21,6 +21,7 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from ._device_parents import async_register_parent_devices
 from ._ids import find_device
+from ._log_redaction import install_log_filter
 from ._services import (  # noqa: F401  (SERVICE_* re-exported for tests/back-compat)
     SERVICE_FORCE_ARM,
     SERVICE_FORCE_ARM_NIGHT,
@@ -62,6 +63,7 @@ if TYPE_CHECKING:
     from homeassistant.helpers.typing import ConfigType
 
 _LOGGER = logging.getLogger(__name__)
+install_log_filter(__name__, __path__)
 
 PLATFORMS: list[Platform] = [
     Platform.ALARM_CONTROL_PANEL,

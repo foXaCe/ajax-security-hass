@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.39.3] - 2026-11-23
+
+### Fixed
+- **A door or wired input no longer flips back right after a realtime event (#285).** The REST data can keep the previous state for a while after an event (up to 23 seconds in a user's log), and polling wrote it over the newer state, showing a closed door as open or the reverse. This became much more visible with the post-disarm polling added in 0.39.1, but the regular refresh could do it too. Polled values are now ignored for a contact for 45 seconds after its last realtime event; contacts without a recent event are polled as before. If the next realtime event is lost, polling can take up to 45 seconds to notice.
+- The log now shows the real polling interval after a disarm (10 seconds, not 5).
+
 ## [0.39.2] - 2026-11-23
 
 ### Fixed

@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.39.2] - 2026-11-23
+
+### Fixed
+- **MAC addresses no longer appear in exported data.** Only a fixed list of fields was redacted, so a MAC address embedded in another value, such as an NVR channel id, stayed in clear. The diagnostics and the raw data files written by the services (devices, NVR recordings, smart locks) now mask MAC addresses in any value, with a stable placeholder per address. Device names, other identifiers and debug logs are not masked: check them before sharing. Files exported with an earlier version are not changed.
+
 ## [0.39.1] - 2026-11-20
 
 ### Fixed

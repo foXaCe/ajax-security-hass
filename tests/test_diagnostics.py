@@ -259,6 +259,7 @@ async def test_get_ajax_raw_data_aggregates_devices_cameras_video_edges() -> Non
         "cameras": 1,
         "video_edges": 2,
         "device_types": {"DoorProtect": 2, "MotionProtect": 1},
+        "details_skipped": 0,
     }
     assert len(result["devices"]) == 3
     assert len(result["cameras"]) == 1
@@ -320,6 +321,7 @@ async def test_get_ajax_raw_data_returns_zero_summary_without_account() -> None:
         "cameras": 0,
         "video_edges": 0,
         "device_types": {},
+        "details_skipped": 0,
     }
 
 
@@ -426,6 +428,7 @@ async def test_get_ajax_raw_data_collects_and_falls_back() -> None:
         "cameras": 1,
         "video_edges": 1,
         "device_types": {"DoorProtect": 1, "unknown": 1},
+        "details_skipped": 0,
     }
     assert {"id": "d2"} in raw["devices"]  # fallback used the light summary
 

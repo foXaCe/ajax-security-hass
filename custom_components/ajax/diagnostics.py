@@ -20,6 +20,10 @@ from .const import CONF_AUTH_MODE, DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
+# The diagnostics download fails silently past 60 seconds. With many devices
+# the detail calls alone can take longer, as the API client is rate-limited.
+DIAGNOSTICS_DETAIL_BUDGET_SECONDS = 35.0
+
 # Read the integration version straight from the manifest so the value
 # stays accurate across releases without a second source of truth.
 _MANIFEST_VERSION: str | None = None
@@ -255,7 +259,9 @@ async def get_ajax_raw_data(
     )
 
     if coordinator.account:
-        inventory = await async_collect_raw_inventory(coordinator, target_device_id)
+        inventory = await async_collect_raw_inventory(
+            coordinator, target_device_id, detail_budget=DIAGNOSTICS_DETAIL_BUDGET_SECONDS
+        )
         all_devices = inventory["devices"]
         all_cameras = inventory["cameras"]
         all_video_edges = inventory["video_edges"]
@@ -273,6 +279,7 @@ async def get_ajax_raw_data(
             "cameras": len(all_cameras),
             "video_edges": len(all_video_edges),
             "device_types": type_list,
+            "details_skipped": inventory["details_skipped"],
         }
     else:
         all_devices = []
@@ -284,6 +291,7 @@ async def get_ajax_raw_data(
             "cameras": 0,
             "video_edges": 0,
             "device_types": {},
+            "details_skipped": 0,
         }
 
     return {

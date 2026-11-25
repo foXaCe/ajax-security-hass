@@ -10,7 +10,10 @@ filter by a single device id and how they aggregate/format the result.
 
 from __future__ import annotations
 
+import asyncio
 import logging
+from collections.abc import Awaitable, Callable
+from functools import partial
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -19,18 +22,45 @@ if TYPE_CHECKING:
 _LOGGER = logging.getLogger(__name__)
 
 
+class _DetailBudget:
+    """Time left for the per-item detail calls, which the API rate-limits."""
+
+    def __init__(self, seconds: float | None) -> None:
+        self._deadline = None if seconds is None else asyncio.get_running_loop().time() + seconds
+        self.skipped = 0
+
+    async def fetch(self, call: Callable[[], Awaitable[dict[str, Any]]], summary: dict[str, Any]) -> dict[str, Any]:
+        """Return the details, or ``summary`` once the time is over."""
+        if self._deadline is not None and asyncio.get_running_loop().time() >= self._deadline:
+            self.skipped += 1
+            return summary
+        try:
+            async with asyncio.timeout_at(self._deadline) as timeout:
+                return await call()
+        except TimeoutError:
+            if not timeout.expired():
+                raise  # the call's own timeout, handled by the caller
+            self.skipped += 1
+            return summary
+
+
 async def async_collect_raw_inventory(
     coordinator: AjaxDataCoordinator,
     target_device_id: str | None = None,
+    detail_budget: float | None = None,
 ) -> dict[str, Any]:
     """Fetch full raw payloads for devices, cameras and video edges.
 
     ``target_device_id`` filters devices and cameras; video edges are always
     returned in full (parity with the historical diagnostics behaviour).
 
+    ``detail_budget`` bounds, in seconds, the time spent on the detail calls of
+    devices and cameras; past it, the light summaries are returned instead.
+
     Returns ``{"devices": [...], "cameras": [...], "video_edges": [...],
-    "hub_count": int}``.
+    "hub_count": int, "details_skipped": int}``.
     """
+    budget = _DetailBudget(detail_budget)
     all_devices: list[dict[str, Any]] = []
     all_cameras: list[dict[str, Any]] = []
     all_video_edges: list[dict[str, Any]] = []
@@ -42,7 +72,23 @@ async def async_collect_raw_inventory(
             "cameras": all_cameras,
             "video_edges": all_video_edges,
             "hub_count": hub_count,
+            "details_skipped": 0,
         }
+
+    # Fetch video edges for each space (requires real_space_id),
+    # first: one call per space, not subject to the budget
+    for _space_id, space in coordinator.account.spaces.items():
+        real_space_id = space.real_space_id
+        if real_space_id:
+            try:
+                video_edges_list = await coordinator.api.async_get_video_edges(real_space_id)
+                all_video_edges.extend(video_edges_list)
+            except Exception as err:
+                _LOGGER.warning(
+                    "Failed to get video edges for space %s: %s",
+                    real_space_id,
+                    err,
+                )
 
     for _space_id, space in coordinator.account.spaces.items():
         hub_id = space.hub_id
@@ -58,7 +104,9 @@ async def async_collect_raw_inventory(
                         continue
                     if device_id:
                         try:
-                            full_device = await coordinator.api.async_get_device(hub_id, device_id)
+                            full_device = await budget.fetch(
+                                partial(coordinator.api.async_get_device, hub_id, device_id), device_summary
+                            )
                             all_devices.append(full_device)
                         except Exception as dev_err:
                             _LOGGER.warning(
@@ -82,7 +130,9 @@ async def async_collect_raw_inventory(
                         continue
                     if camera_id:
                         try:
-                            full_camera = await coordinator.api.async_get_camera(hub_id, camera_id)
+                            full_camera = await budget.fetch(
+                                partial(coordinator.api.async_get_camera, hub_id, camera_id), camera_summary
+                            )
                             all_cameras.append(full_camera)
                         except Exception as cam_err:
                             _LOGGER.warning(
@@ -94,23 +144,10 @@ async def async_collect_raw_inventory(
             except Exception as err:
                 _LOGGER.warning("Failed to get cameras for hub %s: %s", hub_id, err)
 
-    # Fetch video edges for each space (requires real_space_id)
-    for _space_id, space in coordinator.account.spaces.items():
-        real_space_id = space.real_space_id
-        if real_space_id:
-            try:
-                video_edges_list = await coordinator.api.async_get_video_edges(real_space_id)
-                all_video_edges.extend(video_edges_list)
-            except Exception as err:
-                _LOGGER.warning(
-                    "Failed to get video edges for space %s: %s",
-                    real_space_id,
-                    err,
-                )
-
     return {
         "devices": all_devices,
         "cameras": all_cameras,
         "video_edges": all_video_edges,
         "hub_count": hub_count,
+        "details_skipped": budget.skipped,
     }

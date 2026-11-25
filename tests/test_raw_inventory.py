@@ -9,6 +9,7 @@ triggers (both already guard on ``coordinator.account`` before calling in).
 
 from __future__ import annotations
 
+import asyncio
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
@@ -33,7 +34,7 @@ def _coordinator(devices=None, cameras=None, video_edges=None, account=True):
 async def test_returns_empty_inventory_without_account() -> None:
     coord = _coordinator(account=False)
     result = await async_collect_raw_inventory(coord)
-    assert result == {"devices": [], "cameras": [], "video_edges": [], "hub_count": 0}
+    assert result == {"devices": [], "cameras": [], "video_edges": [], "hub_count": 0, "details_skipped": 0}
 
 
 @pytest.mark.asyncio
@@ -61,3 +62,38 @@ async def test_target_device_id_filters_devices_and_cameras_but_not_video_edges(
     assert [d["id"] for d in result["devices"]] == ["d2"]
     assert [c["id"] for c in result["cameras"]] == ["d2"]
     assert [ve["id"] for ve in result["video_edges"]] == ["ve1", "ve2"]
+
+
+@pytest.mark.asyncio
+async def test_detail_budget_falls_back_to_summaries_but_keeps_everything_listed() -> None:
+    """Diagnostics of a large install must not outlast the 60 s download limit (#282)."""
+    coord = _coordinator(
+        devices=[{"id": f"d{i}", "full": True} for i in range(5)],
+        cameras=[{"id": "c1", "full": True}],
+        video_edges=[{"id": "ve1"}],
+    )
+
+    async def slow(_hub: str, device_id: str) -> dict:
+        if device_id == "d1":
+            await asyncio.sleep(30)
+        return {"id": device_id, "full": True}
+
+    coord.api.async_get_device = AsyncMock(side_effect=slow)
+    result = await asyncio.wait_for(async_collect_raw_inventory(coord, detail_budget=0.05), timeout=5)
+    assert [d["id"] for d in result["devices"]] == ["d0", "d1", "d2", "d3", "d4"]
+    assert [d.get("full", False) for d in result["devices"]] == [True, False, False, False, False]
+    assert result["cameras"] == [{"id": "c1"}]
+    assert result["video_edges"] == [{"id": "ve1"}]
+    assert result["details_skipped"] == 5
+    # Once the time is over, no further request is sent.
+    assert coord.api.async_get_device.await_count == 2
+    coord.api.async_get_camera.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_a_timeout_of_the_call_itself_is_not_counted_as_skipped() -> None:
+    coord = _coordinator(devices=[{"id": "d1"}, {"id": "d2", "full": True}])
+    coord.api.async_get_device = AsyncMock(side_effect=[TimeoutError, {"id": "d2", "full": True}])
+    result = await async_collect_raw_inventory(coord, detail_budget=30)
+    assert result["devices"] == [{"id": "d1"}, {"id": "d2", "full": True}]
+    assert result["details_skipped"] == 0

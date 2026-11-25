@@ -24,6 +24,8 @@ from onvif import ONVIFCamera, __file__ as onvif_path
 from onvif.exceptions import ONVIFError
 from zeep.exceptions import Fault
 
+from .models import VideoEdgeType
+
 # Get WSDL directory from onvif package location
 WSDL_DIR = os.path.join(os.path.dirname(onvif_path), "wsdl")
 
@@ -48,7 +50,7 @@ class OnvifDetectionEvent:
     """Represents an ONVIF detection event from Ajax camera."""
 
     video_edge_id: str
-    channel_id: str
+    channel_id: str  # Full source token for an NVR, channel index otherwise
     detection_type: str  # VIDEO_HUMAN, VIDEO_VEHICLE, VIDEO_PET, VIDEO_MOTION
     active: bool
     rule: str = ""  # Detection zone/rule name (e.g., "Zone Entrée")
@@ -90,6 +92,7 @@ class AjaxOnvifClient:
         # Consecutive failed re-subscriptions, for the periodic warning.
         self._resubscribe_failures = 0
         self._last_states: dict[str, bool] = {}  # Cache to filter duplicate events
+        self._is_nvr = video_edge.video_edge_type == VideoEdgeType.NVR
 
     @property
     def connected(self) -> bool:
@@ -135,6 +138,8 @@ class AjaxOnvifClient:
                 "ONVIF: Successfully connected to %s",
                 self.video_edge.name,
             )
+            if self._is_nvr:
+                await self._log_profiles()
             return True
 
         except (ONVIFError, Fault, TimeoutError, OSError) as err:
@@ -149,6 +154,25 @@ class AjaxOnvifClient:
             )
             self._camera = None
             return False
+
+    async def _log_profiles(self) -> None:
+        """Log how the NVR names its channels over ONVIF (debug only)."""
+        if self._camera is None or not _LOGGER.isEnabledFor(logging.DEBUG):
+            return
+        try:
+            media = await self._camera.create_media_service()
+            for profile in await media.GetProfiles():
+                source = getattr(profile, "VideoSourceConfiguration", None)
+                _LOGGER.debug(
+                    "%s: ONVIF profile token=%s name=%s source=%s config=%s",
+                    self.video_edge.name,
+                    getattr(profile, "token", None),
+                    getattr(profile, "Name", None),
+                    getattr(source, "SourceToken", None),
+                    getattr(source, "token", None),
+                )
+        except Exception as err:
+            _LOGGER.debug("%s: could not list ONVIF profiles: %s", self.video_edge.name, err)
 
     async def async_subscribe_events(self, log_errors: bool = True) -> bool:
         """Subscribe to ONVIF events via PullPoint Manager.
@@ -363,6 +387,15 @@ class AjaxOnvifClient:
             if not message_data:
                 return
 
+            if self._is_nvr:
+                _LOGGER.debug(
+                    "%s: ONVIF message topic=%s source=%s data=%s",
+                    self.video_edge.name,
+                    topic,
+                    self._simple_items(message_data, "Source"),
+                    self._simple_items(message_data, "Data"),
+                )
+
             # Extract source info (channel + rule)
             channel_id, rule = self._extract_source_info(message_data)
 
@@ -393,12 +426,26 @@ class AjaxOnvifClient:
                 err,
             )
 
+    @staticmethod
+    def _simple_items(message_data: Any, section: str) -> dict[str, str]:
+        """Return the name/value pairs of a message section."""
+        items = getattr(getattr(message_data, section, None), "SimpleItem", None) or []
+        return {str(getattr(item, "Name", "")): str(getattr(item, "Value", "")) for item in items}
+
+    def _extract_nvr_source(self, message_data: Any) -> tuple[str, str]:
+        """Return the full source token (empty if none) and the rule name."""
+        items = self._simple_items(message_data, "Source")
+        token = items.get("VideoSourceToken") or items.get("Source") or items.get("VideoSourceConfigurationToken") or ""
+        return token, items.get("Rule", "")
+
     def _extract_source_info(self, message_data: Any) -> tuple[str, str]:
         """Extract channel ID and rule name from message source.
 
         Returns:
             Tuple of (channel_id, rule_name)
         """
+        if self._is_nvr:
+            return self._extract_nvr_source(message_data)
         channel_id = "0"
         rule = ""
         try:

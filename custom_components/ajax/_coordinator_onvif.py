@@ -1,10 +1,9 @@
 """ONVIF mixin for ``AjaxDataCoordinator``.
 
 Owns the local-AI detection path: ONVIF subscription bootstrap
-(`_async_init_onvif`), event handler that routes NVR-channel events
-to the right camera and fires the matching HA entity / bus event
-(`_handle_onvif_event`), and the NVR-channel-to-camera mapping helper
-(`_find_camera_for_nvr_channel`).
+(`_async_init_onvif`), event handler that fires the matching HA entity /
+bus event (`_handle_onvif_event`), and the handling of NVR events for the
+channels that have no Ajax camera behind them (`_handle_nvr_event`).
 
 The path is optional — ONVIF only initialises when the user has
 configured RTSP/ONVIF credentials AND the ``onvif-zeep-async`` package
@@ -21,6 +20,7 @@ from typing import TYPE_CHECKING, Any
 from homeassistant.helpers import issue_registry as ir
 
 from ._event_helpers import resolve_camera_entity_id
+from ._nvr_channels import find_channel_by_token, is_third_party_channel
 from .const import CONF_RTSP_PASSWORD, CONF_RTSP_USERNAME, DOMAIN, EVENT_AJAX_CAMERA_DETECTION, EVENT_AJAX_DOORBELL_RING
 from .models import VideoEdgeType
 
@@ -28,7 +28,7 @@ if TYPE_CHECKING:
     from homeassistant.config_entries import ConfigEntry
     from homeassistant.core import HomeAssistant
 
-    from .models import AjaxAccount, AjaxSpace, AjaxVideoEdge
+    from .models import AjaxAccount, AjaxVideoEdge
     from .onvif_client import OnvifDetectionEvent
     from .onvif_manager import AjaxOnvifManager
 
@@ -50,15 +50,6 @@ _LOGGER = logging.getLogger(__name__)
 # path — keeps a persistently failing setup from re-attempting (and
 # re-logging) on every poll cycle.
 ONVIF_BOOTSTRAP_RETRY_SECONDS = 300.0
-
-
-# Ajax camera types observed in NVR `sourceAliases.sources` payloads.
-# Promoted to module-level so the helper does not rebuild the set on
-# every event (ONVIF can fire many per second on a busy installation).
-_AJAX_CAMERA_TYPES_IN_NVR = frozenset(
-    {"TURRET", "TURRET_HL", "BULLET", "BULLET_HL", "MINIDOME", "MINIDOME_HL", "DOORBELL"}
-)
-
 
 # Map the lowercased ONVIF detection_type to the HA event_type used by
 # `event.<camera>_detection`. Kept here (rather than reusing the
@@ -294,9 +285,8 @@ class AjaxOnvifMixin:
     def _handle_onvif_event(self, event: OnvifDetectionEvent) -> None:
         """Handle an ONVIF detection event from a camera or NVR.
 
-        For NVR events, routes the detection to the correct camera based
-        on ``channel_id``. Updates the per-channel video-edge detection
-        state, fires the matching HA entity, and emits the
+        Updates the detection state of the camera (NVR events: of the
+        channel, see ``_handle_nvr_event``), fires the matching HA entity, and emits the
         ``ajax_camera_detection`` / ``ajax_doorbell_ring`` bus events.
         """
         self.stats["events_onvif_received"] += 1
@@ -315,24 +305,11 @@ class AjaxOnvifMixin:
             if not source_ve:
                 continue
 
-            target_ve = source_ve
-
-            # If source is the NVR, find the linked camera for this channel.
             if source_ve.video_edge_type == VideoEdgeType.NVR:
-                if event.detection_type == "DOORBELL_RING":
-                    # DOORBELL_RING always comes from the doorbell, no matter the channel.
-                    for ve in space.video_edges.values():
-                        if ve.video_edge_type == VideoEdgeType.DOORBELL:
-                            target_ve = ve
-                            break
-                else:
-                    target_ve = self._find_camera_for_nvr_channel(space, source_ve, event.channel_id)
-                if target_ve and target_ve != source_ve:
-                    _LOGGER.debug(
-                        "Routing NVR event (channel %s) to camera: %s",
-                        event.channel_id,
-                        target_ve.name,
-                    )
+                self._handle_nvr_event(self.account, source_ve, event)
+                return
+
+            target_ve = source_ve
 
             # Update detection state on the resolved target.
             detection_key = event.detection_type.lower()  # e.g. "video_human"
@@ -388,61 +365,62 @@ class AjaxOnvifMixin:
             return
 
     # ------------------------------------------------------------------
-    # NVR channel → camera routing
+    # NVR channels without an Ajax camera
     # ------------------------------------------------------------------
 
-    def _find_camera_for_nvr_channel(self, space: AjaxSpace, nvr: AjaxVideoEdge, channel_id: str) -> AjaxVideoEdge:
-        """Find the camera linked to ``channel_id`` on ``nvr``.
+    def _handle_nvr_event(self, account: AjaxAccount, nvr: AjaxVideoEdge, event: OnvifDetectionEvent) -> None:
+        """Store an NVR detection on the third-party channel it belongs to.
 
-        Returns the linked Ajax camera when the NVR's
-        ``channels[*].sourceAliases.sources`` lists one with a known
-        camera type and a ``videoEdgeId`` that we already track; falls
-        back to ``nvr`` when no link can be resolved.
+        Events of the channels backed by an Ajax camera are ignored: the camera
+        delivers its own. An event that matches no channel is dropped rather
+        than attributed to the wrong one.
         """
-        channels = nvr.channels
-        if not isinstance(channels, list):
-            return nvr
+        channel = find_channel_by_token(nvr, event.channel_id)
+        if channel is None:
+            _LOGGER.debug("%s: no channel matches ONVIF source '%s'", nvr.name, event.channel_id)
+            return
+        if not is_third_party_channel(nvr, channel):
+            return
+        event_type = _ONVIF_DETECTION_EVENT_TYPES.get(event.detection_type.lower())
+        if event_type is None:
+            _LOGGER.debug("%s: %s is not supported on an NVR channel", nvr.name, event.detection_type)
+            return
 
-        def get_linked_camera_from_channel(channel: dict[str, Any]) -> AjaxVideoEdge | None:
-            """Extract the linked camera from a channel's ``sourceAliases``."""
-            if not isinstance(channel, dict):
-                return None
-            source_aliases = channel.get("sourceAliases", {})
-            if not isinstance(source_aliases, dict):
-                return None
-            sources = source_aliases.get("sources", [])
-            if not isinstance(sources, list):
-                return None
-            for source in sources:
-                if not isinstance(source, dict):
-                    continue
-                if source.get("sourceType") == "PRIMARY":
-                    source_type = source.get("type", "")
-                    source_ve_id = source.get("videoEdgeId", "")
-                    if source_type in _AJAX_CAMERA_TYPES_IN_NVR and source_ve_id:
-                        linked_camera = space.video_edges.get(source_ve_id)
-                        if linked_camera:
-                            return linked_camera
-            return None
+        channel_id = str(channel["id"])
+        _LOGGER.debug(
+            "%s: %s %s on channel '%s' (%s)",
+            nvr.name,
+            event.detection_type,
+            "active" if event.active else "cleared",
+            channel.get("name"),
+            channel_id,
+        )
+        states = nvr.channel_detections.setdefault(channel_id, {})
+        detection_key = event.detection_type.lower()
+        states[detection_key] = event.active
+        if detection_key == "video_motion" and not event.active:
+            for ai_key in ("video_human", "video_vehicle", "video_pet"):
+                states[ai_key] = False
 
-        # Channel index lookup (channel_id is usually "0", "1", ...).
-        try:
-            channel_idx = int(channel_id)
-            if 0 <= channel_idx < len(channels):
-                linked = get_linked_camera_from_channel(channels[channel_idx])
-                if linked:
-                    return linked
-        except (ValueError, IndexError):
-            pass
+        if event.active:
+            event_entity = self._event_entities.get(f"{nvr.id}_detection")
+            if event_entity:
+                attrs = {"channel": channel.get("name") or channel_id}
+                if event.rule:
+                    attrs["rule"] = event.rule
+                event_entity.fire(event_type, attrs)
+            # No camera entity here: the one resolved for an NVR is its first
+            # channel, not necessarily the one that detected something.
+            bus_data: dict[str, str] = {
+                "device_id": nvr.id,
+                "device_name": nvr.name,
+                "channel_id": channel_id,
+                "channel_name": channel.get("name") or channel_id,
+                "event_type": event_type,
+                "source": "onvif",
+            }
+            if event_entity is not None and event_entity.entity_id:
+                bus_data["entity_id"] = event_entity.entity_id
+            self.hass.bus.async_fire(EVENT_AJAX_CAMERA_DETECTION, bus_data)
 
-        # Fallback: scan all channels by id.
-        for channel in channels:
-            if not isinstance(channel, dict):
-                continue
-            ch_id = channel.get("id", "")
-            if str(ch_id) == str(channel_id):
-                linked = get_linked_camera_from_channel(channel)
-                if linked:
-                    return linked
-
-        return nvr
+        self.async_set_updated_data(account)

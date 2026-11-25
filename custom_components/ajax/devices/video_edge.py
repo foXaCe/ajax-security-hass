@@ -613,8 +613,12 @@ class VideoEdgeHandler:
                     if linked_camera and linked_camera.detections.get(onvif_key, False):
                         return True
 
+            # Third-party channel: the state is kept per channel.
+            if self.video_edge.channel_detections.get(channel_id, {}).get(onvif_key, False):
+                return True
+
         # Check ONVIF local detection state on this video edge
-        if self.video_edge.detections.get(onvif_key, False):
+        elif self.video_edge.detections.get(onvif_key, False):
             return True
 
         # Fall back to REST API state

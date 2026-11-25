@@ -12,6 +12,7 @@ import time
 from collections.abc import Callable
 from typing import TYPE_CHECKING
 
+from ._nvr_channels import has_third_party_channels
 from .models import VideoEdgeType
 from .onvif_client import AjaxOnvifClient, OnvifDetectionEvent
 
@@ -26,6 +27,17 @@ _LOGGER = logging.getLogger(__name__)
 # delay is dropped as soon as Ajax reports the camera ONLINE again.
 ONVIF_RETRY_MIN_SECONDS = 60.0
 ONVIF_RETRY_MAX_SECONDS = 300.0
+
+
+def _event_sources(video_edges: list[AjaxVideoEdge]) -> tuple[list[AjaxVideoEdge], list[AjaxVideoEdge]]:
+    """Split the video edges to connect into cameras and NVRs.
+
+    An NVR is only connected for the channels that have no Ajax camera behind
+    them: the others are covered by the camera itself.
+    """
+    cameras = [ve for ve in video_edges if ve.video_edge_type != VideoEdgeType.NVR]
+    nvrs = [ve for ve in video_edges if ve.video_edge_type == VideoEdgeType.NVR and has_third_party_channels(ve)]
+    return cameras, nvrs
 
 
 class AjaxOnvifManager:
@@ -53,6 +65,8 @@ class AjaxOnvifManager:
         # denominator even when a camera fails to connect (failed clients are
         # never inserted into _clients). See target_count / connected_count.
         self._target_ids: set[str] = set()
+        # NVRs connected for their third-party channels, left out of both counts.
+        self._nvr_ids: set[str] = set()
         # Serialise add/remove so concurrent callers cannot duplicate clients.
         self._clients_lock = asyncio.Lock()
         # Per camera: consecutive failed attempts, and when the next one may run.
@@ -64,7 +78,7 @@ class AjaxOnvifManager:
     @property
     def connected_count(self) -> int:
         """Return number of connected cameras."""
-        return sum(1 for client in self._clients.values() if client.connected)
+        return sum(1 for ve_id, client in self._clients.items() if ve_id not in self._nvr_ids and client.connected)
 
     @property
     def target_count(self) -> int:
@@ -183,12 +197,12 @@ class AjaxOnvifManager:
         """Start ONVIF connections for video edges.
 
         Strategy: connect ONVIF directly to every individual camera and
-        doorbell. The NVR is intentionally skipped — its PullPoint events
-        require a sourceAliases channel→camera mapping that is unreliable
-        (channel 0 has been observed misrouting motion events to the
-        doorbell instead of the actual camera). Each Ajax camera runs its
-        own AI detection and exposes ONVIF events directly, so the NVR
-        adds nothing for the events path.
+        doorbell. Each Ajax camera runs its own AI detection and exposes
+        ONVIF events directly, so the NVR adds nothing for them, and mapping
+        its events by channel index is unreliable (channel 0 has been
+        observed misrouting motion events to the doorbell). An NVR is
+        connected only when it has third-party channels, whose events are
+        matched by token (see ``_nvr_channels``).
 
         Args:
             video_edges: List of video edge devices to connect
@@ -199,22 +213,16 @@ class AjaxOnvifManager:
 
         _LOGGER.info("ONVIF: Starting with configured credentials")
 
-        nvrs = [ve for ve in video_edges if ve.video_edge_type == VideoEdgeType.NVR]
-        cameras = [ve for ve in video_edges if ve.video_edge_type != VideoEdgeType.NVR]
-        targets = cameras
-        self._target_ids = {ve.id for ve in targets}
+        cameras, nvrs = _event_sources(video_edges)
+        targets = cameras + nvrs
+        self._target_ids = {ve.id for ve in cameras}
+        self._nvr_ids = {ve.id for ve in nvrs}
 
-        if nvrs:
-            _LOGGER.info(
-                "ONVIF: %d NVR(s) detected and skipped for events; connecting directly to %d camera(s)/doorbell(s)",
-                len(nvrs),
-                len(cameras),
-            )
-        else:
-            _LOGGER.info(
-                "ONVIF: No NVR - connecting to %d individual camera(s)",
-                len(cameras),
-            )
+        _LOGGER.info(
+            "ONVIF: connecting directly to %d camera(s)/doorbell(s), and to %d NVR(s) with third-party channels",
+            len(cameras),
+            len(nvrs),
+        )
 
         if not targets:
             _LOGGER.info("ONVIF: No video edge devices found to connect")
@@ -247,16 +255,17 @@ class AjaxOnvifManager:
     async def async_update_video_edges(self, video_edges: list[AjaxVideoEdge]) -> None:
         """Update video edges list (add new, remove old).
 
-        Same strategy as async_start: connect directly to cameras and
-        doorbells, never via the NVR (channel mapping is unreliable).
+        Same strategy as async_start.
 
         Args:
             video_edges: Current list of video edge devices
         """
-        targets = [ve for ve in video_edges if ve.video_edge_type != VideoEdgeType.NVR]
+        cameras, nvrs = _event_sources(video_edges)
+        targets = cameras + nvrs
 
         current_ids = {ve.id for ve in targets}
-        self._target_ids = current_ids
+        self._target_ids = {ve.id for ve in cameras}
+        self._nvr_ids = {ve.id for ve in nvrs}
         existing_ids = set(self._clients.keys())
 
         # Remove devices no longer in targets

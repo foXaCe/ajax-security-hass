@@ -264,6 +264,8 @@ class AjaxVideoEdge:
     # ONVIF detection states (from local ONVIF events)
     # Keys: video_human, video_vehicle, video_pet, video_motion, doorbell_ring
     detections: dict[str, bool] = field(default_factory=dict)
+    # NVR only: same, per channel id, for the channels without an Ajax camera.
+    channel_detections: dict[str, dict[str, bool]] = field(default_factory=dict)
 
     @property
     def online(self) -> bool:
